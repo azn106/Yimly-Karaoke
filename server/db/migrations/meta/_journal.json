@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787360339586,
+      "tag": "0000_tired_ben_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787360524936,
+      "tag": "0001_perpetual_skreet",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787360595346,
+      "tag": "0002_cynical_quentin_quire",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787370000000,
+      "tag": "0003_media_upgrade",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787395719808,
+      "tag": "0004_adorable_yellowjacket",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787400000000,
+      "tag": "0005_artwork_path",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787410000000,
+      "tag": "0006_song_artists",
+      "breakpoints": true
+    }
+  ]
+}

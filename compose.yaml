@@ -1,0 +1,35 @@
+services:
+  yimly:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: yimly:latest
+    container_name: yimly
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      cloudflared_bridge:
+        aliases:
+          - yimly
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-yimly_production_secure_secret_change_me}
+      - DATA_DIR=/app/data
+      - WATCH_POLL_INTERVAL_MS=${WATCH_POLL_INTERVAL_MS:-3000}
+    volumes:
+      # Persistent SQLite database and configuration (never wiped on rebuild)
+      - ${DATA_PATH:-./data}:/app/data
+      # Host media directory for MP3/LRC files
+      - ${MEDIA_PATH:-./media}:/media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  cloudflared_bridge:
+    external: true

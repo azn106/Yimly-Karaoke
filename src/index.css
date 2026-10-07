@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Manrope';
+  src: url('./components/font/Manrope.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sora';
+  src: url('./components/font/Sora.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('./components/font/PlusJakartaSans.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('./components/font/InstrumentSerif.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Urbanist';
+  src: url('./components/font/Urbanist.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('./components/font/CormorantGaramond.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lobster';
+  src: url('./components/font/Lobster.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Huggable';
+  src: url('./components/font/Huggable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Super Sale';
+  src: url('./components/font/Super Sale.otf') format('opentype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --accent: #FF4FA3;
+  --accent-hover: #ff6eb3;
+  --accent-glow: rgba(255, 79, 163, 0.25);
+  --bg-main: #0a0b10;
+  --bg-surface: #12131c;
+  --bg-card: #181926;
+  --bg-elevated: #222436;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+}
+
+html, body {
+  background-color: #0a0b10;
+  color: #f3f4f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overflow-x: hidden;
+}
+
+/* Inertia touch scrolling on iOS */
+.overflow-y-auto, .overflow-x-auto, .overflow-auto, aside, main, .scrollable {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Viewport height fix for mobile Safari */
+.min-h-screen {
+  min-height: 100vh;
+  min-height: calc(var(--vh, 1vh) * 100);
+}
+
+.h-screen {
+  height: 100vh;
+  height: calc(var(--vh, 1vh) * 100);
+}
+
+/* Flex gap fallback for iOS 12 Safari when no-flex-gap is present */
+.no-flex-gap .flex:not(.flex-col) > * + *,
+.no-flex-gap .inline-flex:not(.flex-col) > * + * {
+  margin-left: var(--flex-gap, 0.5rem);
+}
+
+.no-flex-gap .flex.flex-col > * + *,
+.no-flex-gap .inline-flex.flex-col > * + * {
+  margin-top: var(--flex-gap, 0.5rem);
+}
+
+.no-flex-gap .gap-1 { --flex-gap: 0.25rem; }
+.no-flex-gap .gap-1\.5 { --flex-gap: 0.375rem; }
+.no-flex-gap .gap-2 { --flex-gap: 0.5rem; }
+.no-flex-gap .gap-2\.5 { --flex-gap: 0.625rem; }
+.no-flex-gap .gap-3 { --flex-gap: 0.75rem; }
+.no-flex-gap .gap-4 { --flex-gap: 1rem; }
+.no-flex-gap .gap-5 { --flex-gap: 1.25rem; }
+.no-flex-gap .gap-6 { --flex-gap: 1.5rem; }
+.no-flex-gap .gap-8 { --flex-gap: 2rem; }
+
+/* Backdrop-filter fallback for older WebKit without backdrop-filter */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .backdrop-blur-xl, .backdrop-blur-lg, .backdrop-blur-md, .backdrop-blur-sm {
+    background-color: rgba(18, 19, 28, 0.96) !important;
+  }
+}
+
+/* Custom sleek scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 79, 163, 0.4);
+}
+
+/* Fallback immersive view for legacy browsers (iOS 10 Safari) lacking native Element Fullscreen API */
+.ios-fullscreen-fallback {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 99999 !important;
+  overflow: hidden !important;
+}

@@ -1,0 +1,12 @@
+node_modules
+dist
+data
+media
+.git
+.github
+*.log
+.DS_Store
+cookies.txt
+.env
+.env.local
+.env.*.local

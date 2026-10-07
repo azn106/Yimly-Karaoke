@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="theme-color" content="#08090E">
+
+    <!-- Viewport configuration for iOS and modern displays -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Yimly</title>
+    
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+    <!-- Apple Touch Icons for iOS Home Screen (iPad 4 iOS 10.3.4 compatibility) -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon-76x76.png">
+    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/apple-touch-icon-180x180.png">
+    <link rel="apple-touch-icon-precomposed" sizes="120x120" href="/apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon-precomposed" sizes="76x76" href="/apple-touch-icon-76x76.png">
+
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="description" content="A lightweight, self-hosted karaoke media server and web application." />
+    <meta property="og:title" content="Yimly" />
+    <meta property="og:description" content="A lightweight, self-hosted karaoke media server and web application." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function() {
+        window.__yimly_started = false;
+        window.onerror = function(msg, url, line, col, error) {
+          if (window.__yimly_started) return;
+          var root = document.getElementById('root');
+          if (root && !root.hasChildNodes()) {
+            var detail = (msg || 'Unknown script initialization error') + (line ? ' (Line ' + line + ')' : '');
+            root.innerHTML = '<div style="background-color:#0a0b10;color:#ffffff;min-height:100vh;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center;padding:24px;font-family:-apple-system,sans-serif;text-align:center;">' +
+              '<div style="max-width:380px;width:100%;background-color:#12131d;border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:32px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);">' +
+              '<div style="width:56px;height:56px;border-radius:16px;background-color:rgba(255,79,163,0.15);border:1px solid rgba(255,79,163,0.3);display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center;margin:0 auto 20px auto;color:#FF4FA3;font-size:24px;">&#9888;</div>' +
+              '<h2 style="font-size:20px;font-weight:800;margin:0 0 8px 0;color:#ffffff;">Yimly could not start</h2>' +
+              '<p style="font-size:12px;color:#a1a1aa;margin:0 0 20px 0;line-height:1.5;">Application startup failed on this browser session.</p>' +
+              '<div style="background-color:rgba(255,79,163,0.1);border:1px solid rgba(255,79,163,0.2);border-radius:12px;padding:12px;font-size:11px;font-family:monospace;color:#ff7ebd;word-break:break-all;text-align:left;max-height:100px;overflow-y:auto;margin-bottom:20px;">' + detail + '</div>' +
+              '<button onclick="window.location.reload()" style="width:100%;padding:12px;background-color:#FF4FA3;color:#ffffff;border:none;border-radius:12px;font-weight:700;font-size:13px;cursor:pointer;">Reload Yimly</button>' +
+              '</div></div>';
+          }
+        };
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
