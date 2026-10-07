@@ -272,6 +272,7 @@ export default function GuestRoom({
               const isPlaying = index === 0;
               const addedBy = item.userName || 'Guest';
               const isDownloading = (item as any).songId === null && (item as any).downloadStatus === 'downloading';
+              const isProcessing = (item as any).songId === null && (item as any).downloadStatus === 'processing';
               const isFailed = (item as any).songId === null && (item as any).downloadStatus === 'failed';
 
               return (
@@ -315,6 +316,11 @@ export default function GuestRoom({
                   {isDownloading && (
                     <span className="px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0">
                       DOWNLOADING
+                    </span>
+                  )}
+                  {isProcessing && (
+                    <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0 animate-pulse">
+                      PROCESSING
                     </span>
                   )}
                   {isFailed && (

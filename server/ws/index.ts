@@ -598,8 +598,13 @@ export async function advanceQueue(sessionId: string, room: RoomState) {
       .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
       .orderBy(asc(queueItems.position));
 
-    // Find the first item that is ready (meaning songId is set, or downloadStatus is 'ready' or not 'downloading'/'failed')
-    const nextItem = pendingItems.find(item => item.songId !== null || (item.downloadStatus !== 'downloading' && item.downloadStatus !== 'failed'));
+    // Find the first item that is ready: must have real songId, and not downloading/processing/failed
+    const nextItem = pendingItems.find(item => 
+      item.songId !== null && 
+      item.downloadStatus !== 'downloading' && 
+      item.downloadStatus !== 'processing' && 
+      item.downloadStatus !== 'failed'
+    );
 
     if (nextItem) {
       await db.update(queueItems)

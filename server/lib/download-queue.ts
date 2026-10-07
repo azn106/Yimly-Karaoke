@@ -875,54 +875,28 @@ export class DownloadQueueManager {
       }).where(eq(downloadTrackJobs.id, track.id));
 
       if (track.status === 'completed' && track.outputPath) {
-        let linked = false;
+        // Trigger standalone song processing pipeline (Demucs GPU + FFmpeg instrumental + Cloud lyrics + Library indexing)
         try {
-          const { importSingleAudioFile } = await import('./scanner.js');
           const jobRec = await db.select().from(downloadJobs).where(eq(downloadJobs.id, track.jobId)).limit(1);
           if (jobRec.length > 0 && jobRec[0].libraryId) {
             const libraryId = jobRec[0].libraryId;
-            const imported = await importSingleAudioFile(libraryId, track.outputPath);
-            if (imported && imported.length > 0 && imported[0]?.id) {
-              const songId = imported[0].id;
-              
-              // Update queueItems in DB
-              await db.update(queueItems).set({
-                songId,
-                downloadStatus: 'ready'
-              }).where(eq(queueItems.downloadTrackId, track.id));
-              
-              // Find which sessions had this queued and notify them!
-              const matchedQueues = await db.select().from(queueItems).where(eq(queueItems.downloadTrackId, track.id));
-              const sessionIds = Array.from(new Set(matchedQueues.map(q => q.sessionId)));
-              
-              // Notify each room over websocket
-              const { notifyQueueUpdate } = await import('../ws/index.js');
-              for (const sId of sessionIds) {
-                notifyQueueUpdate(sId);
-              }
-              linked = true;
-            }
+            const { processDownloadedSong } = await import('./song-processor.js');
+
+            // Fire processing asynchronously; processDownloadedSong manages PROCESSING -> READY / FAILED
+            processDownloadedSong({
+              downloadTrackId: track.id,
+              originalAudioPath: track.outputPath,
+              libraryId,
+              title: track.title,
+              artist: track.artist,
+              album: track.album || undefined,
+              duration: track.duration || undefined,
+            }).catch(err => {
+              console.error('[Downloader] Song processing trigger error:', err);
+            });
           }
         } catch (err) {
-          console.error('[Downloader] Room queue linking failed on completion:', err);
-        }
-
-        if (!linked) {
-          try {
-            await db.update(queueItems).set({
-              downloadStatus: 'failed'
-            }).where(eq(queueItems.downloadTrackId, track.id));
-
-            const matchedQueues = await db.select().from(queueItems).where(eq(queueItems.downloadTrackId, track.id));
-            const sessionIds = Array.from(new Set(matchedQueues.map(q => q.sessionId)));
-
-            const { notifyQueueUpdate } = await import('../ws/index.js');
-            for (const sId of sessionIds) {
-              notifyQueueUpdate(sId);
-            }
-          } catch (failErr) {
-            console.error('[Downloader] Failed to mark queue items as failed on scanner failure:', failErr);
-          }
+          console.error('[Downloader] Failed to initiate song processing:', err);
         }
       } else if (track.status === 'failed') {
         try {

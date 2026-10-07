@@ -23,6 +23,13 @@ services:
       - ${DATA_PATH:-./data}:/app/data
       # Host media directory for MP3/LRC files
       - ${MEDIA_PATH:-./media}:/media
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s

@@ -937,11 +937,11 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
         tempArtworkUrl = track.artworkUrl || null;
         
         // Prevent duplicate active downloads for the same requested track:
-        // If there is already an active queue item with downloadStatus === 'downloading' and same title and artist,
+        // If there is already an active queue item with downloadStatus === 'downloading' or 'processing' and same title and artist,
         // reuse its downloadJobId and downloadTrackId instead of starting a new download job.
         const dup = await db.select().from(queueItems).where(
           and(
-            eq(queueItems.downloadStatus, 'downloading'),
+            sql`(${queueItems.downloadStatus} = 'downloading' OR ${queueItems.downloadStatus} = 'processing')`,
             eq(queueItems.tempTitle, track.title),
             eq(queueItems.tempArtist, track.artist)
           )
@@ -950,7 +950,7 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
         if (dup.length > 0 && dup[0].downloadJobId && dup[0].downloadTrackId) {
           downloadJobId = dup[0].downloadJobId;
           downloadTrackId = dup[0].downloadTrackId;
-          downloadStatus = 'downloading';
+          downloadStatus = dup[0].downloadStatus || 'downloading';
         } else {
           // 1. Resolve target library
           let targetLib;

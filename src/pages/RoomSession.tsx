@@ -2342,6 +2342,7 @@ export default function RoomSession() {
                   const isPlaying = item.status === 'playing' || index === 0;
                   const singerName = item.userName || (item.userId ? `Singer ${item.userId}` : 'Guest');
                   const isDownloading = item.songId === null && item.downloadStatus === 'downloading';
+                  const isProcessing = item.songId === null && item.downloadStatus === 'processing';
                   const isFailed = item.songId === null && item.downloadStatus === 'failed';
 
                   return (
@@ -2359,17 +2360,22 @@ export default function RoomSession() {
                         </h4>
                         {isPlaying && (
                           <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-[#FF4FA3] text-white shrink-0">
-                            Live
+                            LIVE
                           </span>
                         )}
                         {isDownloading && (
                           <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-yellow-500/20 text-yellow-500 shrink-0">
-                            Downloading
+                            DOWNLOADING
+                          </span>
+                        )}
+                        {isProcessing && (
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-400 shrink-0 animate-pulse">
+                            PROCESSING
                           </span>
                         )}
                         {isFailed && (
                           <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-red-500/20 text-red-500 shrink-0">
-                            Failed
+                            FAILED
                           </span>
                         )}
                       </div>
