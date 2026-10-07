@@ -20,7 +20,9 @@ export async function checkCudaAvailability(pythonBin?: string): Promise<{ avail
   return new Promise((resolve) => {
     const pyScript = `import sys, json
 try:
+    import numpy
     import torch
+    import demucs
     avail = torch.cuda.is_available()
     cnt = torch.cuda.device_count()
     if avail and cnt > 0:

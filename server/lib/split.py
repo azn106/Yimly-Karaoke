@@ -71,12 +71,13 @@ def run_separation(req, status_path=None):
 
     progress(2, "verifying mandatory CUDA acceleration")
     try:
+        import numpy
         import torch
         import demucs.separate
     except ImportError as e:
         err_msg = f"missing dependency: {e}"
         log("ERR ", err_msg)
-        log("ERR ", "Run setup_whisperx.bat to install PyTorch with CUDA and Demucs.")
+        log("ERR ", "Ensure numpy, torch (with CUDA), and demucs are installed.")
         res = {
             "ok": False,
             "error": f"CUDA/RTX 3060 is required for audio separation but is unavailable: {err_msg}",
@@ -197,10 +198,30 @@ def run_separation(req, status_path=None):
 def worker_loop():
     log("INFO", "Starting Demucs Persistent Worker Process...")
     try:
+        import numpy
         import torch
         import demucs.separate
     except ImportError as e:
         log("ERR ", f"Demucs worker missing dependency: {e}")
+        sys.exit(1)
+
+    # Strict mandatory CUDA validation on worker boot: RTX 3060 / CUDA tensor compute
+    if not torch.cuda.is_available() or torch.cuda.device_count() < 1:
+        log("ERR ", "Demucs Persistent Worker: torch.cuda.is_available() is False or deviceCount < 1. GPU is mandatory.")
+        sys.exit(1)
+
+    try:
+        dev_name = torch.cuda.get_device_name(0)
+        vram_gb = round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2)
+        # Execute real CUDA tensor test and sync
+        test_x = torch.ones((256, 256), device='cuda', dtype=torch.float32)
+        test_y = torch.matmul(test_x, test_x)
+        torch.cuda.synchronize()
+        del test_x, test_y
+        torch.cuda.empty_cache()
+        log("INFO", f"Demucs Persistent Worker verified GPU: CUDA — {dev_name} ({vram_gb} GB VRAM). Tensor ops synchronized.")
+    except Exception as e:
+        log("ERR ", f"Demucs Persistent Worker CUDA tensor test failed: {e}")
         sys.exit(1)
 
     log("INFO", "Demucs Persistent Worker initialized. Awaiting requests...")

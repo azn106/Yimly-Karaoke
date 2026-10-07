@@ -41,7 +41,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && chmod +x /usr/local/bin/yt-dlp \
   && pip3 install --no-cache-dir --upgrade pip \
   && pip3 install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu124 \
-    torch torchaudio demucs \
+    numpy \
+    torch \
+    torchaudio \
+    demucs \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
