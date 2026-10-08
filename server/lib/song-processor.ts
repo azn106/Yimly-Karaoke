@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { separateAndCreateInstrumental } from './audio-separation.js';
 import { fetchSongDualLyrics } from '../lyrics/manager.js';
+import { getElrcLineLeadInMsFromDb } from '../karaoke-sync-config.js';
 import { importSingleAudioFile } from './scanner.js';
 import { db } from '../db/index.js';
 import { queueItems } from '../db/schema.js';
@@ -103,10 +104,12 @@ export async function processDownloadedSong(req: ProcessSongRequest): Promise<vo
 
     // 3. Lyrics retrieval: NetEase → QQ Music → Kugou → Musixmatch cascade
     try {
-      console.log(`[SongProcessor] Retrieving cloud lyrics (NetEase -> QQ -> Kugou -> Musixmatch)...`);
+      const configuredLeadInMs = await getElrcLineLeadInMsFromDb();
+      console.log(`[SongProcessor] Retrieving cloud lyrics (NetEase -> QQ -> Kugou -> Musixmatch) with lead-in ${configuredLeadInMs}ms...`);
       const dualResult = await fetchSongDualLyrics(title, artist, {
         album,
         duration,
+        leadInMs: configuredLeadInMs,
         onLog: (msg) => console.log(`[SongProcessor Lyric] ${msg}`),
       });
 

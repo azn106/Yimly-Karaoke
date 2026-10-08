@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { getSettings } from './karaoke-sync-config.js';
+import { getSettings, sanitizeLeadInMs } from './karaoke-sync-config.js';
 
 const HMAC_SECRET = 'IEJ5E8XFaHQvIQNfs7IC';
 const BASE_URL = 'https://apic-desktop.musixmatch.com/ws/1.1';
@@ -313,12 +313,13 @@ export async function matchTrack(
   return null;
 }
 
-export function renderRichsyncToElrc(lines: RichsyncLine[], leadInMs: number = 0): string | null {
+export function renderRichsyncToElrc(lines: RichsyncLine[], leadInMs?: number): string | null {
   if (!Array.isArray(lines) || lines.length === 0) {
     return null;
   }
 
-  const safeLeadInMs = Math.max(0, Math.min(5000, Number.isFinite(leadInMs) ? leadInMs : 0));
+  const effectiveLeadInMs = leadInMs !== undefined ? leadInMs : (getSettings().lyrics?.elrcLineLeadInMs ?? 500);
+  const safeLeadInMs = Math.max(0, Math.min(5000, Number.isFinite(effectiveLeadInMs) ? effectiveLeadInMs : 500));
   const safeLeadInSec = safeLeadInMs / 1000;
 
   const outputLines: string[] = [];

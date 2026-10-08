@@ -46,6 +46,7 @@ export default function Settings() {
     lyricsProviders: ['lrclib'],
     folderStructure: '{artist}/{artist} - {title}',
     playlistFolder: true,
+    elrcLineLeadInMs: 500,
   });
   const [savingDlSettings, setSavingDlSettings] = useState(false);
   const [dlSavedMessage, setDlSavedMessage] = useState('');
@@ -1238,6 +1239,54 @@ export default function Settings() {
                 <option value="musixmatch">musixmatch (Legacy)</option>
                 <option value="azlyrics">azlyrics (Legacy)</option>
               </select>
+            </div>
+
+            {/* eLRC Line Lead-In (Word-Synced Lyrics Offset) */}
+            <div className="p-3.5 bg-[#08090E] border border-white/5 rounded-xl space-y-2 md:col-span-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <span className="text-xs font-semibold text-white block">eLRC Line Lead-In (ms)</span>
+                  <span className="text-[11px] text-zinc-500 block">
+                    How many milliseconds before the first word an eLRC outer line timestamp appears.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <input
+                    type="number"
+                    min={0}
+                    max={5000}
+                    step={50}
+                    value={dlSettings.elrcLineLeadInMs ?? 500}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setDlSettings({
+                        ...dlSettings,
+                        elrcLineLeadInMs: isNaN(val) ? 500 : Math.max(0, Math.min(5000, val)),
+                      });
+                    }}
+                    className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#FF4FA3]"
+                  />
+                  <span className="text-xs text-zinc-400 font-mono font-medium">ms</span>
+                </div>
+              </div>
+              <div className="p-2.5 rounded-lg bg-[#141622]/70 border border-white/5 text-[11px] text-zinc-400 flex flex-wrap items-center justify-between gap-2 font-mono">
+                <span className="text-zinc-500">Preview (First word at 01:24.00):</span>
+                <span>
+                  Line appears at:{' '}
+                  <strong className="text-[#FF4FA3] font-semibold">
+                    {(() => {
+                      const leadMs = dlSettings.elrcLineLeadInMs ?? 500;
+                      const wordSec = 84.0; // 01:24.00
+                      const leadSec = Math.max(0, Math.min(5000, leadMs)) / 1000;
+                      const lineSec = Math.max(0, Math.round((wordSec - leadSec) * 100) / 100);
+                      const m = Math.floor(lineSec / 60);
+                      const s = Math.floor(lineSec % 60);
+                      const cs = Math.round((lineSec % 1) * 100);
+                      return `[${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}] <01:24.00>First <01:24.40>word`;
+                    })()}
+                  </strong>
+                </span>
+              </div>
             </div>
           </div>
 

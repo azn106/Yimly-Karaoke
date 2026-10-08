@@ -79,6 +79,9 @@ export async function fetchSongDualLyrics(
 ): Promise<DualLyricRetrievalResult> {
   const log = options?.onLog || (() => {});
   const providers = options?.providers || getActiveProviderList();
+  const effectiveLeadInMs = options?.leadInMs !== undefined
+    ? options.leadInMs
+    : (getSettings().lyrics?.elrcLineLeadInMs ?? 500);
 
   let needElrc = options?.needElrc !== false;
   let needLrc = options?.needLrc !== false;
@@ -110,7 +113,7 @@ export async function fetchSongDualLyrics(
       const fetchOpts: FetchLyricOptions = {
         album,
         duration,
-        leadInMs: options?.leadInMs,
+        leadInMs: effectiveLeadInMs,
         onLog: log,
       };
 

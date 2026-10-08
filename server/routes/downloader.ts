@@ -13,6 +13,7 @@ import {
 import { resolveSpotifyEntity } from '../lib/spotify-resolver.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { sanitizeLeadInMs, setCachedLeadInMs } from '../karaoke-sync-config.js';
 
 const execFilePromise = promisify(execFile);
 
@@ -50,6 +51,9 @@ router.get('/settings', async (req, res) => {
 
     const downloadLyrics = rawDownloadLyrics !== 'false';
     const concurrencyVal = parseInt(settingsMap.get('downloader_concurrency') || '4', 10) || 4;
+    const rawLeadInMs = settingsMap.get('downloader_elrc_line_lead_in_ms');
+    const elrcLineLeadInMs = sanitizeLeadInMs(rawLeadInMs !== undefined ? rawLeadInMs : 500);
+    setCachedLeadInMs(elrcLineLeadInMs);
 
     res.json({
       libraryId: settingsMap.get('downloader_library_id') || defaultLibId,
@@ -65,6 +69,7 @@ router.get('/settings', async (req, res) => {
       folderStructure: settingsMap.get('downloader_folder_structure') || '{artist}/{artist} - {title}',
       playlistFolder: settingsMap.get('downloader_playlist_folder') !== 'false',
       concurrency: concurrencyVal,
+      elrcLineLeadInMs,
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch downloader settings' });
@@ -108,6 +113,14 @@ router.post('/settings', async (req, res) => {
       const parsedConcurrency = Math.min(16, Math.max(1, parseInt(concurrency, 10) || 4));
       pairs.push(['downloader_concurrency', String(parsedConcurrency)]);
       downloadQueue.setConcurrency(parsedConcurrency);
+    }
+
+    const { elrcLineLeadInMs, elrc_line_lead_in_ms } = req.body;
+    const incomingLeadIn = elrcLineLeadInMs ?? elrc_line_lead_in_ms;
+    if (incomingLeadIn !== undefined) {
+      const sanitized = sanitizeLeadInMs(incomingLeadIn);
+      pairs.push(['downloader_elrc_line_lead_in_ms', String(sanitized)]);
+      setCachedLeadInMs(sanitized);
     }
 
     for (const [key, value] of pairs) {
