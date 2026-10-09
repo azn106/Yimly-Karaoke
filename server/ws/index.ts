@@ -696,15 +696,20 @@ export async function checkAndAutoPlay(sessionId: string) {
     const isCurrentlyPlaying = (room.playing && room.currentSongId !== null) || currentlyPlayingInDB.length > 0;
 
     if (!isCurrentlyPlaying) {
-      // Look for first pending queue item in DB
+      // Look for first pending queue item in DB that is eligible to play:
+      // must have real songId, and not downloading/processing/failed (mirrors advanceQueue eligibility logic)
       const pendingItems = await db.select().from(queueItems)
         .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
-        .orderBy(asc(queueItems.position))
-        .limit(1);
+        .orderBy(asc(queueItems.position));
 
-      if (pendingItems.length > 0) {
-        const itemToPlay = pendingItems[0];
+      const itemToPlay = pendingItems.find(item => 
+        item.songId !== null && 
+        item.downloadStatus !== 'downloading' && 
+        item.downloadStatus !== 'processing' && 
+        item.downloadStatus !== 'failed'
+      );
 
+      if (itemToPlay) {
         await db.update(queueItems)
           .set({ status: 'playing' })
           .where(eq(queueItems.id, itemToPlay.id));

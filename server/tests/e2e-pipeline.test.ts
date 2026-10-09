@@ -210,3 +210,118 @@ test('E2E Pipeline Verification: Complete Queue -> Download -> Processing -> Rea
   await db.delete(sessions).where(eq(sessions.id, testSessionId));
   fs.rmSync(testLibDir, { recursive: true, force: true });
 });
+
+test('Room Queue checkAndAutoPlay: Non-local song auto-play promotion only when READY', async () => {
+  const { checkAndAutoPlay, getOrCreateRoom } = await import('../ws/index.js');
+
+  // Setup user and test room session
+  let userRec = await db.select().from(users).limit(1);
+  if (userRec.length === 0) {
+    const insertedUser = await db.insert(users).values({
+      username: `testuser_cap_${Date.now()}`,
+      password: 'password123',
+      role: 'administrator',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+    userRec = insertedUser;
+  }
+  const userId = userRec[0].id;
+
+  const testSessionId = crypto.randomUUID();
+  await db.insert(sessions).values({
+    id: testSessionId,
+    hostId: userId,
+    hostDevice: 'Chrome (Linux)',
+    roomCode: `CAP_${Date.now().toString().slice(-4)}`,
+    status: 'active',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  const room = await getOrCreateRoom(testSessionId);
+  room.playing = false;
+  room.currentSongId = null;
+  room.currentQueueItemId = null;
+
+  // 1. Queue is empty: checkAndAutoPlay does nothing
+  await checkAndAutoPlay(testSessionId);
+  assert.strictEqual(room.playing, false);
+  assert.strictEqual(room.currentSongId, null);
+
+  // 2. Add one non-local song: starts pending/downloading with songId=null
+  const dlTrackId = `dl_track_cap_${Date.now()}`;
+  const qItem = await db.insert(queueItems).values({
+    sessionId: testSessionId,
+    songId: null,
+    position: 1,
+    status: 'pending',
+    tempTitle: 'Remote Song',
+    tempArtist: 'Remote Artist',
+    downloadJobId: 'job_cap_1',
+    downloadTrackId: dlTrackId,
+    downloadStatus: 'downloading',
+    userId,
+    addedAt: new Date(),
+  }).returning();
+
+  // 3. checkAndAutoPlay must NOT mark it playing while DOWNLOADING
+  await checkAndAutoPlay(testSessionId);
+  assert.strictEqual(room.playing, false, 'Room must remain not playing while DOWNLOADING');
+  assert.strictEqual(room.currentSongId, null, 'currentSongId must remain null');
+  let dbItem = (await db.select().from(queueItems).where(eq(queueItems.id, qItem[0].id)).limit(1))[0];
+  assert.strictEqual(dbItem.status, 'pending', 'Queue item must remain status=pending');
+
+  // 4. Item changes to PROCESSING with songId=null
+  await db.update(queueItems).set({
+    downloadStatus: 'processing'
+  }).where(eq(queueItems.id, qItem[0].id));
+
+  // checkAndAutoPlay still does NOT mark it playing while PROCESSING
+  await checkAndAutoPlay(testSessionId);
+  assert.strictEqual(room.playing, false, 'Room must remain not playing while PROCESSING');
+  assert.strictEqual(room.currentSongId, null);
+  dbItem = (await db.select().from(queueItems).where(eq(queueItems.id, qItem[0].id)).limit(1))[0];
+  assert.strictEqual(dbItem.status, 'pending', 'Queue item must still remain status=pending');
+
+  // 5. Item becomes READY with a real songId
+  let existingSong = await db.select().from(songs).limit(1);
+  let dummySongId: number;
+  if (existingSong.length > 0) {
+    dummySongId = existingSong[0].id;
+  } else {
+    let artistRec = await db.select().from(artists).limit(1);
+    let artistId: number;
+    if (artistRec.length === 0) {
+      const art = await db.insert(artists).values({ name: 'CAP Artist' }).returning();
+      artistId = art[0].id;
+    } else {
+      artistId = artistRec[0].id;
+    }
+    const createdSong = await db.insert(songs).values({
+      libraryId: 1,
+      artistId,
+      title: 'CAP Test Song',
+      duration: 120,
+    }).returning();
+    dummySongId = createdSong[0].id;
+  }
+
+  await db.update(queueItems).set({
+    songId: dummySongId,
+    downloadStatus: 'ready'
+  }).where(eq(queueItems.id, qItem[0].id));
+
+  // 6. checkAndAutoPlay now marks it playing using the existing auto-play behavior
+  await checkAndAutoPlay(testSessionId);
+  assert.strictEqual(room.playing, true, 'Room must start playing once READY');
+  assert.strictEqual(room.currentSongId, dummySongId, 'currentSongId must equal dummySongId');
+  assert.strictEqual(room.currentQueueItemId, qItem[0].id, 'currentQueueItemId must equal qItem.id');
+  dbItem = (await db.select().from(queueItems).where(eq(queueItems.id, qItem[0].id)).limit(1))[0];
+  assert.strictEqual(dbItem.status, 'playing', 'Queue item status must be updated to playing');
+
+  // 7. Cleanup
+  await db.delete(queueItems).where(eq(queueItems.sessionId, testSessionId));
+  await db.delete(sessions).where(eq(sessions.id, testSessionId));
+});
+
