@@ -16,7 +16,8 @@ import {
   advanceQueueBySessionId, 
   getRoomState,
   broadcastLyricSettingsToSession,
-  broadcastLyricSettingsToAllActiveRooms
+  broadcastLyricSettingsToAllActiveRooms,
+  broadcastBackgroundMusicSettingsToAllActiveRooms
 } from '../ws/index.js';
 import { formatArtistDisplay, parseArtists } from '../lib/artist-utils.js';
 import { getSongArtistsMap } from './songs.js';
@@ -406,6 +407,66 @@ const saveGlobalLyricsSettings = async (req: any, res: any) => {
 
 router.put('/settings/lyrics', saveGlobalLyricsSettings);
 router.post('/settings/lyrics', saveGlobalLyricsSettings);
+
+// Background Music Settings endpoints
+router.get('/settings/background-music', async (req, res) => {
+  try {
+    const saved = await db.select().from(settings).where(eq(settings.key, 'background_music_settings')).limit(1);
+    if (saved.length > 0 && saved[0].value) {
+      try {
+        const parsed = JSON.parse(saved[0].value);
+        const enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : true;
+        const volume = typeof parsed.volume === 'number' && !isNaN(parsed.volume) ? Math.max(0, Math.min(100, Math.round(parsed.volume))) : 25;
+        return res.json({ settings: { enabled, volume } });
+      } catch (e) {
+        // ignore parse error
+      }
+    }
+    res.json({ settings: { enabled: true, volume: 25 } });
+  } catch (error) {
+    console.error('Failed to fetch background music settings:', error);
+    res.status(500).json({ error: 'Failed to fetch background music settings' });
+  }
+});
+
+const saveBackgroundMusicSettingsHandler = async (req: any, res: any) => {
+  try {
+    const raw = req.body?.settings || req.body || {};
+    const enabled = typeof raw.enabled === 'boolean' 
+      ? raw.enabled 
+      : (raw.enabled === 'true' || raw.enabled === 1 || raw.enabled === '1' ? true : raw.enabled === 'false' || raw.enabled === 0 || raw.enabled === '0' ? false : true);
+    let volume = 25;
+    if (typeof raw.volume === 'number' && !isNaN(raw.volume)) {
+      volume = Math.max(0, Math.min(100, Math.round(raw.volume)));
+    } else if (typeof raw.volume === 'string' && raw.volume.trim() !== '') {
+      const parsed = parseInt(raw.volume, 10);
+      if (!isNaN(parsed)) volume = Math.max(0, Math.min(100, parsed));
+    }
+    const resolved = { enabled, volume };
+    const jsonStr = JSON.stringify(resolved);
+
+    const existing = await db.select().from(settings).where(eq(settings.key, 'background_music_settings')).limit(1);
+    if (existing.length === 0) {
+      await db.insert(settings).values({ key: 'background_music_settings', value: jsonStr });
+    } else {
+      await db.update(settings).set({ value: jsonStr }).where(eq(settings.key, 'background_music_settings'));
+    }
+
+    try {
+      broadcastBackgroundMusicSettingsToAllActiveRooms(resolved);
+    } catch (wsErr) {
+      console.warn('[Karaoke] Failed to broadcast background music settings to rooms:', wsErr);
+    }
+
+    res.json({ success: true, settings: resolved });
+  } catch (error) {
+    console.error('Failed to save background music settings:', error);
+    res.status(500).json({ error: 'Failed to save background music settings' });
+  }
+};
+
+router.put('/settings/background-music', saveBackgroundMusicSettingsHandler);
+router.post('/settings/background-music', saveBackgroundMusicSettingsHandler);
 
 router.post('/sessions', async (req, res) => {
   try {

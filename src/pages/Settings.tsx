@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { 
   Plus, Folder, RefreshCw, Trash2, AlertCircle, HardDrive, 
   ShieldCheck, Type, AlignLeft, AlignCenter, AlignRight, RotateCcw, Sparkles, Download, Save, Check,
-  Layers, Zap, Sliders, Eye, Shield
+  Layers, Zap, Sliders, Eye, Shield, Music, Volume2, Shuffle
 } from 'lucide-react';
 import { AutoResponsiveLyrics } from '../components/AutoResponsiveLyrics';
 import { 
@@ -19,6 +19,13 @@ import {
   getAlignmentClass,
   LYRICS_FONT_OPTIONS
 } from '../utils/lyricsSettings';
+import {
+  getBackgroundMusicSettings,
+  saveBackgroundMusicSettings,
+  fetchServerBackgroundMusicSettings,
+  BackgroundMusicSettings,
+  DEFAULT_BACKGROUND_MUSIC_SETTINGS,
+} from '../utils/backgroundMusicSettings';
 
 export default function Settings() {
   const context = useOutletContext<{ user: any }>();
@@ -51,6 +58,11 @@ export default function Settings() {
   const [savingDlSettings, setSavingDlSettings] = useState(false);
   const [dlSavedMessage, setDlSavedMessage] = useState('');
 
+  // Background Music Settings State
+  const [bgmSettings, setBgmSettings] = useState<BackgroundMusicSettings>(getBackgroundMusicSettings);
+  const [savingBgmSettings, setSavingBgmSettings] = useState(false);
+  const [bgmSavedMessage, setBgmSavedMessage] = useState('');
+
   useEffect(() => {
     fetchLibraries();
     fetchDlSettings();
@@ -59,7 +71,28 @@ export default function Settings() {
         setLyricsSettings(srv);
       }
     });
+    fetchServerBackgroundMusicSettings().then((srv) => {
+      if (srv) {
+        setBgmSettings(srv);
+      }
+    });
   }, []);
+
+  const saveBgm = async (newSettings: BackgroundMusicSettings) => {
+    setBgmSettings(newSettings);
+    setSavingBgmSettings(true);
+    setBgmSavedMessage('');
+    try {
+      const saved = await saveBackgroundMusicSettings(newSettings);
+      setBgmSettings(saved);
+      setBgmSavedMessage('Background music settings saved!');
+      setTimeout(() => setBgmSavedMessage(''), 3000);
+    } catch (e) {
+      console.error('Failed to save background music settings:', e);
+    } finally {
+      setSavingBgmSettings(false);
+    }
+  };
 
   const fetchDlSettings = async () => {
     try {
@@ -1307,6 +1340,116 @@ export default function Settings() {
             </button>
           </div>
         </form>
+      </section>
+
+      {/* ========================================================= */}
+      {/* SECTION: BACKGROUND MUSIC                                 */}
+      {/* ========================================================= */}
+      <section className="space-y-6 pt-6 border-t border-white/10" id="section-background-music">
+        <div className="flex items-center justify-between border-b border-white/5 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] rounded-xl">
+              <Music className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-white">Background Music</h2>
+              <p className="text-xs text-zinc-400">Configure ambient music playback from your local library when the karaoke room queue is empty</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[#141622] border border-white/10 rounded-2xl p-6 space-y-6">
+          <div className="space-y-4">
+            {/* Enable Toggle */}
+            <div className="flex items-center justify-between p-4 bg-[#08090E] border border-white/5 rounded-xl">
+              <div>
+                <span className="text-sm font-bold text-white block">Enable Background Music</span>
+                <span className="text-xs text-zinc-400">
+                  Automatically play ambient songs from your local music library when no karaoke tracks are queued or playing.
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
+                <input
+                  type="checkbox"
+                  checked={bgmSettings.enabled}
+                  onChange={(e) => saveBgm({ ...bgmSettings, enabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FF4FA3]"></div>
+              </label>
+            </div>
+
+            {/* Music Source (Local Library info) */}
+            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Folder className="w-4 h-4 text-[#FF4FA3]" />
+                <div>
+                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Music Source</span>
+                  <span className="text-xs text-zinc-400">Local Yimly Media Library ({libraries.length} {libraries.length === 1 ? 'directory' : 'directories'} configured)</span>
+                </div>
+              </div>
+              <span className="text-[11px] font-mono text-zinc-500 bg-white/5 px-2.5 py-1 rounded-lg">Local Only</span>
+            </div>
+
+            {/* Playback Mode (Shuffled) */}
+            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shuffle className="w-4 h-4 text-[#FF4FA3]" />
+                <div>
+                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Playback Mode</span>
+                  <span className="text-xs text-zinc-400">Continuous shuffle without repeats until all eligible library tracks have played</span>
+                </div>
+              </div>
+              <span className="text-[11px] font-mono text-zinc-500 bg-white/5 px-2.5 py-1 rounded-lg">Continuous Shuffle</span>
+            </div>
+
+            {/* Background Volume Slider */}
+            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-[#FF4FA3]" />
+                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Background Music Volume</span>
+                </div>
+                <span className="text-xs font-mono font-bold text-[#FF4FA3]">{bgmSettings.volume}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={bgmSettings.volume}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setBgmSettings({ ...bgmSettings, volume: val });
+                }}
+                onMouseUp={() => saveBgm(bgmSettings)}
+                onTouchEnd={() => saveBgm(bgmSettings)}
+                className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3] focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+              />
+              <p className="text-[11px] text-zinc-500">
+                Independent volume control for ambient background music. Does not affect host karaoke volume. Default is 25%.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            {bgmSavedMessage && (
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <Check className="w-4 h-4" />
+                <span>{bgmSavedMessage}</span>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => saveBgm(bgmSettings)}
+              disabled={savingBgmSettings}
+              className="ml-auto px-6 py-2.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#FF4FA3]/20 flex items-center gap-2 transition-all disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              <span>{savingBgmSettings ? 'Saving...' : 'Save Background Music Settings'}</span>
+            </button>
+          </div>
+        </div>
       </section>
 
       {/* ========================================================= */}

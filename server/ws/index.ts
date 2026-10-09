@@ -495,7 +495,7 @@ export function setupWebSockets(wss: WebSocketServer) {
 
   // Keep-alive ping interval to prevent proxy idle timeouts
   const PING_INTERVAL_MS = 25 * 1000;
-  setInterval(() => {
+  const pingTimer = setInterval(() => {
     for (const [sessionId, room] of activeRooms.entries()) {
       for (const client of room.clients) {
         if (client.readyState === WebSocket.OPEN) {
@@ -509,11 +509,14 @@ export function setupWebSockets(wss: WebSocketServer) {
       }
     }
   }, PING_INTERVAL_MS);
+  if (pingTimer && typeof pingTimer.unref === 'function') {
+    pingTimer.unref();
+  }
 
   // Background Session Expiry Cleaner (runs every 30 seconds)
   // An active room expires ONLY when the host has not sent a heartbeat and has been disconnected for > 90 seconds.
   const EXPIRY_THRESHOLD_MS = 90 * 1000;
-  setInterval(async () => {
+  const expiryTimer = setInterval(async () => {
     try {
       const activeSessions = await db.select().from(sessions).where(eq(sessions.status, 'active'));
       const now = Date.now();
@@ -537,6 +540,9 @@ export function setupWebSockets(wss: WebSocketServer) {
       console.error('[SESSION CLEANUP] Error during session expiry cleanup:', err);
     }
   }, 30 * 1000);
+  if (expiryTimer && typeof expiryTimer.unref === 'function') {
+    expiryTimer.unref();
+  }
 }
 
 export async function handleHostHeartbeat(sessionId: string) {
@@ -796,6 +802,15 @@ export function broadcastLyricSettingsToAllActiveRooms(newSettings: LyricsAppear
     room.lyricSettings = newSettings;
     broadcastToRoom(sessionId, {
       type: 'LYRIC_SETTINGS_UPDATED',
+      payload: { settings: newSettings }
+    });
+  }
+}
+
+export function broadcastBackgroundMusicSettingsToAllActiveRooms(newSettings: { enabled: boolean; volume: number }) {
+  for (const sessionId of activeRooms.keys()) {
+    broadcastToRoom(sessionId, {
+      type: 'BACKGROUND_MUSIC_SETTINGS_UPDATED',
       payload: { settings: newSettings }
     });
   }

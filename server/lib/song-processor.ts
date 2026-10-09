@@ -106,9 +106,7 @@ export async function processDownloadedSong(req: ProcessSongRequest): Promise<vo
     try {
       const configuredLeadInMs = await getElrcLineLeadInMsFromDb();
       console.log(`[SongProcessor] Retrieving cloud lyrics (NetEase -> QQ -> Kugou -> Musixmatch) with lead-in ${configuredLeadInMs}ms...`);
-      const dualResult = await fetchSongDualLyrics(title, artist, {
-        album,
-        duration,
+      const dualResult = await fetchSongDualLyrics(title, artist, album, duration, {
         leadInMs: configuredLeadInMs,
         onLog: (msg) => console.log(`[SongProcessor Lyric] ${msg}`),
       });

@@ -1609,6 +1609,69 @@ test('Lyrics Font System: 9 built-in fonts, removed font fallback to manrope, an
   assert.strictEqual(customRetrieved.settings.customFontName, 'MyStudioFont');
 });
 
+test('Background Music Settings API & Persistence Suite', async () => {
+  const token = (global as any).tokenTest;
+
+  // 1. Verify unauthenticated public GET access (needed for TV displays / room hosts)
+  const getPubRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`);
+  assert.strictEqual(getPubRes.status, 200, 'Public GET /api/karaoke/settings/background-music must return 200');
+  const pubData = await getPubRes.json();
+  assert.ok(pubData.settings, 'Response must include settings');
+  assert.strictEqual(typeof pubData.settings.enabled, 'boolean');
+  assert.strictEqual(typeof pubData.settings.volume, 'number');
+
+  // 2. Authenticated PUT update to new settings
+  const putRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: false, volume: 42 } })
+  });
+  assert.strictEqual(putRes.status, 200);
+  const putData = await putRes.json();
+  assert.strictEqual(putData.success, true);
+  assert.strictEqual(putData.settings.enabled, false);
+  assert.strictEqual(putData.settings.volume, 42);
+
+  // 3. GET to verify persistence
+  const getRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.strictEqual(getRes.status, 200);
+  const getData = await getRes.json();
+  assert.strictEqual(getData.settings.enabled, false);
+  assert.strictEqual(getData.settings.volume, 42);
+
+  // 4. Volume range clamping (0 to 100)
+  const clampHighRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: 150 } })
+  });
+  assert.strictEqual(clampHighRes.status, 200);
+  const clampHighData = await clampHighRes.json();
+  assert.strictEqual(clampHighData.settings.volume, 100, 'Volume > 100 must clamp to 100');
+
+  const clampLowRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: -25 } })
+  });
+  assert.strictEqual(clampLowRes.status, 200);
+  const clampLowData = await clampLowRes.json();
+  assert.strictEqual(clampLowData.settings.volume, 0, 'Volume < 0 must clamp to 0');
+
+  // 5. Restore default enabled state
+  const restoreRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: 25 } })
+  });
+  assert.strictEqual(restoreRes.status, 200);
+  const restoreData = await restoreRes.json();
+  assert.strictEqual(restoreData.settings.enabled, true);
+  assert.strictEqual(restoreData.settings.volume, 25);
+});
+
 test('MP3 Audio Streaming & HTTP Byte-Range Delivery Suite', async () => {
   // 1. Create a dummy test library and sample MP3 binary file with known deterministic byte pattern
   const testLibDir = path.resolve(process.cwd(), 'data', 'test_stream_lib');
@@ -3130,7 +3193,13 @@ test('Production Step #9: Security Hardening Audit Suite', async () => {
 test('Close server', async () => {
   const { libraryWatcher } = await import('../lib/watcher.js');
   libraryWatcher.stopAll();
+  if (testWss) {
+    try {
+      testWss.close();
+    } catch (e) {}
+  }
   await new Promise<void>((resolve) => {
     server.close(() => resolve());
   });
+  setTimeout(() => process.exit(0), 200);
 });

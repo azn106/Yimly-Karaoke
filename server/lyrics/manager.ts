@@ -22,7 +22,7 @@ export const PROVIDER_DISPLAY_NAMES: Record<LyricProviderId, string> = {
 export function getActiveProviderList(): LyricProviderId[] {
   try {
     const settings = getSettings();
-    const configured = settings.lyrics?.providers;
+    const configured = (settings.lyrics as any)?.providers;
     if (Array.isArray(configured) && configured.length > 0) {
       return configured.filter((p): p is LyricProviderId =>
         ['netease', 'qqmusic', 'kugou', 'musixmatch'].includes(p)

@@ -18,10 +18,18 @@ import {
   Play, Pause, SkipForward, RotateCcw, Mic, Music, 
   FileText, ArrowLeft, Plus, Radio, Check, AlertCircle, 
   User, Library as LibraryIcon, Search, X, RefreshCw,
-  Maximize2, Minimize2, Info, LogOut, QrCode, Clock, Volume2
+  Maximize2, Minimize2, Info, LogOut, QrCode, Clock, Volume2, Disc3
 } from 'lucide-react';
 import { filterSongs, SearchableSong } from '../lib/search-utils';
 import { getAuthToken } from '../lib/auth';
+import {
+  getBackgroundMusicSettings,
+  fetchServerBackgroundMusicSettings,
+  resolveBackgroundMusicSettings,
+  BACKGROUND_MUSIC_STORAGE_KEY,
+  BackgroundMusicSettings,
+  DEFAULT_BACKGROUND_MUSIC_SETTINGS,
+} from '../utils/backgroundMusicSettings';
 
 export interface LyricWord {
   text: string;
@@ -178,6 +186,16 @@ export default function RoomSession() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const restorePositionRef = useRef<{ time: number, playing: boolean } | null>(null);
+
+  // Background Music State & Controller (Host Only)
+  const bgmAudioRef = useRef<HTMLAudioElement>(null);
+  const [bgmSettings, setBgmSettings] = useState<BackgroundMusicSettings>(getBackgroundMusicSettings);
+  const [bgmLibrary, setBgmLibrary] = useState<Array<{ id: number; title: string; artist: string }>>([]);
+  const bgmShuffleQueueRef = useRef<number[]>([]);
+  const bgmCurrentIndexRef = useRef<number>(0);
+  const [bgmCurrentSong, setBgmCurrentSong] = useState<{ id: number; title: string; artist: string } | null>(null);
+  const [bgmIsActive, setBgmIsActive] = useState<boolean>(false);
+  const bgmSavedPosRef = useRef<{ songId: number | null; time: number }>({ songId: null, time: 0 });
 
   // TV Remote / D-pad Navigation Focus Management
   const playButtonRef = useRef<HTMLButtonElement>(null);
@@ -830,6 +848,11 @@ export default function RoomSession() {
                 prevSettingsJsonRef.current = JSON.stringify(resolved);
               }
               break;
+            case 'BACKGROUND_MUSIC_SETTINGS_UPDATED':
+              if (msg.payload?.settings) {
+                setBgmSettings(resolveBackgroundMusicSettings(msg.payload.settings));
+              }
+              break;
             case 'SESSION_CLOSED':
               isClosedIntentionally = true;
               setValidationStatus('expired');
@@ -1266,6 +1289,21 @@ export default function RoomSession() {
     }
   }, []);
 
+  // Safe play helper for ambient background music without tripping main karaoke blocked banner
+  const safePlayBgm = useCallback((audio: HTMLAudioElement | null) => {
+    if (!audio) return;
+    try {
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.catch((err: any) => {
+          console.warn('[BGM] Play waiting for user interaction:', err);
+        });
+      }
+    } catch (err) {
+      console.warn('[BGM] Synchronous play failed:', err);
+    }
+  }, []);
+
   // Host Control actions
   const togglePlay = () => {
     if (!isHost) return;
@@ -1449,9 +1487,165 @@ export default function RoomSession() {
     }
   }, [playing, currentSong?.songId, variant, isHost, safePlay]);
 
+  // Load and listen to Background Music Settings (Host Only)
+  useEffect(() => {
+    if (!isHost) return;
+
+    fetchServerBackgroundMusicSettings().then((srv) => {
+      if (srv) setBgmSettings(srv);
+    });
+
+    const handleSettingsChange = (e: any) => {
+      if (e.detail) {
+        setBgmSettings(e.detail);
+      }
+    };
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === BACKGROUND_MUSIC_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setBgmSettings(resolveBackgroundMusicSettings(parsed));
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('yimly_bgm_settings_changed', handleSettingsChange);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('yimly_bgm_settings_changed', handleSettingsChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [isHost]);
+
+  // Fetch local library tracks for background music pool (Host Only)
+  useEffect(() => {
+    if (!isHost) return;
+
+    fetch('/api/karaoke/songs')
+      .then(res => res.ok ? res.json() : fetch('/api/songs').then(r => r.json()))
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          const eligible = data
+            .filter((s: any) => s && s.id)
+            .map((s: any) => ({
+              id: s.id,
+              title: s.title || 'Unknown Title',
+              artist: s.artist || 'Unknown Artist'
+            }));
+          setBgmLibrary(eligible);
+        }
+      })
+      .catch(err => console.warn('[BGM] Failed to load library for background music:', err));
+  }, [isHost]);
+
+  // Helper to generate a new shuffled order of track IDs without immediate repeat
+  const generateShuffledQueue = useCallback((tracks: Array<{ id: number }>, lastId?: number | null) => {
+    if (tracks.length === 0) return [];
+    const ids = tracks.map(t => t.id);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    // If the first song in new shuffle is identical to last played and library > 1, swap it
+    if (ids.length > 1 && lastId && ids[0] === lastId) {
+      [ids[0], ids[ids.length - 1]] = [ids[ids.length - 1], ids[0]];
+    }
+    return ids;
+  }, []);
+
+  // Determine if Room is in a genuine idle, empty-queue state
+  const isKaraokeActive = !!currentSong || playing || queue.some(q => q.status === 'playing' || (q.status === 'pending' && q.downloadStatus !== 'failed'));
+
+  // Background Music Playback Coordinator Effect
+  useEffect(() => {
+    if (!isHost) return;
+
+    const bgmAudio = bgmAudioRef.current;
+    if (!bgmAudio) return;
+
+    // Apply configured background music volume dynamically
+    const targetVol = Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100));
+    bgmAudio.volume = targetVol;
+
+    // If karaoke is active or BGM is disabled or no library tracks:
+    // Background music MUST be paused immediately.
+    if (isKaraokeActive || !bgmSettings.enabled || bgmLibrary.length === 0) {
+      if (!bgmAudio.paused) {
+        // Save exact playback position and current track identity
+        bgmSavedPosRef.current = {
+          songId: bgmCurrentSong?.id ?? null,
+          time: bgmAudio.currentTime
+        };
+        try {
+          bgmAudio.pause();
+        } catch (e) {}
+      }
+      setBgmIsActive(false);
+      return;
+    }
+
+    // Karaoke is NOT active, BGM is enabled, and library has tracks.
+    // Ensure shuffle queue is populated
+    if (bgmShuffleQueueRef.current.length === 0) {
+      bgmShuffleQueueRef.current = generateShuffledQueue(bgmLibrary);
+      bgmCurrentIndexRef.current = 0;
+    }
+
+    // If no BGM track is mounted, pick the current one from the shuffle queue
+    if (!bgmCurrentSong) {
+      const targetId = bgmShuffleQueueRef.current[bgmCurrentIndexRef.current];
+      const found = bgmLibrary.find(t => t.id === targetId) || bgmLibrary[0];
+      setBgmCurrentSong(found);
+      return; // Will re-run once bgmCurrentSong state updates
+    }
+
+    // Resume or play the background track
+    setBgmIsActive(true);
+    if (bgmAudio.paused) {
+      // If we have saved position for this same song, restore it
+      if (bgmSavedPosRef.current.songId === bgmCurrentSong.id && bgmSavedPosRef.current.time > 0) {
+        try {
+          if (Math.abs(bgmAudio.currentTime - bgmSavedPosRef.current.time) > 0.5) {
+            bgmAudio.currentTime = bgmSavedPosRef.current.time;
+          }
+        } catch (e) {}
+      }
+      safePlayBgm(bgmAudio);
+    }
+  }, [isHost, isKaraokeActive, bgmSettings.enabled, bgmSettings.volume, bgmLibrary, bgmCurrentSong, safePlayBgm, generateShuffledQueue]);
+
+  // Handler when a background music track finishes naturally: advance continuous shuffle
+  const handleBgmEnded = useCallback(() => {
+    if (!isHost || bgmLibrary.length === 0) return;
+
+    let nextIdx = bgmCurrentIndexRef.current + 1;
+    if (nextIdx >= bgmShuffleQueueRef.current.length) {
+      // Re-shuffle avoiding repeating the last track
+      const lastId = bgmCurrentSong?.id ?? null;
+      bgmShuffleQueueRef.current = generateShuffledQueue(bgmLibrary, lastId);
+      nextIdx = 0;
+    }
+    bgmCurrentIndexRef.current = nextIdx;
+    const nextSongId = bgmShuffleQueueRef.current[nextIdx];
+    const nextTrack = bgmLibrary.find(t => t.id === nextSongId) || bgmLibrary[0];
+
+    // Reset saved position for new track
+    bgmSavedPosRef.current = { songId: nextTrack.id, time: 0 };
+    setBgmCurrentSong(nextTrack);
+  }, [isHost, bgmLibrary, bgmCurrentSong?.id, generateShuffledQueue]);
+
+  // Handler for BGM audio errors (e.g. file missing on disk)
+  const handleBgmError = useCallback(() => {
+    if (!isHost || bgmLibrary.length <= 1) return;
+    console.warn('[BGM] Track unavailable on disk, advancing to next background track');
+    handleBgmEnded();
+  }, [isHost, bgmLibrary.length, handleBgmEnded]);
+
   const handleEnableAudio = () => {
     if (audioRef.current) {
       safePlay(audioRef.current);
+    }
+    if (bgmAudioRef.current && isHost && !isKaraokeActive && bgmSettings.enabled) {
+      safePlayBgm(bgmAudioRef.current);
     }
   };
 
@@ -2158,6 +2352,17 @@ export default function RoomSession() {
                 <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">
                   Waiting for someone to choose a song...
                 </p>
+
+                {bgmSettings.enabled && bgmCurrentSong && (
+                  <div className="mt-6 px-4 py-2 rounded-2xl bg-[#141622]/80 border border-white/10 flex items-center gap-3 text-xs text-zinc-300 shadow-lg">
+                    <Disc3 className={`w-4 h-4 text-[#FF4FA3] ${bgmIsActive ? 'animate-spin' : ''}`} />
+                    <div className="text-left">
+                      <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">Background Music</span>
+                      <span className="font-semibold text-white truncate max-w-[200px] sm:max-w-[260px] inline-block align-bottom">{bgmCurrentSong.title}</span>
+                      <span className="text-zinc-400 ml-1.5">— {bgmCurrentSong.artist}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2280,6 +2485,25 @@ export default function RoomSession() {
                 setAudioAutoplayBlocked(false);
                 setAudioError('Audio track could not be loaded or is unavailable on disk. Tap Skip to continue.');
               }}
+              className="hidden"
+            />
+          )}
+
+          {/* Background Music Audio Player for Host (Empty Queue) */}
+          {isHost && (
+            <audio
+              ref={bgmAudioRef}
+              src={bgmCurrentSong ? `/api/songs/${bgmCurrentSong.id}/audio?type=original` : undefined}
+              preload="auto"
+              playsInline
+              onCanPlay={() => {
+                const bgmAudio = bgmAudioRef.current;
+                if (bgmAudio && !isKaraokeActive && bgmSettings.enabled && bgmAudio.paused) {
+                  safePlayBgm(bgmAudio);
+                }
+              }}
+              onEnded={handleBgmEnded}
+              onError={handleBgmError}
               className="hidden"
             />
           )}
