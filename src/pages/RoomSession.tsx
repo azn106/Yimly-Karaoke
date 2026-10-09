@@ -926,8 +926,18 @@ export default function RoomSession() {
     };
   }, [isHost, validationStatus, sessionId, ws]);
 
-  // Determine current song
-  const currentSong = queue.find(q => q.status === 'playing') || queue.find(q => q.status === 'pending') || queue[0];
+  // Determine current song: only select an item that has a valid songId and is eligible to play.
+  // Prefer an item with status === 'playing', followed by an eligible pending item.
+  // Do not select items that are downloading, processing, or failed, and do not fall back to queue[0].
+  const currentSong = queue.find(q => q.status === 'playing' && q.songId !== null && q.songId !== undefined) ||
+    queue.find(q => 
+      q.status === 'pending' && 
+      q.songId !== null && 
+      q.songId !== undefined && 
+      q.downloadStatus !== 'downloading' && 
+      q.downloadStatus !== 'processing' && 
+      q.downloadStatus !== 'failed'
+    );
 
   // Fetch song details and lyrics whenever currentSong changes
   useEffect(() => {
@@ -2233,7 +2243,7 @@ export default function RoomSession() {
           {isHost && (
             <audio 
               ref={audioRef}
-              src={currentSong ? `/api/songs/${currentSong.songId}/audio?type=${variant}` : undefined}
+              src={currentSong && currentSong.songId ? `/api/songs/${currentSong.songId}/audio?type=${variant}` : undefined}
               preload="auto"
               playsInline
               onTimeUpdate={() => {
@@ -2339,7 +2349,7 @@ export default function RoomSession() {
               {/* Scrollable Queue Items */}
               <div className="relative z-10 flex-1 overflow-y-auto space-y-2 pr-0.5 scrollbar-thin min-h-0">
                 {queue.map((item, index) => {
-                  const isPlaying = item.status === 'playing' || index === 0;
+                  const isPlaying = item.status === 'playing' && item.songId !== null && item.songId !== undefined;
                   const singerName = item.userName || (item.userId ? `Singer ${item.userId}` : 'Guest');
                   const isDownloading = item.songId === null && item.downloadStatus === 'downloading';
                   const isProcessing = item.songId === null && item.downloadStatus === 'processing';
