@@ -47,6 +47,7 @@ export interface RoomState {
   currentSongId: number | null;
   currentQueueItemId: number | null;
   variant: 'original' | 'instrumental';
+  lyricsFormat?: 'elrc' | 'lrc';
   lrcOffset: number; // in ms
   elrcOffset: number; // in ms
   lyricOffset: number; // in ms
@@ -135,12 +136,31 @@ export async function getOrCreateRoom(sessionId: string): Promise<RoomState> {
       console.error('[WS] Error initializing room state from DB:', e);
     }
 
+    let initialVariant: 'original' | 'instrumental' = 'instrumental';
+    let initialLyricsFormat: 'elrc' | 'lrc' = 'elrc';
+
+    try {
+      const defaultsSaved = await db.select().from(settings).where(eq(settings.key, 'karaoke_startup_defaults')).limit(1);
+      if (defaultsSaved.length > 0 && defaultsSaved[0].value) {
+        const parsed = JSON.parse(defaultsSaved[0].value);
+        if (parsed.audioMode === 'original' || parsed.audioMode === 'instrumental') {
+          initialVariant = parsed.audioMode;
+        }
+        if (parsed.lyricsMode === 'elrc' || parsed.lyricsMode === 'lrc') {
+          initialLyricsFormat = parsed.lyricsMode;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
     room = {
       playing: false,
       position: 0,
       currentSongId: initialSongId,
       currentQueueItemId: initialQueueItemId,
-      variant: 'original',
+      variant: initialVariant,
+      lyricsFormat: initialLyricsFormat,
       lrcOffset: initialLrcOffset,
       elrcOffset: initialElrcOffset,
       lyricOffset: initialLyricOffset,
@@ -212,6 +232,9 @@ export function setupWebSockets(wss: WebSocketServer) {
           currentSongId: room.currentSongId,
           currentQueueItemId: room.currentQueueItemId,
           variant: room.variant,
+          lyricsFormat: room.lyricsFormat || 'elrc',
+          lrcOffset: room.lrcOffset,
+          elrcOffset: room.elrcOffset,
           lyricOffset: room.lyricOffset,
           lyricSettings: room.lyricSettings
         }
@@ -315,6 +338,22 @@ export function setupWebSockets(wss: WebSocketServer) {
             });
             break;
 
+          case 'FORMAT_CHANGED':
+            if (!socketIsHost) {
+              console.warn(`[WS] Unauthorized non-host attempted FORMAT_CHANGED on session ${sessionId}`);
+              break;
+            }
+            if (data.payload?.format === 'elrc' || data.payload?.format === 'lrc') {
+              room.lyricsFormat = data.payload.format;
+              broadcastToRoom(sessionId, {
+                type: 'FORMAT_CHANGED',
+                payload: {
+                  format: room.lyricsFormat
+                }
+              });
+            }
+            break;
+
           case 'OFFSET_CHANGED': {
             if (!socketIsHost) {
               console.warn(`[WS] Unauthorized non-host attempted OFFSET_CHANGED on session ${sessionId}`);
@@ -399,6 +438,7 @@ export function setupWebSockets(wss: WebSocketServer) {
                   currentSongId: room.currentSongId,
                   currentQueueItemId: room.currentQueueItemId,
                   variant: room.variant,
+                  lyricsFormat: room.lyricsFormat || 'elrc',
                   lrcOffset: room.lrcOffset,
                   elrcOffset: room.elrcOffset,
                   lyricOffset: room.lyricOffset,
@@ -807,7 +847,12 @@ export function broadcastLyricSettingsToAllActiveRooms(newSettings: LyricsAppear
   }
 }
 
-export function broadcastBackgroundMusicSettingsToAllActiveRooms(newSettings: { enabled: boolean; volume: number }) {
+export function broadcastBackgroundMusicSettingsToAllActiveRooms(newSettings: {
+  enabled: boolean;
+  volume: number;
+  playlistId: string | null;
+  audioMode?: 'both' | 'instrumental' | 'original';
+}) {
   for (const sessionId of activeRooms.keys()) {
     broadcastToRoom(sessionId, {
       type: 'BACKGROUND_MUSIC_SETTINGS_UPDATED',

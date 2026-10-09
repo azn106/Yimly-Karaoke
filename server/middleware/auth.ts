@@ -43,8 +43,8 @@ export const isPublicRoute = (req: Request): boolean => {
     return true;
   }
 
-  // Global lyrics appearance and background music settings for hosts & rooms (and custom font file serving)
-  if (method === 'GET' && (/^\/api\/karaoke\/settings\/(lyrics|background-music)(\/custom-font(\/[^\/]+)?)?$/.test(url) || /^\/api\/lyrics\/custom-font(\/[^\/]+)?$/.test(url))) {
+  // Global lyrics appearance, background music, and karaoke default settings for hosts & rooms (and custom font file serving)
+  if (method === 'GET' && (/^\/api\/karaoke\/settings\/(lyrics|background-music|karaoke-defaults|defaults)(\/custom-font(\/[^\/]+)?)?$/.test(url) || /^\/api\/lyrics\/custom-font(\/[^\/]+)?$/.test(url))) {
     return true;
   }
 

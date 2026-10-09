@@ -30,6 +30,14 @@ import {
   BackgroundMusicSettings,
   DEFAULT_BACKGROUND_MUSIC_SETTINGS,
 } from '../utils/backgroundMusicSettings';
+import {
+  getKaraokeDefaultsSettings,
+  fetchServerKaraokeDefaultsSettings,
+  KaraokeDefaultsSettings,
+  DEFAULT_KARAOKE_DEFAULTS_SETTINGS,
+  AudioMode,
+  LyricsMode
+} from '../utils/karaokeDefaultsSettings';
 
 export interface LyricWord {
   text: string;
@@ -84,7 +92,9 @@ export default function RoomSession() {
   const [duration, setDuration] = useState(0);
 
   // Advanced features state
-  const [variant, setVariant] = useState<'original' | 'instrumental'>('original');
+  const [variant, setVariant] = useState<'original' | 'instrumental'>(() => {
+    return getKaraokeDefaultsSettings().audioMode;
+  });
   const [lrcOffset, setLrcOffset] = useState<number>(0); // in ms
   const [elrcOffset, setElrcOffset] = useState<number>(0); // in ms
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
@@ -154,16 +164,26 @@ export default function RoomSession() {
   }, [sessionId]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [lyricsFormat, setLyricsFormat] = useState<'elrc' | 'lrc'>('elrc');
+  const [lyricsFormat, setLyricsFormat] = useState<'elrc' | 'lrc'>(() => {
+    return getKaraokeDefaultsSettings().lyricsMode;
+  });
+  const preferredLyricsFormatRef = useRef<'elrc' | 'lrc'>(getKaraokeDefaultsSettings().lyricsMode);
   const rawLyricsRef = useRef<string>('');
 
   const handleToggleLyricsFormat = () => {
     if (!currentSongDetails?.hasElrc) return;
     const newFormat = lyricsFormat === 'elrc' ? 'lrc' : 'elrc';
+    preferredLyricsFormatRef.current = newFormat;
     setLyricsFormat(newFormat);
     if (rawLyricsRef.current) {
       const parsed = parseLrc(rawLyricsRef.current, newFormat);
       setLyrics(parsed);
+    }
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'FORMAT_CHANGED',
+        payload: { format: newFormat }
+      }));
     }
   };
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
@@ -190,10 +210,10 @@ export default function RoomSession() {
   // Background Music State & Controller (Host Only)
   const bgmAudioRef = useRef<HTMLAudioElement>(null);
   const [bgmSettings, setBgmSettings] = useState<BackgroundMusicSettings>(getBackgroundMusicSettings);
-  const [bgmLibrary, setBgmLibrary] = useState<Array<{ id: number; title: string; artist: string }>>([]);
+  const [bgmLibrary, setBgmLibrary] = useState<Array<{ id: number; title: string; artist: string; hasOriginal?: boolean; hasInstrumental?: boolean; variant?: string }>>([]);
   const bgmShuffleQueueRef = useRef<number[]>([]);
   const bgmCurrentIndexRef = useRef<number>(0);
-  const [bgmCurrentSong, setBgmCurrentSong] = useState<{ id: number; title: string; artist: string } | null>(null);
+  const [bgmCurrentSong, setBgmCurrentSong] = useState<{ id: number; title: string; artist: string; hasOriginal?: boolean; hasInstrumental?: boolean; variant?: string } | null>(null);
   const [bgmIsActive, setBgmIsActive] = useState<boolean>(false);
   const bgmSavedPosRef = useRef<{ songId: number | null; time: number }>({ songId: null, time: 0 });
 
@@ -725,6 +745,10 @@ export default function RoomSession() {
           if (data.playback.variant) {
             setVariant(data.playback.variant);
           }
+          if (data.playback.lyricsFormat) {
+            setLyricsFormat(data.playback.lyricsFormat);
+            preferredLyricsFormatRef.current = data.playback.lyricsFormat;
+          }
           if (typeof data.playback.lrcOffset === 'number') {
             setLrcOffset(data.playback.lrcOffset);
           } else if (typeof data.playback.lyricOffset === 'number') {
@@ -786,6 +810,14 @@ export default function RoomSession() {
             case 'STATE_UPDATE':
               if (typeof msg.payload?.playing === 'boolean') setPlaying(msg.payload.playing);
               if (msg.payload?.variant) setVariant(msg.payload.variant);
+              if (msg.payload?.lyricsFormat) {
+                setLyricsFormat(msg.payload.lyricsFormat);
+                preferredLyricsFormatRef.current = msg.payload.lyricsFormat;
+                if (rawLyricsRef.current) {
+                  const parsed = parseLrc(rawLyricsRef.current, msg.payload.lyricsFormat);
+                  setLyrics(parsed);
+                }
+              }
               if (typeof msg.payload?.lrcOffset === 'number') setLrcOffset(msg.payload.lrcOffset);
               if (typeof msg.payload?.elrcOffset === 'number') setElrcOffset(msg.payload.elrcOffset);
               if (msg.payload?.lyricSettings) {
@@ -828,6 +860,16 @@ export default function RoomSession() {
               }
               if (msg.payload.playing !== undefined) {
                 setPlaying(msg.payload.playing);
+              }
+              break;
+            case 'FORMAT_CHANGED':
+              if (msg.payload?.format === 'elrc' || msg.payload?.format === 'lrc') {
+                setLyricsFormat(msg.payload.format);
+                preferredLyricsFormatRef.current = msg.payload.format;
+                if (rawLyricsRef.current) {
+                  const parsed = parseLrc(rawLyricsRef.current, msg.payload.format);
+                  setLyrics(parsed);
+                }
               }
               break;
             case 'OFFSET_CHANGED':
@@ -1011,14 +1053,15 @@ export default function RoomSession() {
           rawLyricsRef.current = lyricsText;
           const hasElrcMarker = lyricsText.includes('<') && lyricsText.includes('>');
           const isElrc = Boolean(data?.hasElrc || hasElrcMarker);
-          const format = isElrc ? 'elrc' : 'lrc';
+          const preferred = preferredLyricsFormatRef.current;
+          const format = (preferred === 'elrc' && isElrc) ? 'elrc' : 'lrc';
           setLyricsFormat(format);
           const parsed = parseLrc(lyricsText, format);
           setLyrics(parsed);
         } else {
           rawLyricsRef.current = '';
           setLyrics([]);
-          setLyricsFormat(data?.hasElrc ? 'elrc' : 'lrc');
+          setLyricsFormat(data?.hasElrc ? preferredLyricsFormatRef.current : 'lrc');
         }
       }).catch(err => {
         if (!isCancelled) {
@@ -1239,10 +1282,18 @@ export default function RoomSession() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
+      const defaults = getKaraokeDefaultsSettings();
       const res = await fetch('/api/karaoke/sessions', {
         method: 'POST',
         credentials: 'same-origin',
-        headers
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          audioMode: defaults.audioMode,
+          lyricsMode: defaults.lyricsMode
+        })
       });
       let newSession: any = {};
       if (res.headers.get('content-type')?.includes('application/json')) {
@@ -1516,27 +1567,6 @@ export default function RoomSession() {
     };
   }, [isHost]);
 
-  // Fetch local library tracks for background music pool (Host Only)
-  useEffect(() => {
-    if (!isHost) return;
-
-    fetch('/api/karaoke/songs')
-      .then(res => res.ok ? res.json() : fetch('/api/songs').then(r => r.json()))
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          const eligible = data
-            .filter((s: any) => s && s.id)
-            .map((s: any) => ({
-              id: s.id,
-              title: s.title || 'Unknown Title',
-              artist: s.artist || 'Unknown Artist'
-            }));
-          setBgmLibrary(eligible);
-        }
-      })
-      .catch(err => console.warn('[BGM] Failed to load library for background music:', err));
-  }, [isHost]);
-
   // Helper to generate a new shuffled order of track IDs without immediate repeat
   const generateShuffledQueue = useCallback((tracks: Array<{ id: number }>, lastId?: number | null) => {
     if (tracks.length === 0) return [];
@@ -1551,6 +1581,130 @@ export default function RoomSession() {
     }
     return ids;
   }, []);
+
+  // Fetch background music track pool (Host Only): Selected Playlist or All Local Songs
+  useEffect(() => {
+    if (!isHost) return;
+
+    let cancelled = false;
+
+    const loadPool = async () => {
+      let tracks: Array<{ id: number; title: string; artist: string; hasOriginal?: boolean; hasInstrumental?: boolean; variant?: string }> = [];
+
+      // 1. If a playlist is specified, try to load its songs
+      if (bgmSettings.playlistId) {
+        try {
+          const token = getAuthToken();
+          const headers: Record<string, string> = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          // Try playlist endpoint first, with fallback to karaoke songs filtered by playlist
+          const plRes = await fetch(`/api/playlists/${bgmSettings.playlistId}`, { headers });
+          if (plRes.ok) {
+            const data = await plRes.json();
+            if (Array.isArray(data?.songs) && data.songs.length > 0) {
+              tracks = data.songs
+                .filter((s: any) => s && s.id)
+                .map((s: any) => ({
+                  id: s.id,
+                  title: s.title || 'Unknown Title',
+                  artist: s.artist || 'Unknown Artist',
+                  hasOriginal: s.hasOriginal !== undefined ? s.hasOriginal : (s.variant !== 'instrumental'),
+                  hasInstrumental: s.hasInstrumental !== undefined ? s.hasInstrumental : (s.variant === 'instrumental'),
+                  variant: s.variant,
+                }));
+            }
+          } else {
+            // Also attempt /api/karaoke/songs?playlistId=...
+            const fallbackRes = await fetch(`/api/karaoke/songs?playlistId=${bgmSettings.playlistId}&audioMode=${bgmSettings.audioMode || 'both'}`);
+            if (fallbackRes.ok) {
+              const data = await fallbackRes.json();
+              if (Array.isArray(data) && data.length > 0) {
+                tracks = data
+                  .filter((s: any) => s && s.id)
+                  .map((s: any) => ({
+                    id: s.id,
+                    title: s.title || 'Unknown Title',
+                    artist: s.artist || 'Unknown Artist',
+                    hasOriginal: s.hasOriginal !== undefined ? s.hasOriginal : (s.variant !== 'instrumental'),
+                    hasInstrumental: s.hasInstrumental !== undefined ? s.hasInstrumental : (s.variant === 'instrumental'),
+                    variant: s.variant,
+                  }));
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[BGM] Error fetching playlist tracks:', err);
+        }
+      }
+
+      // 2. If no playlist selected or playlist was empty/unavailable:
+      // Fallback to All Local Music
+      if (tracks.length === 0) {
+        if (bgmSettings.playlistId) {
+          console.warn('[BGM] Selected playlist unavailable or empty, falling back to All Local Music');
+        }
+        try {
+          const allRes = await fetch(`/api/karaoke/songs?audioMode=${bgmSettings.audioMode || 'both'}`);
+          const allData = allRes.ok ? await allRes.json() : await fetch('/api/songs').then(r => r.json());
+          if (Array.isArray(allData) && allData.length > 0) {
+            tracks = allData
+              .filter((s: any) => s && s.id)
+              .map((s: any) => ({
+                id: s.id,
+                title: s.title || 'Unknown Title',
+                artist: s.artist || 'Unknown Artist',
+                hasOriginal: s.hasOriginal !== undefined ? s.hasOriginal : (s.variant !== 'instrumental'),
+                hasInstrumental: s.hasInstrumental !== undefined ? s.hasInstrumental : (s.variant === 'instrumental'),
+                variant: s.variant,
+              }));
+          }
+        } catch (err) {
+          console.warn('[BGM] Failed to load local songs fallback:', err);
+        }
+      }
+
+      // Apply Background Music Audio Mode filtering (both, instrumental, original)
+      const mode = bgmSettings.audioMode || 'both';
+      if (mode === 'instrumental') {
+        tracks = tracks.filter(t => t.hasInstrumental || t.variant === 'instrumental');
+      } else if (mode === 'original') {
+        tracks = tracks.filter(t => t.hasOriginal || (t.variant !== 'instrumental' && t.hasOriginal !== false));
+      }
+
+      if (cancelled) return;
+
+      setBgmLibrary(tracks);
+
+      // Re-initialize shuffle queue for the new track pool
+      if (tracks.length > 0) {
+        // If current song is in the new track pool, keep it to avoid jarring reset
+        const currentSongInNewPool = bgmCurrentSong && tracks.some(t => t.id === bgmCurrentSong.id);
+        if (currentSongInNewPool) {
+          bgmShuffleQueueRef.current = generateShuffledQueue(tracks, bgmCurrentSong!.id);
+          bgmCurrentIndexRef.current = 0;
+        } else {
+          // Song not in new pool: pick fresh track from new shuffle queue
+          const newQueue = generateShuffledQueue(tracks);
+          bgmShuffleQueueRef.current = newQueue;
+          bgmCurrentIndexRef.current = 0;
+          const firstTrack = tracks.find(t => t.id === newQueue[0]) || tracks[0];
+          bgmSavedPosRef.current = { songId: firstTrack.id, time: 0 };
+          setBgmCurrentSong(firstTrack);
+        }
+      } else {
+        bgmShuffleQueueRef.current = [];
+        bgmCurrentIndexRef.current = 0;
+        setBgmCurrentSong(null);
+      }
+    };
+
+    loadPool();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isHost, bgmSettings.playlistId, bgmSettings.audioMode, generateShuffledQueue]);
 
   // Determine if Room is in a genuine idle, empty-queue state
   const isKaraokeActive = !!currentSong || playing || queue.some(q => q.status === 'playing' || (q.status === 'pending' && q.downloadStatus !== 'failed'));

@@ -3,7 +3,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { db } from '../db/index.js';
-import { sessions, controllers, queueItems, songs, artists, albums, songArtists, users, settings, lyrics, libraries } from '../db/schema.js';
+import { sessions, controllers, queueItems, songs, artists, albums, songArtists, users, settings, lyrics, libraries, playlistSongs } from '../db/schema.js';
 import { downloadQueue } from '../lib/download-queue.js';
 import { resolveUrlOrQuery } from './downloader.js';
 import { eq, and, asc, or, inArray, like, sql } from 'drizzle-orm';
@@ -15,6 +15,7 @@ import {
   handleHostHeartbeat, 
   advanceQueueBySessionId, 
   getRoomState,
+  getOrCreateRoom,
   broadcastLyricSettingsToSession,
   broadcastLyricSettingsToAllActiveRooms,
   broadcastBackgroundMusicSettingsToAllActiveRooms
@@ -417,12 +418,22 @@ router.get('/settings/background-music', async (req, res) => {
         const parsed = JSON.parse(saved[0].value);
         const enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : true;
         const volume = typeof parsed.volume === 'number' && !isNaN(parsed.volume) ? Math.max(0, Math.min(100, Math.round(parsed.volume))) : 25;
-        return res.json({ settings: { enabled, volume } });
+        let playlistId: string | null = null;
+        if (parsed.playlistId !== undefined && parsed.playlistId !== null) {
+          const trimmed = String(parsed.playlistId).trim();
+          if (trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined' && trimmed !== 'all') {
+            playlistId = trimmed;
+          }
+        }
+        const audioMode = (parsed.audioMode === 'both' || parsed.audioMode === 'instrumental' || parsed.audioMode === 'original')
+          ? parsed.audioMode
+          : 'both';
+        return res.json({ settings: { enabled, volume, playlistId, audioMode } });
       } catch (e) {
         // ignore parse error
       }
     }
-    res.json({ settings: { enabled: true, volume: 25 } });
+    res.json({ settings: { enabled: true, volume: 25, playlistId: null, audioMode: 'both' } });
   } catch (error) {
     console.error('Failed to fetch background music settings:', error);
     res.status(500).json({ error: 'Failed to fetch background music settings' });
@@ -442,7 +453,20 @@ const saveBackgroundMusicSettingsHandler = async (req: any, res: any) => {
       const parsed = parseInt(raw.volume, 10);
       if (!isNaN(parsed)) volume = Math.max(0, Math.min(100, parsed));
     }
-    const resolved = { enabled, volume };
+
+    let playlistId: string | null = null;
+    if (raw.playlistId !== undefined && raw.playlistId !== null) {
+      const trimmed = String(raw.playlistId).trim();
+      if (trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined' && trimmed !== 'all') {
+        playlistId = trimmed;
+      }
+    }
+
+    const audioMode = (raw.audioMode === 'both' || raw.audioMode === 'instrumental' || raw.audioMode === 'original')
+      ? raw.audioMode
+      : 'both';
+
+    const resolved = { enabled, volume, playlistId, audioMode };
     const jsonStr = JSON.stringify(resolved);
 
     const existing = await db.select().from(settings).where(eq(settings.key, 'background_music_settings')).limit(1);
@@ -468,6 +492,66 @@ const saveBackgroundMusicSettingsHandler = async (req: any, res: any) => {
 router.put('/settings/background-music', saveBackgroundMusicSettingsHandler);
 router.post('/settings/background-music', saveBackgroundMusicSettingsHandler);
 
+// Karaoke Startup Defaults endpoints
+router.get(['/settings/karaoke-defaults', '/settings/defaults'], async (req, res) => {
+  try {
+    const saved = await db.select().from(settings).where(eq(settings.key, 'karaoke_startup_defaults')).limit(1);
+    if (saved.length > 0 && saved[0].value) {
+      try {
+        const parsed = JSON.parse(saved[0].value);
+        const audioMode = parsed.audioMode === 'original' || parsed.audioMode === 'instrumental' ? parsed.audioMode : 'instrumental';
+        const lyricsMode = parsed.lyricsMode === 'lrc' || parsed.lyricsMode === 'elrc' ? parsed.lyricsMode : 'elrc';
+        return res.json({ settings: { audioMode, lyricsMode } });
+      } catch (e) {
+        // ignore parse error
+      }
+    }
+    res.json({ settings: { audioMode: 'instrumental', lyricsMode: 'elrc' } });
+  } catch (error) {
+    console.error('Failed to fetch karaoke startup defaults:', error);
+    res.status(500).json({ error: 'Failed to fetch karaoke startup defaults' });
+  }
+});
+
+const saveKaraokeDefaultsHandler = async (req: any, res: any) => {
+  try {
+    const raw = req.body?.settings || req.body || {};
+    const audioMode = raw.audioMode === 'original' || raw.audioMode === 'instrumental'
+      ? raw.audioMode
+      : (raw.audio === 'original' || raw.audio === 'instrumental'
+          ? raw.audio
+          : (raw.variant === 'original' || raw.variant === 'instrumental'
+              ? raw.variant
+              : 'instrumental'));
+
+    const lyricsMode = raw.lyricsMode === 'lrc' || raw.lyricsMode === 'elrc'
+      ? raw.lyricsMode
+      : (raw.lyrics === 'lrc' || raw.lyrics === 'elrc'
+          ? raw.lyrics
+          : (raw.lyricsFormat === 'lrc' || raw.lyricsFormat === 'elrc'
+              ? raw.lyricsFormat
+              : 'elrc'));
+
+    const resolved = { audioMode, lyricsMode };
+    const jsonStr = JSON.stringify(resolved);
+
+    const existing = await db.select().from(settings).where(eq(settings.key, 'karaoke_startup_defaults')).limit(1);
+    if (existing.length === 0) {
+      await db.insert(settings).values({ key: 'karaoke_startup_defaults', value: jsonStr });
+    } else {
+      await db.update(settings).set({ value: jsonStr }).where(eq(settings.key, 'karaoke_startup_defaults'));
+    }
+
+    res.json({ success: true, settings: resolved });
+  } catch (error) {
+    console.error('Failed to save karaoke startup defaults:', error);
+    res.status(500).json({ error: 'Failed to save karaoke startup defaults' });
+  }
+};
+
+router.put(['/settings/karaoke-defaults', '/settings/defaults'], saveKaraokeDefaultsHandler);
+router.post(['/settings/karaoke-defaults', '/settings/defaults'], saveKaraokeDefaultsHandler);
+
 router.post('/sessions', async (req, res) => {
   try {
     const user = (req as any).user;
@@ -488,6 +572,29 @@ router.post('/sessions', async (req, res) => {
     const hostId = user?.id;
     if (!hostId) {
       return res.status(401).json({ error: 'Authentication required to create a karaoke room' });
+    }
+
+    // Determine initial startup defaults (Instrumental & eLRC default)
+    let initialAudioMode: 'instrumental' | 'original' = 'instrumental';
+    let initialLyricsMode: 'elrc' | 'lrc' = 'elrc';
+    try {
+      const defaultsSaved = await db.select().from(settings).where(eq(settings.key, 'karaoke_startup_defaults')).limit(1);
+      if (defaultsSaved.length > 0 && defaultsSaved[0].value) {
+        const parsed = JSON.parse(defaultsSaved[0].value);
+        if (parsed.audioMode === 'original' || parsed.audioMode === 'instrumental') {
+          initialAudioMode = parsed.audioMode;
+        }
+        if (parsed.lyricsMode === 'elrc' || parsed.lyricsMode === 'lrc') {
+          initialLyricsMode = parsed.lyricsMode;
+        }
+      }
+    } catch (e) {}
+
+    if (req.body?.audioMode === 'original' || req.body?.audioMode === 'instrumental') {
+      initialAudioMode = req.body.audioMode;
+    }
+    if (req.body?.lyricsMode === 'elrc' || req.body?.lyricsMode === 'lrc') {
+      initialLyricsMode = req.body.lyricsMode;
     }
 
     // Determine initial lyric settings
@@ -517,7 +624,9 @@ router.post('/sessions', async (req, res) => {
 
     res.json({
       ...inserted[0],
-      lyricSettings: initialLyricsSettings
+      lyricSettings: initialLyricsSettings,
+      audioMode: initialAudioMode,
+      lyricsMode: initialLyricsMode
     });
   } catch (error) {
     console.error('Failed to create room:', error);
@@ -869,7 +978,7 @@ router.get('/sessions/:sessionId/state', async (req, res) => {
       };
     });
 
-    const liveState = getRoomState(sessionId);
+    const liveState = (await getOrCreateRoom(sessionId)) || getRoomState(sessionId);
     let resolvedLyricSettings = DEFAULT_LYRICS_SETTINGS;
     if (liveState?.lyricSettings) {
       resolvedLyricSettings = liveState.lyricSettings;
@@ -894,6 +1003,7 @@ router.get('/sessions/:sessionId/state', async (req, res) => {
         currentSongId: liveState.currentSongId,
         currentQueueItemId: liveState.currentQueueItemId,
         variant: liveState.variant,
+        lyricsFormat: liveState.lyricsFormat || 'elrc',
         lyricOffset: liveState.lyricOffset,
         lyricSettings: liveState.lyricSettings
       } : null
@@ -1098,23 +1208,55 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
 // Guest-scoped songs catalog for karaoke room queueing (minimal metadata, no filesystem paths)
 router.get('/songs', async (req, res) => {
   try {
-    const allSongs = await db.select({
-      id: songs.id,
-      title: songs.title,
-      artist: artists.name,
-      artistId: songs.artistId,
-      album: albums.title,
-      albumId: songs.albumId,
-      duration: songs.duration,
-      variant: songs.variant,
-      genre: songs.genre,
-      year: songs.year,
-      artworkPath: songs.artworkPath,
-      albumArtworkPath: albums.artworkPath,
-    })
-    .from(songs)
-    .leftJoin(artists, eq(songs.artistId, artists.id))
-    .leftJoin(albums, eq(songs.albumId, albums.id));
+    const playlistIdQuery = req.query.playlistId ? parseInt(req.query.playlistId as string, 10) : null;
+    let allSongs;
+
+    const audioModeQuery = (req.query.audioMode as string)?.toLowerCase();
+
+    if (playlistIdQuery && !isNaN(playlistIdQuery)) {
+      allSongs = await db.select({
+        id: songs.id,
+        title: songs.title,
+        artist: artists.name,
+        artistId: songs.artistId,
+        album: albums.title,
+        albumId: songs.albumId,
+        duration: songs.duration,
+        variant: songs.variant,
+        genre: songs.genre,
+        year: songs.year,
+        artworkPath: songs.artworkPath,
+        albumArtworkPath: albums.artworkPath,
+        mainAudioPath: songs.mainAudioPath,
+        instrumentalAudioPath: songs.instrumentalAudioPath,
+      })
+      .from(playlistSongs)
+      .innerJoin(songs, eq(playlistSongs.songId, songs.id))
+      .leftJoin(artists, eq(songs.artistId, artists.id))
+      .leftJoin(albums, eq(songs.albumId, albums.id))
+      .where(eq(playlistSongs.playlistId, playlistIdQuery))
+      .orderBy(asc(playlistSongs.position));
+    } else {
+      allSongs = await db.select({
+        id: songs.id,
+        title: songs.title,
+        artist: artists.name,
+        artistId: songs.artistId,
+        album: albums.title,
+        albumId: songs.albumId,
+        duration: songs.duration,
+        variant: songs.variant,
+        genre: songs.genre,
+        year: songs.year,
+        artworkPath: songs.artworkPath,
+        albumArtworkPath: albums.artworkPath,
+        mainAudioPath: songs.mainAudioPath,
+        instrumentalAudioPath: songs.instrumentalAudioPath,
+      })
+      .from(songs)
+      .leftJoin(artists, eq(songs.artistId, artists.id))
+      .leftJoin(albums, eq(songs.albumId, albums.id));
+    }
 
     const songIds = allSongs.map(s => s.id);
     const artistsMap = await getSongArtistsMap(songIds);
@@ -1131,9 +1273,11 @@ router.get('/songs', async (req, res) => {
       });
     }
 
-    const formatted = allSongs.map(s => {
+    let formatted = allSongs.map(s => {
       const trackArtists = artistsMap.get(s.id) || (s.artist ? [{ id: s.artistId, name: s.artist }] : []);
       const lyr = lyricsMap.get(s.id) || { hasLrc: false, hasElrc: false };
+      const hasOriginal = !!(s.mainAudioPath && s.mainAudioPath.trim().length > 0) || (s.variant === 'original' && !s.instrumentalAudioPath);
+      const hasInstrumental = !!(s.instrumentalAudioPath && s.instrumentalAudioPath.trim().length > 0) || s.variant === 'instrumental';
       return {
         id: s.id,
         title: s.title,
@@ -1145,8 +1289,16 @@ router.get('/songs', async (req, res) => {
         hasArtwork: !!s.artworkPath || !!s.albumArtworkPath,
         hasLrc: lyr.hasLrc,
         hasElrc: lyr.hasElrc,
+        hasOriginal,
+        hasInstrumental,
       };
     });
+
+    if (audioModeQuery === 'instrumental') {
+      formatted = formatted.filter(s => s.hasInstrumental);
+    } else if (audioModeQuery === 'original') {
+      formatted = formatted.filter(s => s.hasOriginal);
+    }
 
     res.json(formatted);
   } catch (error) {

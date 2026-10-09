@@ -1,11 +1,17 @@
+export type BackgroundMusicAudioMode = 'both' | 'instrumental' | 'original';
+
 export interface BackgroundMusicSettings {
   enabled: boolean;
   volume: number; // 0 to 100
+  playlistId: string | null;
+  audioMode: BackgroundMusicAudioMode;
 }
 
 export const DEFAULT_BACKGROUND_MUSIC_SETTINGS: BackgroundMusicSettings = {
   enabled: true,
   volume: 25,
+  playlistId: null,
+  audioMode: 'both',
 };
 
 export const BACKGROUND_MUSIC_STORAGE_KEY = 'yimly_background_music_settings_v1';
@@ -29,9 +35,28 @@ export function resolveBackgroundMusicSettings(raw?: any): BackgroundMusicSettin
     }
   }
 
+  let playlistId: string | null = null;
+  if (raw.playlistId !== undefined && raw.playlistId !== null) {
+    const trimmed = String(raw.playlistId).trim();
+    if (trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined' && trimmed !== 'all') {
+      playlistId = trimmed;
+    }
+  }
+
+  let audioMode: BackgroundMusicAudioMode = DEFAULT_BACKGROUND_MUSIC_SETTINGS.audioMode;
+  if (raw.audioMode === 'both' || raw.audioMode === 'instrumental' || raw.audioMode === 'original') {
+    audioMode = raw.audioMode;
+  } else if (raw.audio === 'both' || raw.audio === 'instrumental' || raw.audio === 'original') {
+    audioMode = raw.audio;
+  } else if (raw.mode === 'both' || raw.mode === 'instrumental' || raw.mode === 'original') {
+    audioMode = raw.mode;
+  }
+
   return {
     enabled,
     volume,
+    playlistId,
+    audioMode,
   };
 }
 

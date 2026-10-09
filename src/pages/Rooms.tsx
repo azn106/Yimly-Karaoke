@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Play, LogIn, Users, Mic, Radio, Sparkles, ArrowRight, Disc, RefreshCw, User, LogOut, AlertCircle } from 'lucide-react';
 import { getAuthToken } from '../lib/auth';
+import { getKaraokeDefaultsSettings } from '../utils/karaokeDefaultsSettings';
 
 export default function Rooms() {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -83,10 +84,18 @@ export default function Rooms() {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
+      const defaults = getKaraokeDefaultsSettings();
       const res = await fetch('/api/karaoke/sessions', {
         method: 'POST',
         credentials: 'same-origin',
-        headers
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          audioMode: defaults.audioMode,
+          lyricsMode: defaults.lyricsMode
+        })
       });
       let data: any = {};
       if (res.headers.get('content-type')?.includes('application/json')) {

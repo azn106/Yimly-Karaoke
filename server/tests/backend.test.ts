@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 import fsSync from 'fs';
 import path from 'path';
 import { db, setupDatabase } from '../db/index.js';
-import { users, libraries, artists, albums, songs, favorites, playlists, playlistSongs, lyrics, queueItems } from '../db/schema.js';
+import { users, libraries, artists, albums, songs, favorites, playlists, playlistSongs, lyrics, queueItems, settings } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 import playlistsRoutes from '../routes/playlists.js';
@@ -1084,18 +1084,31 @@ test('Issue 3: Library Rescan Must Remove Orphaned Artists and Albums', async ()
   }
   fsSync.mkdirSync(testDir, { recursive: true });
 
+  // Clean up any stale test library and orphaned records from prior aborted test runs
+  const prevLibs = await db.select().from(libraries).where(eq(libraries.name, 'Orphan Rescan Test Lib'));
+  for (const prevLib of prevLibs) {
+    const prevSongs = await db.select().from(songs).where(eq(songs.libraryId, prevLib.id));
+    for (const ps of prevSongs) {
+      await db.delete(songArtists).where(eq(songArtists.songId, ps.id));
+      await db.delete(songs).where(eq(songs.id, ps.id));
+    }
+    await db.delete(libraries).where(eq(libraries.id, prevLib.id));
+  }
+  const { cleanupOrphanedRecords: initialCleanup } = await import('../lib/artist-utils.js');
+  await initialCleanup();
+
   // 1. Setup library directory with structured files:
-  // - "Artist Alpha" -> "Album Alpha 1" (Song A1, Song A2) & "Album Alpha 2" (Song A3)
-  // - "Artist Beta"  -> "Album Beta 1" (Song B1)
-  // - Multi-Artist "Artist Gamma; Artist Delta" -> "Album GammaDelta" (Song GD1)
-  // - "Artist Gamma" solo -> "Album Gamma Solo" (Song G1)
+  // - "Orphan Artist Alpha" -> "Album Alpha 1" (Song A1, Song A2) & "Album Alpha 2" (Song A3)
+  // - "Orphan Artist Beta"  -> "Album Beta 1" (Song B1)
+  // - Multi-Artist "Orphan Artist Gamma; Orphan Artist Delta" -> "Album GammaDelta" (Song GD1)
+  // - "Orphan Artist Gamma" solo -> "Album Gamma Solo" (Song G1)
   
-  const fileA1 = path.join(testDir, 'Artist Alpha - Song A1.mp3');
-  const fileA2 = path.join(testDir, 'Artist Alpha - Song A2.mp3');
-  const fileA3 = path.join(testDir, 'Artist Alpha - Song A3.mp3');
-  const fileB1 = path.join(testDir, 'Artist Beta - Song B1.mp3');
-  const fileGD1 = path.join(testDir, 'Artist Gamma; Artist Delta - Song GD1.mp3');
-  const fileG1 = path.join(testDir, 'Artist Gamma - Song G1.mp3');
+  const fileA1 = path.join(testDir, 'Orphan Artist Alpha - Song A1.mp3');
+  const fileA2 = path.join(testDir, 'Orphan Artist Alpha - Song A2.mp3');
+  const fileA3 = path.join(testDir, 'Orphan Artist Alpha - Song A3.mp3');
+  const fileB1 = path.join(testDir, 'Orphan Artist Beta - Song B1.mp3');
+  const fileGD1 = path.join(testDir, 'Orphan Artist Gamma; Orphan Artist Delta - Song GD1.mp3');
+  const fileG1 = path.join(testDir, 'Orphan Artist Gamma - Song G1.mp3');
 
   fsSync.writeFileSync(fileA1, 'dummy audio a1');
   fsSync.writeFileSync(fileA2, 'dummy audio a2');
@@ -1115,10 +1128,10 @@ test('Issue 3: Library Rescan Must Remove Orphaned Artists and Albums', async ()
   await scanLibrary(testLibId, testDir);
 
   // Verify all 4 artists exist: Alpha, Beta, Gamma, Delta
-  const artAlpha = await db.select().from(artists).where(eq(artists.name, 'Artist Alpha')).limit(1);
-  const artBeta = await db.select().from(artists).where(eq(artists.name, 'Artist Beta')).limit(1);
-  const artGamma = await db.select().from(artists).where(eq(artists.name, 'Artist Gamma')).limit(1);
-  const artDelta = await db.select().from(artists).where(eq(artists.name, 'Artist Delta')).limit(1);
+  const artAlpha = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Alpha')).limit(1);
+  const artBeta = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Beta')).limit(1);
+  const artGamma = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Gamma')).limit(1);
+  const artDelta = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Delta')).limit(1);
 
   assert.strictEqual(artAlpha.length, 1, 'Artist Alpha must exist');
   assert.strictEqual(artBeta.length, 1, 'Artist Beta must exist');
@@ -1144,7 +1157,7 @@ test('Issue 3: Library Rescan Must Remove Orphaned Artists and Albums', async ()
   assert.strictEqual(songsAfterStep2.some(s => s.title === 'Song A1'), false, 'Song A1 must be removed');
   assert.strictEqual(songsAfterStep2.some(s => s.title === 'Song A2'), true, 'Song A2 must remain');
 
-  const artAlphaAfterStep2 = await db.select().from(artists).where(eq(artists.name, 'Artist Alpha')).limit(1);
+  const artAlphaAfterStep2 = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Alpha')).limit(1);
   assert.strictEqual(artAlphaAfterStep2.length, 1, 'Artist Alpha must remain because Song A2 & A3 exist');
 
   // Step 3: Delete remaining songs for Artist Beta (fileB1) and rescan
@@ -1154,7 +1167,7 @@ test('Issue 3: Library Rescan Must Remove Orphaned Artists and Albums', async ()
 
   const songsAfterStep3 = await db.select().from(songs).where(eq(songs.libraryId, testLibId));
   assert.strictEqual(songsAfterStep3.length, 4, 'Should have 4 songs after deleting Song B1');
-  const artBetaAfterStep3 = await db.select().from(artists).where(eq(artists.name, 'Artist Beta')).limit(1);
+  const artBetaAfterStep3 = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Beta')).limit(1);
   assert.strictEqual(artBetaAfterStep3.length, 0, 'Artist Beta must be deleted because it has 0 remaining songs');
 
   // Step 4: Delete multi-artist song (fileGD1) and rescan
@@ -1166,10 +1179,10 @@ test('Issue 3: Library Rescan Must Remove Orphaned Artists and Albums', async ()
   const songsAfterStep4 = await db.select().from(songs).where(eq(songs.libraryId, testLibId));
   assert.strictEqual(songsAfterStep4.length, 3, 'Should have 3 songs remaining');
 
-  const artDeltaAfterStep4 = await db.select().from(artists).where(eq(artists.name, 'Artist Delta')).limit(1);
+  const artDeltaAfterStep4 = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Delta')).limit(1);
   assert.strictEqual(artDeltaAfterStep4.length, 0, 'Artist Delta must be deleted after its only song was deleted');
 
-  const artGammaAfterStep4 = await db.select().from(artists).where(eq(artists.name, 'Artist Gamma')).limit(1);
+  const artGammaAfterStep4 = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Gamma')).limit(1);
   assert.strictEqual(artGammaAfterStep4.length, 1, 'Artist Gamma must remain because Song G1 still exists');
 
   // Confirm no orphaned song_artists records exist anywhere
@@ -1182,14 +1195,14 @@ test('Issue 3: Library Rescan Must Remove Orphaned Artists and Albums', async ()
   });
   assert.strictEqual(artistsRes.status, 200);
   const artistsList = await artistsRes.json() as any[];
-  assert.strictEqual(artistsList.some(a => a.name === 'Artist Beta'), false, 'API /api/artists must not include Artist Beta');
-  assert.strictEqual(artistsList.some(a => a.name === 'Artist Delta'), false, 'API /api/artists must not include Artist Delta');
-  assert.strictEqual(artistsList.some(a => a.name === 'Artist Alpha'), true, 'API /api/artists must include Artist Alpha');
-  assert.strictEqual(artistsList.some(a => a.name === 'Artist Gamma'), true, 'API /api/artists must include Artist Gamma');
+  assert.strictEqual(artistsList.some(a => a.name === 'Orphan Artist Beta'), false, 'API /api/artists must not include Artist Beta');
+  assert.strictEqual(artistsList.some(a => a.name === 'Orphan Artist Delta'), false, 'API /api/artists must not include Artist Delta');
+  assert.strictEqual(artistsList.some(a => a.name === 'Orphan Artist Alpha'), true, 'API /api/artists must include Artist Alpha');
+  assert.strictEqual(artistsList.some(a => a.name === 'Orphan Artist Gamma'), true, 'API /api/artists must include Artist Gamma');
 
   // Confirm all artists in DB and API have at least 1 song
   for (const art of artistsList) {
-    if (art.name === 'Artist Alpha' || art.name === 'Artist Gamma') {
+    if (art.name === 'Orphan Artist Alpha' || art.name === 'Orphan Artist Gamma') {
       assert.ok(art.songCount > 0, `Artist ${art.name} must have songCount > 0`);
     }
   }
@@ -1203,8 +1216,8 @@ test('Issue 3: Library Rescan Must Remove Orphaned Artists and Albums', async ()
   const finalSongs = await db.select().from(songs).where(eq(songs.libraryId, testLibId));
   assert.strictEqual(finalSongs.length, 0, 'All songs in library must be 0');
 
-  const finalAlpha = await db.select().from(artists).where(eq(artists.name, 'Artist Alpha')).limit(1);
-  const finalGamma = await db.select().from(artists).where(eq(artists.name, 'Artist Gamma')).limit(1);
+  const finalAlpha = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Alpha')).limit(1);
+  const finalGamma = await db.select().from(artists).where(eq(artists.name, 'Orphan Artist Gamma')).limit(1);
   assert.strictEqual(finalAlpha.length, 0, 'Artist Alpha must be deleted when all its songs are gone');
   assert.strictEqual(finalGamma.length, 0, 'Artist Gamma must be deleted when all its songs are gone');
 
@@ -1670,6 +1683,239 @@ test('Background Music Settings API & Persistence Suite', async () => {
   const restoreData = await restoreRes.json();
   assert.strictEqual(restoreData.settings.enabled, true);
   assert.strictEqual(restoreData.settings.volume, 25);
+  assert.strictEqual(restoreData.settings.playlistId, null, 'Default playlistId must be null (All Local Music)');
+
+  // 6. Test saving and restoring a selected playlistId
+  const savePlaylistRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: 30, playlistId: '42' } })
+  });
+  assert.strictEqual(savePlaylistRes.status, 200);
+  const savePlaylistData = await savePlaylistRes.json();
+  assert.strictEqual(savePlaylistData.settings.playlistId, '42');
+
+  const getPlaylistRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.strictEqual(getPlaylistRes.status, 200);
+  const getPlaylistData = await getPlaylistRes.json();
+  assert.strictEqual(getPlaylistData.settings.playlistId, '42');
+
+  // 7. Test backward compatibility: PUT without playlistId or with null restores All Local Music
+  const nullPlaylistRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: 25, playlistId: null } })
+  });
+  assert.strictEqual(nullPlaylistRes.status, 200);
+  const nullPlaylistData = await nullPlaylistRes.json();
+  assert.strictEqual(nullPlaylistData.settings.playlistId, null);
+
+  // 8. Test client resolver backward compatibility and fallback logic
+  const { resolveBackgroundMusicSettings, DEFAULT_BACKGROUND_MUSIC_SETTINGS } = await import('../../src/utils/backgroundMusicSettings.js');
+  assert.strictEqual(DEFAULT_BACKGROUND_MUSIC_SETTINGS.playlistId, null);
+
+  // Legacy payload without playlistId remains valid and defaults to null
+  const legacyResolved = resolveBackgroundMusicSettings({ enabled: true, volume: 50 });
+  assert.strictEqual(legacyResolved.playlistId, null);
+  assert.strictEqual(legacyResolved.volume, 50);
+
+  // String playlistId is preserved
+  const playlistResolved = resolveBackgroundMusicSettings({ enabled: true, volume: 25, playlistId: '7' });
+  assert.strictEqual(playlistResolved.playlistId, '7');
+
+  // Number playlistId is converted to string
+  const numResolved = resolveBackgroundMusicSettings({ enabled: true, volume: 25, playlistId: 10 });
+  assert.strictEqual(numResolved.playlistId, '10');
+
+  // Empty string or 'all' or null resolves to null (All Local Music)
+  assert.strictEqual(resolveBackgroundMusicSettings({ playlistId: '' }).playlistId, null);
+  assert.strictEqual(resolveBackgroundMusicSettings({ playlistId: 'all' }).playlistId, null);
+  assert.strictEqual(resolveBackgroundMusicSettings({ playlistId: null }).playlistId, null);
+
+  // 9. Test playlist-scoped song retrieval endpoint: nonexistent or empty playlist returns empty array safely
+  const emptyPlaylistSongsRes = await fetch(`${baseUrl}/api/karaoke/songs?playlistId=999999`);
+  assert.strictEqual(emptyPlaylistSongsRes.status, 200);
+  const emptyPlaylistSongs = await emptyPlaylistSongsRes.json();
+  assert.strictEqual(Array.isArray(emptyPlaylistSongs), true);
+  assert.strictEqual(emptyPlaylistSongs.length, 0, 'Unavailable or empty playlist must return empty array without error');
+});
+
+test('Karaoke Startup Defaults & Room Playback Synchronization Suite', async () => {
+  const token = (global as any).tokenTest;
+  const { WebSocket } = await import('ws');
+  const { resolveKaraokeDefaultsSettings, DEFAULT_KARAOKE_DEFAULTS_SETTINGS } = await import('../../src/utils/karaokeDefaultsSettings.js');
+
+  // 1. Instrumental and eLRC are used when no preferences have been saved
+  assert.strictEqual(DEFAULT_KARAOKE_DEFAULTS_SETTINGS.audioMode, 'instrumental', 'Default audioMode must be instrumental');
+  assert.strictEqual(DEFAULT_KARAOKE_DEFAULTS_SETTINGS.lyricsMode, 'elrc', 'Default lyricsMode must be elrc');
+
+  // Client resolver defaults and backward compatibility
+  assert.deepStrictEqual(resolveKaraokeDefaultsSettings(), { audioMode: 'instrumental', lyricsMode: 'elrc' });
+  assert.deepStrictEqual(resolveKaraokeDefaultsSettings({}), { audioMode: 'instrumental', lyricsMode: 'elrc' });
+  assert.deepStrictEqual(resolveKaraokeDefaultsSettings(null), { audioMode: 'instrumental', lyricsMode: 'elrc' });
+  assert.deepStrictEqual(resolveKaraokeDefaultsSettings({ invalidKey: 123 }), { audioMode: 'instrumental', lyricsMode: 'elrc' });
+
+  // Clean DB startup defaults if any
+  await db.delete(settings).where(eq(settings.key, 'karaoke_startup_defaults'));
+
+  // Public unauthenticated GET access
+  const getPubRes = await fetch(`${baseUrl}/api/karaoke/settings/karaoke-defaults`);
+  assert.strictEqual(getPubRes.status, 200, 'Public GET /api/karaoke/settings/karaoke-defaults must return 200');
+  const pubData = await getPubRes.json();
+  assert.strictEqual(pubData.settings.audioMode, 'instrumental');
+  assert.strictEqual(pubData.settings.lyricsMode, 'elrc');
+
+  // 2. Selecting Original and LRC saves and restores those preferences
+  const saveRes = await fetch(`${baseUrl}/api/karaoke/settings/karaoke-defaults`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { audioMode: 'original', lyricsMode: 'lrc' } })
+  });
+  assert.strictEqual(saveRes.status, 200);
+  const saveData = await saveRes.json();
+  assert.strictEqual(saveData.success, true);
+  assert.strictEqual(saveData.settings.audioMode, 'original');
+  assert.strictEqual(saveData.settings.lyricsMode, 'lrc');
+
+  // Verify persistence via GET
+  const getSavedRes = await fetch(`${baseUrl}/api/karaoke/settings/karaoke-defaults`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.strictEqual(getSavedRes.status, 200);
+  const getSavedData = await getSavedRes.json();
+  assert.strictEqual(getSavedData.settings.audioMode, 'original');
+  assert.strictEqual(getSavedData.settings.lyricsMode, 'lrc');
+
+  // Fallback for invalid values
+  const invalidSaveRes = await fetch(`${baseUrl}/api/karaoke/settings/karaoke-defaults`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { audioMode: 'unsupported_mode', lyricsMode: 'corrupt_mode' } })
+  });
+  assert.strictEqual(invalidSaveRes.status, 200);
+  const invalidSaveData = await invalidSaveRes.json();
+  assert.strictEqual(invalidSaveData.settings.audioMode, 'instrumental', 'Invalid audioMode must safely fall back to instrumental');
+  assert.strictEqual(invalidSaveData.settings.lyricsMode, 'elrc', 'Invalid lyricsMode must safely fall back to elrc');
+
+  // Re-save Original and LRC for subsequent room startup testing
+  await fetch(`${baseUrl}/api/karaoke/settings/karaoke-defaults`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { audioMode: 'original', lyricsMode: 'lrc' } })
+  });
+
+  // 3. Saved preferences are applied when a new room/session starts
+  const createRoomRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+  });
+  assert.strictEqual(createRoomRes.status, 200);
+  const newRoom = await createRoomRes.json();
+  assert.ok(newRoom.id, 'Session id must be returned');
+  assert.strictEqual(newRoom.audioMode, 'original');
+  assert.strictEqual(newRoom.lyricsMode, 'lrc');
+
+  // Verify GET session state returns matching playback startup defaults
+  const stateRes = await fetch(`${baseUrl}/api/karaoke/sessions/${newRoom.id}/state`);
+  assert.strictEqual(stateRes.status, 200);
+  const stateData = await stateRes.json();
+  assert.ok(stateData.playback, 'Playback state must exist');
+  assert.strictEqual(stateData.playback.variant, 'original', 'Startup variant must match saved preference');
+  assert.strictEqual(stateData.playback.lyricsFormat, 'lrc', 'Startup lyricsFormat must match saved preference');
+
+  // 4. In-room toggles still work after startup (Host can switch Original <-> Instrumental and LRC <-> eLRC)
+  const wsUrl = baseUrl.replace('http://', 'ws://');
+  const hostWs = new WebSocket(`${wsUrl}/ws/karaoke?sessionId=${newRoom.id}&isHost=true&token=${encodeURIComponent(token)}`);
+  await new Promise<void>((resolve) => hostWs.on('open', () => resolve()));
+
+  // 6. Host and guest playback state remains correctly synchronised
+  const guestWs = new WebSocket(`${wsUrl}/ws/karaoke?sessionId=${newRoom.id}`);
+  await new Promise<void>((resolve) => guestWs.on('open', () => resolve()));
+
+  // Wait for initial connection messages
+  let guestInitialState: any = null;
+  guestWs.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === 'STATE_UPDATE' && !guestInitialState) {
+        guestInitialState = msg.payload;
+      }
+    } catch (e) {}
+  });
+
+  await new Promise((r) => setTimeout(r, 120));
+  assert.ok(guestInitialState, 'Guest must receive initial STATE_UPDATE');
+  assert.strictEqual(guestInitialState.variant, 'original');
+  assert.strictEqual(guestInitialState.lyricsFormat, 'lrc');
+
+  // Host toggles variant to instrumental
+  let guestReceivedVariantChange: any = null;
+  guestWs.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === 'VARIANT_CHANGED') {
+        guestReceivedVariantChange = msg.payload;
+      }
+    } catch (e) {}
+  });
+
+  hostWs.send(JSON.stringify({
+    type: 'VARIANT_CHANGED',
+    payload: { variant: 'instrumental', position: 12.5, playing: true }
+  }));
+  await new Promise((r) => setTimeout(r, 100));
+
+  assert.ok(guestReceivedVariantChange, 'Guest must receive broadcast VARIANT_CHANGED');
+  assert.strictEqual(guestReceivedVariantChange.variant, 'instrumental');
+
+  // Host toggles lyricsFormat to elrc
+  let guestReceivedFormatChange: any = null;
+  guestWs.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === 'FORMAT_CHANGED') {
+        guestReceivedFormatChange = msg.payload;
+      }
+    } catch (e) {}
+  });
+
+  hostWs.send(JSON.stringify({
+    type: 'FORMAT_CHANGED',
+    payload: { format: 'elrc' }
+  }));
+  await new Promise((r) => setTimeout(r, 100));
+
+  assert.ok(guestReceivedFormatChange, 'Guest must receive broadcast FORMAT_CHANGED');
+  assert.strictEqual(guestReceivedFormatChange.format, 'elrc');
+
+  // Guest attempts unauthorized VARIANT_CHANGED -> should be rejected and not affect room state
+  guestWs.send(JSON.stringify({
+    type: 'VARIANT_CHANGED',
+    payload: { variant: 'original', position: 0, playing: false }
+  }));
+  await new Promise((r) => setTimeout(r, 100));
+
+  const roomStateCheck = (await import('../ws/index.js')).getRoomState(newRoom.id);
+  assert.strictEqual(roomStateCheck?.variant, 'instrumental', 'Guest cannot overwrite room variant');
+
+  // 5. Preferences are not unexpectedly reset by WebSocket updates or track changes
+  hostWs.send(JSON.stringify({ type: 'QUEUE_UPDATE' }));
+  await new Promise((r) => setTimeout(r, 80));
+  assert.strictEqual(roomStateCheck?.variant, 'instrumental', 'QUEUE_UPDATE must not reset variant');
+  assert.strictEqual(roomStateCheck?.lyricsFormat, 'elrc', 'QUEUE_UPDATE must not reset lyricsFormat');
+
+  hostWs.close();
+  guestWs.close();
+
+  // 7. Existing Background Music playlist selection and playback behaviour remain intact
+  const bgmRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`);
+  assert.strictEqual(bgmRes.status, 200);
+  const bgmData = await bgmRes.json();
+  assert.ok(bgmData.settings);
+  assert.strictEqual(typeof bgmData.settings.enabled, 'boolean');
+  assert.strictEqual(typeof bgmData.settings.volume, 'number');
 });
 
 test('MP3 Audio Streaming & HTTP Byte-Range Delivery Suite', async () => {

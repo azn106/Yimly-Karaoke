@@ -211,6 +211,8 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
       variant: songs.variant,
       artworkPath: songs.artworkPath,
       albumArtworkPath: albums.artworkPath,
+      mainAudioPath: songs.mainAudioPath,
+      instrumentalAudioPath: songs.instrumentalAudioPath,
     })
     .from(playlistSongs)
     .innerJoin(songs, eq(playlistSongs.songId, songs.id))
@@ -237,6 +239,8 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
     const formattedSongs = pSongs.map(s => {
       const trackArtists = artistsMap.get(s.id) || (s.artist ? [{ id: s.artistId, name: s.artist }] : []);
       const lyr = lyricsMap.get(s.id) || { hasLrc: false, hasElrc: false };
+      const hasOriginal = !!(s.mainAudioPath && s.mainAudioPath.trim().length > 0) || (s.variant === 'original' && !s.instrumentalAudioPath);
+      const hasInstrumental = !!(s.instrumentalAudioPath && s.instrumentalAudioPath.trim().length > 0) || s.variant === 'instrumental';
       return {
         playlistSongId: s.playlistSongId,
         position: s.position,
@@ -252,6 +256,8 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
         hasArtwork: !!s.artworkPath || !!s.albumArtworkPath,
         hasLrc: lyr.hasLrc,
         hasElrc: lyr.hasElrc,
+        hasOriginal,
+        hasInstrumental,
       };
     });
 

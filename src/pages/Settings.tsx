@@ -3,8 +3,9 @@ import { useOutletContext } from 'react-router-dom';
 import { 
   Plus, Folder, RefreshCw, Trash2, AlertCircle, HardDrive, 
   ShieldCheck, Type, AlignLeft, AlignCenter, AlignRight, RotateCcw, Sparkles, Download, Save, Check,
-  Layers, Zap, Sliders, Eye, Shield, Music, Volume2, Shuffle
+  Layers, Zap, Sliders, Eye, Shield, Music, Volume2, Shuffle, ListMusic
 } from 'lucide-react';
+import { getAuthToken } from '../lib/auth';
 import { AutoResponsiveLyrics } from '../components/AutoResponsiveLyrics';
 import { 
   getLyricsSettings, 
@@ -24,8 +25,18 @@ import {
   saveBackgroundMusicSettings,
   fetchServerBackgroundMusicSettings,
   BackgroundMusicSettings,
+  BackgroundMusicAudioMode,
   DEFAULT_BACKGROUND_MUSIC_SETTINGS,
 } from '../utils/backgroundMusicSettings';
+import {
+  getKaraokeDefaultsSettings,
+  saveKaraokeDefaultsSettings,
+  fetchServerKaraokeDefaultsSettings,
+  KaraokeDefaultsSettings,
+  DEFAULT_KARAOKE_DEFAULTS_SETTINGS,
+  AudioMode,
+  LyricsMode,
+} from '../utils/karaokeDefaultsSettings';
 
 export default function Settings() {
   const context = useOutletContext<{ user: any }>();
@@ -62,10 +73,44 @@ export default function Settings() {
   const [bgmSettings, setBgmSettings] = useState<BackgroundMusicSettings>(getBackgroundMusicSettings);
   const [savingBgmSettings, setSavingBgmSettings] = useState(false);
   const [bgmSavedMessage, setBgmSavedMessage] = useState('');
+  const [playlists, setPlaylists] = useState<Array<{ id: number; name: string; songCount?: number }>>([]);
+
+  // Karaoke Startup Defaults State
+  const [karaokeDefaults, setKaraokeDefaults] = useState<KaraokeDefaultsSettings>(getKaraokeDefaultsSettings);
+  const [savingDefaults, setSavingDefaults] = useState(false);
+  const [defaultsSavedMessage, setDefaultsSavedMessage] = useState('');
+
+  const fetchPlaylists = async () => {
+    try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/playlists', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setPlaylists(data);
+          // If the currently saved playlistId is no longer in the playlist list, fall back to All Local Music
+          const currentBgm = getBackgroundMusicSettings();
+          if (currentBgm.playlistId) {
+            const exists = data.some((p: any) => String(p.id) === String(currentBgm.playlistId));
+            if (!exists) {
+              const fallback = { ...currentBgm, playlistId: null };
+              setBgmSettings(fallback);
+              saveBgm(fallback);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Settings] Failed to fetch playlists for background music:', e);
+    }
+  };
 
   useEffect(() => {
     fetchLibraries();
     fetchDlSettings();
+    fetchPlaylists();
     fetchServerLyricsSettings().then((srv) => {
       if (srv) {
         setLyricsSettings(srv);
@@ -76,7 +121,28 @@ export default function Settings() {
         setBgmSettings(srv);
       }
     });
+    fetchServerKaraokeDefaultsSettings().then((srv) => {
+      if (srv) {
+        setKaraokeDefaults(srv);
+      }
+    });
   }, []);
+
+  const saveKaraokeDefaults = async (newSettings: KaraokeDefaultsSettings) => {
+    setKaraokeDefaults(newSettings);
+    setSavingDefaults(true);
+    setDefaultsSavedMessage('');
+    try {
+      const saved = await saveKaraokeDefaultsSettings(newSettings);
+      setKaraokeDefaults(saved);
+      setDefaultsSavedMessage('Karaoke defaults saved!');
+      setTimeout(() => setDefaultsSavedMessage(''), 3000);
+    } catch (e) {
+      console.error('[Settings] Failed to save karaoke defaults:', e);
+    } finally {
+      setSavingDefaults(false);
+    }
+  };
 
   const saveBgm = async (newSettings: BackgroundMusicSettings) => {
     setBgmSettings(newSettings);
@@ -1379,16 +1445,133 @@ export default function Settings() {
               </label>
             </div>
 
-            {/* Music Source (Local Library info) */}
-            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Folder className="w-4 h-4 text-[#FF4FA3]" />
-                <div>
-                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Music Source</span>
-                  <span className="text-xs text-zinc-400">Local Yimly Media Library ({libraries.length} {libraries.length === 1 ? 'directory' : 'directories'} configured)</span>
+            {/* Music Source (Playlist Selection Dropdown) */}
+            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <ListMusic className="w-4 h-4 text-[#FF4FA3]" />
+                  <div>
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Music Source</span>
+                    <span className="text-xs text-zinc-400">
+                      Choose which playlist supplies background music, or play all local tracks.
+                    </span>
+                  </div>
                 </div>
+                <span className="text-[11px] font-mono text-zinc-400 bg-white/5 px-2.5 py-1 rounded-lg">
+                  {bgmSettings.playlistId ? 'Playlist' : 'All Local Music'}
+                </span>
               </div>
-              <span className="text-[11px] font-mono text-zinc-500 bg-white/5 px-2.5 py-1 rounded-lg">Local Only</span>
+              <select
+                aria-label="Background Music Source Playlist"
+                value={bgmSettings.playlistId || ''}
+                onChange={(e) => {
+                  const val = e.target.value === '' ? null : e.target.value;
+                  const updated = { ...bgmSettings, playlistId: val };
+                  setBgmSettings(updated);
+                  saveBgm(updated);
+                }}
+                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3] cursor-pointer"
+              >
+                <option value="">All Local Music</option>
+                {playlists.map((pl) => (
+                  <option key={pl.id} value={String(pl.id)}>
+                    {pl.name} ({pl.songCount || 0} {pl.songCount === 1 ? 'song' : 'songs'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Background Music Audio Mode */}
+            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-3" id="bgm-audio-mode-setting">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Music className="w-4 h-4 text-[#FF4FA3]" />
+                  <div>
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Background Music Audio Mode</span>
+                    <span className="text-xs text-zinc-400">
+                      Choose whether ambient music plays original vocal tracks, instrumental backing tracks, or both.
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[11px] font-mono text-zinc-400 bg-white/5 px-2.5 py-1 rounded-lg">
+                  {bgmSettings.audioMode === 'instrumental'
+                    ? 'Instrumental Only'
+                    : bgmSettings.audioMode === 'original'
+                    ? 'Original Only'
+                    : 'Both (Default)'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  data-testid="bgm-audio-mode-both-btn"
+                  onClick={() => {
+                    const updated = { ...bgmSettings, audioMode: 'both' as BackgroundMusicAudioMode };
+                    setBgmSettings(updated);
+                    saveBgm(updated);
+                  }}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
+                    bgmSettings.audioMode === 'both'
+                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                      : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Music className="w-3.5 h-3.5" />
+                  <span>Both</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="bgm-audio-mode-instrumental-btn"
+                  onClick={() => {
+                    const updated = { ...bgmSettings, audioMode: 'instrumental' as BackgroundMusicAudioMode };
+                    setBgmSettings(updated);
+                    saveBgm(updated);
+                  }}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
+                    bgmSettings.audioMode === 'instrumental'
+                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                      : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Music className="w-3.5 h-3.5" />
+                  <span>Instrumental Only</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="bgm-audio-mode-original-btn"
+                  onClick={() => {
+                    const updated = { ...bgmSettings, audioMode: 'original' as BackgroundMusicAudioMode };
+                    setBgmSettings(updated);
+                    saveBgm(updated);
+                  }}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
+                    bgmSettings.audioMode === 'original'
+                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                      : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Music className="w-3.5 h-3.5" />
+                  <span>Original Only</span>
+                </button>
+              </div>
+
+              <select
+                id="bgm-audio-mode-select"
+                aria-label="Background Music Audio Mode"
+                value={bgmSettings.audioMode || 'both'}
+                onChange={(e) => {
+                  const val = e.target.value as BackgroundMusicAudioMode;
+                  const updated = { ...bgmSettings, audioMode: val };
+                  setBgmSettings(updated);
+                  saveBgm(updated);
+                }}
+                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3] cursor-pointer"
+              >
+                <option value="both">Both</option>
+                <option value="instrumental">Instrumental Only</option>
+                <option value="original">Original Only</option>
+              </select>
             </div>
 
             {/* Playback Mode (Shuffled) */}
@@ -1447,6 +1630,191 @@ export default function Settings() {
             >
               <Save className="w-4 h-4" />
               <span>{savingBgmSettings ? 'Saving...' : 'Save Background Music Settings'}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================= */}
+      {/* SECTION: KARAOKE STARTUP DEFAULTS                         */}
+      {/* ========================================================= */}
+      <section className="space-y-6 pt-6 border-t border-white/10" id="section-karaoke-defaults">
+        <div className="flex items-center justify-between border-b border-white/5 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] rounded-xl">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-white">Karaoke Defaults</h2>
+              <p className="text-xs text-zinc-400">Configure startup audio and lyrics preferences when a new karaoke room starts</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[#141622] border border-white/10 rounded-2xl p-6 space-y-6">
+          <div className="space-y-4">
+            {/* Default Audio Mode */}
+            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Music className="w-4 h-4 text-[#FF4FA3]" />
+                  <div>
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Default Audio Mode</span>
+                    <span className="text-xs text-zinc-400">
+                      Choose whether new karaoke rooms begin with Instrumental backing track or Original vocal track.
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-zinc-400 bg-white/5 px-2.5 py-1 rounded-lg capitalize">
+                    {karaokeDefaults.audioMode === 'instrumental' ? 'Instrumental (Default)' : 'Original'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  data-testid="audio-mode-instrumental-btn"
+                  onClick={() => {
+                    const updated = { ...karaokeDefaults, audioMode: 'instrumental' as AudioMode };
+                    setKaraokeDefaults(updated);
+                    saveKaraokeDefaults(updated);
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
+                    karaokeDefaults.audioMode === 'instrumental'
+                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                      : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Music className="w-3.5 h-3.5" />
+                  <span>Instrumental (Default)</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="audio-mode-original-btn"
+                  onClick={() => {
+                    const updated = { ...karaokeDefaults, audioMode: 'original' as AudioMode };
+                    setKaraokeDefaults(updated);
+                    saveKaraokeDefaults(updated);
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
+                    karaokeDefaults.audioMode === 'original'
+                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                      : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Music className="w-3.5 h-3.5" />
+                  <span>Original</span>
+                </button>
+              </div>
+
+              <select
+                id="default-audio-mode-select"
+                aria-label="Default Audio Mode"
+                value={karaokeDefaults.audioMode}
+                onChange={(e) => {
+                  const val = e.target.value as AudioMode;
+                  const updated = { ...karaokeDefaults, audioMode: val };
+                  setKaraokeDefaults(updated);
+                  saveKaraokeDefaults(updated);
+                }}
+                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3] cursor-pointer"
+              >
+                <option value="instrumental">Instrumental</option>
+                <option value="original">Original</option>
+              </select>
+            </div>
+
+            {/* Default Lyrics Mode */}
+            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Sliders className="w-4 h-4 text-[#FF4FA3]" />
+                  <div>
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Default Lyrics Mode</span>
+                    <span className="text-xs text-zinc-400">
+                      Choose whether synchronized word-by-word enhanced LRC (eLRC) or line-by-line LRC is active by default.
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-zinc-400 bg-white/5 px-2.5 py-1 rounded-lg uppercase">
+                    {karaokeDefaults.lyricsMode === 'elrc' ? 'eLRC (Default)' : 'LRC'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  data-testid="lyrics-mode-elrc-btn"
+                  onClick={() => {
+                    const updated = { ...karaokeDefaults, lyricsMode: 'elrc' as LyricsMode };
+                    setKaraokeDefaults(updated);
+                    saveKaraokeDefaults(updated);
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
+                    karaokeDefaults.lyricsMode === 'elrc'
+                      ? 'bg-cyan-500 text-white border-cyan-500 shadow-lg shadow-cyan-500/25'
+                      : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>eLRC (Default)</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="lyrics-mode-lrc-btn"
+                  onClick={() => {
+                    const updated = { ...karaokeDefaults, lyricsMode: 'lrc' as LyricsMode };
+                    setKaraokeDefaults(updated);
+                    saveKaraokeDefaults(updated);
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
+                    karaokeDefaults.lyricsMode === 'lrc'
+                      ? 'bg-cyan-500 text-white border-cyan-500 shadow-lg shadow-cyan-500/25'
+                      : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>LRC</span>
+                </button>
+              </div>
+
+              <select
+                id="default-lyrics-mode-select"
+                aria-label="Default Lyrics Mode"
+                value={karaokeDefaults.lyricsMode}
+                onChange={(e) => {
+                  const val = e.target.value as LyricsMode;
+                  const updated = { ...karaokeDefaults, lyricsMode: val };
+                  setKaraokeDefaults(updated);
+                  saveKaraokeDefaults(updated);
+                }}
+                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3] cursor-pointer"
+              >
+                <option value="elrc">eLRC</option>
+                <option value="lrc">LRC</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            {defaultsSavedMessage && (
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <Check className="w-4 h-4" />
+                <span>{defaultsSavedMessage}</span>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => saveKaraokeDefaults(karaokeDefaults)}
+              disabled={savingDefaults}
+              className="ml-auto px-6 py-2.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#FF4FA3]/20 flex items-center gap-2 transition-all disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              <span>{savingDefaults ? 'Saving...' : 'Save Karaoke Defaults'}</span>
             </button>
           </div>
         </div>
