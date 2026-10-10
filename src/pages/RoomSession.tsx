@@ -208,7 +208,8 @@ export default function RoomSession() {
   const restorePositionRef = useRef<{ time: number, playing: boolean } | null>(null);
 
   // Background Music State & Controller (Host Only)
-  const bgmAudioRef = useRef<HTMLAudioElement>(null);
+  const bgmAudioRef1 = useRef<HTMLAudioElement>(null);
+  const bgmAudioRef2 = useRef<HTMLAudioElement>(null);
   const [bgmSettings, setBgmSettings] = useState<BackgroundMusicSettings>(getBackgroundMusicSettings);
   const [bgmLibrary, setBgmLibrary] = useState<Array<{ id: number; title: string; artist: string; hasOriginal?: boolean; hasInstrumental?: boolean; variant?: string }>>([]);
   const bgmShuffleQueueRef = useRef<number[]>([]);
@@ -1355,6 +1356,34 @@ export default function RoomSession() {
     }
   }, []);
 
+  const fadeOut = useCallback((audio: HTMLAudioElement, duration: number) => {
+    let startVol = audio.volume;
+    const step = startVol / (duration / 50); // 50ms intervals
+    const timer = setInterval(() => {
+      if (audio.volume > step) {
+        audio.volume -= step;
+      } else {
+        audio.pause();
+        audio.volume = startVol;
+        clearInterval(timer);
+      }
+    }, 50);
+  }, []);
+
+  const fadeIn = useCallback((audio: HTMLAudioElement, duration: number, targetVol: number) => {
+    audio.volume = 0;
+    safePlayBgm(audio);
+    const step = targetVol / (duration / 50);
+    const timer = setInterval(() => {
+      if (audio.volume < targetVol - step) {
+        audio.volume += step;
+      } else {
+        audio.volume = targetVol;
+        clearInterval(timer);
+      }
+    }, 50);
+  }, [safePlayBgm]);
+
   // Host Control actions
   const togglePlay = () => {
     if (!isHost) return;
@@ -1616,7 +1645,7 @@ export default function RoomSession() {
             }
           } else {
             // Also attempt /api/karaoke/songs?playlistId=...
-            const fallbackRes = await fetch(`/api/karaoke/songs?playlistId=${bgmSettings.playlistId}&audioMode=${bgmSettings.audioMode || 'both'}`);
+            const fallbackRes = await fetch(`/api/karaoke/songs?playlistId=${bgmSettings.playlistId}&audioMode=${bgmSettings.audioMode}`);
             if (fallbackRes.ok) {
               const data = await fallbackRes.json();
               if (Array.isArray(data) && data.length > 0) {
@@ -1645,7 +1674,7 @@ export default function RoomSession() {
           console.warn('[BGM] Selected playlist unavailable or empty, falling back to All Local Music');
         }
         try {
-          const allRes = await fetch(`/api/karaoke/songs?audioMode=${bgmSettings.audioMode || 'both'}`);
+          const allRes = await fetch(`/api/karaoke/songs?audioMode=${bgmSettings.audioMode}`);
           const allData = allRes.ok ? await allRes.json() : await fetch('/api/songs').then(r => r.json());
           if (Array.isArray(allData) && allData.length > 0) {
             tracks = allData
@@ -1664,12 +1693,12 @@ export default function RoomSession() {
         }
       }
 
-      // Apply Background Music Audio Mode filtering (both, instrumental, original)
-      const mode = bgmSettings.audioMode || 'both';
+      // Apply Background Music Audio Mode filtering (instrumental, original)
+      const mode = bgmSettings.audioMode || 'original';
       if (mode === 'instrumental') {
-        tracks = tracks.filter(t => t.hasInstrumental || t.variant === 'instrumental');
+        tracks = tracks.filter(t => t.hasInstrumental);
       } else if (mode === 'original') {
-        tracks = tracks.filter(t => t.hasOriginal || (t.variant !== 'instrumental' && t.hasOriginal !== false));
+        tracks = tracks.filter(t => t.hasOriginal);
       }
 
       if (cancelled) return;
@@ -1713,26 +1742,29 @@ export default function RoomSession() {
   useEffect(() => {
     if (!isHost) return;
 
-    const bgmAudio = bgmAudioRef.current;
-    if (!bgmAudio) return;
+    const bgmAudio1 = bgmAudioRef1.current;
+    const bgmAudio2 = bgmAudioRef2.current;
+    if (!bgmAudio1 || !bgmAudio2) return;
 
     // Apply configured background music volume dynamically
     const targetVol = Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100));
-    bgmAudio.volume = targetVol;
+    bgmAudio1.volume = targetVol;
+    bgmAudio2.volume = targetVol;
 
     // If karaoke is active or BGM is disabled or no library tracks:
     // Background music MUST be paused immediately.
     if (isKaraokeActive || !bgmSettings.enabled || bgmLibrary.length === 0) {
-      if (!bgmAudio.paused) {
-        // Save exact playback position and current track identity
-        bgmSavedPosRef.current = {
-          songId: bgmCurrentSong?.id ?? null,
-          time: bgmAudio.currentTime
-        };
-        try {
-          bgmAudio.pause();
-        } catch (e) {}
-      }
+      [bgmAudio1, bgmAudio2].forEach(audio => {
+        if (!audio.paused) {
+          bgmSavedPosRef.current = {
+            songId: bgmCurrentSong?.id ?? null,
+            time: audio.currentTime
+          };
+          try {
+            audio.pause();
+          } catch (e) {}
+        }
+      });
       setBgmIsActive(false);
       return;
     }
@@ -1754,16 +1786,27 @@ export default function RoomSession() {
 
     // Resume or play the background track
     setBgmIsActive(true);
-    if (bgmAudio.paused) {
-      // If we have saved position for this same song, restore it
-      if (bgmSavedPosRef.current.songId === bgmCurrentSong.id && bgmSavedPosRef.current.time > 0) {
-        try {
-          if (Math.abs(bgmAudio.currentTime - bgmSavedPosRef.current.time) > 0.5) {
-            bgmAudio.currentTime = bgmSavedPosRef.current.time;
-          }
-        } catch (e) {}
+    
+    if (bgmSettings.crossfadeEnabled) {
+      // Crossfade logic
+      const durationMs = bgmSettings.crossfadeDuration * 1000;
+      
+      // Start BGM with crossfade if currently paused
+      if (bgmAudio1.paused) {
+          fadeIn(bgmAudio1, durationMs, targetVol);
       }
-      safePlayBgm(bgmAudio);
+    } else {
+        if (bgmAudio1.paused) {
+          // If we have saved position for this same song, restore it
+          if (bgmSavedPosRef.current.songId === bgmCurrentSong.id && bgmSavedPosRef.current.time > 0) {
+            try {
+              if (Math.abs(bgmAudio1.currentTime - bgmSavedPosRef.current.time) > 0.5) {
+                bgmAudio1.currentTime = bgmSavedPosRef.current.time;
+              }
+            } catch (e) {}
+          }
+          safePlayBgm(bgmAudio1);
+        }
     }
   }, [isHost, isKaraokeActive, bgmSettings.enabled, bgmSettings.volume, bgmLibrary, bgmCurrentSong, safePlayBgm, generateShuffledQueue]);
 
@@ -1773,7 +1816,6 @@ export default function RoomSession() {
 
     let nextIdx = bgmCurrentIndexRef.current + 1;
     if (nextIdx >= bgmShuffleQueueRef.current.length) {
-      // Re-shuffle avoiding repeating the last track
       const lastId = bgmCurrentSong?.id ?? null;
       bgmShuffleQueueRef.current = generateShuffledQueue(bgmLibrary, lastId);
       nextIdx = 0;
@@ -1782,10 +1824,36 @@ export default function RoomSession() {
     const nextSongId = bgmShuffleQueueRef.current[nextIdx];
     const nextTrack = bgmLibrary.find(t => t.id === nextSongId) || bgmLibrary[0];
 
-    // Reset saved position for new track
+    // Crossfade Logic:
+    // 1. Identify which audio ref is currently playing and which is not
+    const audio1 = bgmAudioRef1.current;
+    const audio2 = bgmAudioRef2.current;
+    if (!audio1 || !audio2) return;
+
+    // Assuming we toggle between 1 and 2
+    // Full implementation needs state to track activeRef
+    const activeRef = audio1.paused ? audio2 : audio1;
+    const inactiveRef = audio1.paused ? audio1 : audio2;
+
+    // Load next track into inactiveRef
+    inactiveRef.src = `/api/songs/${nextTrack.id}/audio?type=${bgmSettings.audioMode}`;
+    inactiveRef.load();
+    
+    // Crossfade (Fade out active, Fade in inactive)
+    const targetVol = Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100));
+    if (bgmSettings.crossfadeEnabled) {
+        const durationMs = bgmSettings.crossfadeDuration * 1000;
+        fadeOut(activeRef, durationMs);
+        fadeIn(inactiveRef, durationMs, targetVol);
+    } else {
+        activeRef.pause();
+        activeRef.volume = targetVol;
+        safePlayBgm(inactiveRef);
+    }
+
     bgmSavedPosRef.current = { songId: nextTrack.id, time: 0 };
     setBgmCurrentSong(nextTrack);
-  }, [isHost, bgmLibrary, bgmCurrentSong?.id, generateShuffledQueue]);
+  }, [isHost, bgmLibrary, bgmCurrentSong?.id, generateShuffledQueue, bgmSettings.audioMode, bgmSettings.crossfadeEnabled, bgmSettings.crossfadeDuration, bgmSettings.volume, fadeOut, fadeIn, safePlayBgm]);
 
   // Handler for BGM audio errors (e.g. file missing on disk)
   const handleBgmError = useCallback(() => {
@@ -1798,8 +1866,9 @@ export default function RoomSession() {
     if (audioRef.current) {
       safePlay(audioRef.current);
     }
-    if (bgmAudioRef.current && isHost && !isKaraokeActive && bgmSettings.enabled) {
-      safePlayBgm(bgmAudioRef.current);
+    if (isHost && !isKaraokeActive && bgmSettings.enabled) {
+      if (bgmAudioRef1.current) safePlayBgm(bgmAudioRef1.current);
+      if (bgmAudioRef2.current) safePlayBgm(bgmAudioRef2.current);
     }
   };
 
@@ -2645,21 +2714,26 @@ export default function RoomSession() {
 
           {/* Background Music Audio Player for Host (Empty Queue) */}
           {isHost && (
-            <audio
-              ref={bgmAudioRef}
-              src={bgmCurrentSong ? `/api/songs/${bgmCurrentSong.id}/audio?type=original` : undefined}
-              preload="auto"
-              playsInline
-              onCanPlay={() => {
-                const bgmAudio = bgmAudioRef.current;
-                if (bgmAudio && !isKaraokeActive && bgmSettings.enabled && bgmAudio.paused) {
-                  safePlayBgm(bgmAudio);
-                }
-              }}
-              onEnded={handleBgmEnded}
-              onError={handleBgmError}
-              className="hidden"
-            />
+            <>
+              <audio
+                ref={bgmAudioRef1}
+                src={bgmCurrentSong ? `/api/songs/${bgmCurrentSong.id}/audio?type=${bgmSettings.audioMode}` : undefined}
+                preload="auto"
+                playsInline
+                className="hidden"
+                onEnded={handleBgmEnded}
+                onError={handleBgmError}
+              />
+              <audio
+                ref={bgmAudioRef2}
+                src={bgmCurrentSong ? `/api/songs/${bgmCurrentSong.id}/audio?type=${bgmSettings.audioMode}` : undefined}
+                preload="auto"
+                playsInline
+                className="hidden"
+                onEnded={handleBgmEnded}
+                onError={handleBgmError}
+              />
+            </>
           )}
         </main>
 

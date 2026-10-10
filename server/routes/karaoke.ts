@@ -1302,6 +1302,7 @@ router.get('/songs', async (req, res) => {
 
     res.json(formatted);
   } catch (error) {
+    console.error('[KARAOKE] Failed to fetch songs:', error);
     res.status(500).json({ error: 'Failed to fetch karaoke songs' });
   }
 });

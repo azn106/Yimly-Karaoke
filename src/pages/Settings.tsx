@@ -1489,37 +1489,18 @@ export default function Settings() {
                   <div>
                     <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Background Music Audio Mode</span>
                     <span className="text-xs text-zinc-400">
-                      Choose whether ambient music plays original vocal tracks, instrumental backing tracks, or both.
+                      Choose whether ambient music plays original vocal tracks or instrumental backing tracks.
                     </span>
                   </div>
                 </div>
                 <span className="text-[11px] font-mono text-zinc-400 bg-white/5 px-2.5 py-1 rounded-lg">
                   {bgmSettings.audioMode === 'instrumental'
                     ? 'Instrumental Only'
-                    : bgmSettings.audioMode === 'original'
-                    ? 'Original Only'
-                    : 'Both (Default)'}
+                    : 'Original Only'}
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2.5 pt-1">
-                <button
-                  type="button"
-                  data-testid="bgm-audio-mode-both-btn"
-                  onClick={() => {
-                    const updated = { ...bgmSettings, audioMode: 'both' as BackgroundMusicAudioMode };
-                    setBgmSettings(updated);
-                    saveBgm(updated);
-                  }}
-                  className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
-                    bgmSettings.audioMode === 'both'
-                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
-                      : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  <Music className="w-3.5 h-3.5" />
-                  <span>Both</span>
-                </button>
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <button
                   type="button"
                   data-testid="bgm-audio-mode-instrumental-btn"
@@ -1559,7 +1540,7 @@ export default function Settings() {
               <select
                 id="bgm-audio-mode-select"
                 aria-label="Background Music Audio Mode"
-                value={bgmSettings.audioMode || 'both'}
+                value={bgmSettings.audioMode}
                 onChange={(e) => {
                   const val = e.target.value as BackgroundMusicAudioMode;
                   const updated = { ...bgmSettings, audioMode: val };
@@ -1568,69 +1549,142 @@ export default function Settings() {
                 }}
                 className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3] cursor-pointer"
               >
-                <option value="both">Both</option>
                 <option value="instrumental">Instrumental Only</option>
                 <option value="original">Original Only</option>
               </select>
             </div>
 
             {/* Playback Mode (Shuffled) */}
-            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Shuffle className="w-4 h-4 text-[#FF4FA3]" />
-                <div>
-                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Playback Mode</span>
-                  <span className="text-xs text-zinc-400">Continuous shuffle without repeats until all eligible library tracks have played</span>
+            <div className="space-y-4">
+              {/* Shuffle Mode */}
+              <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Shuffle className="w-4 h-4 text-[#FF4FA3]" />
+                  <div>
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Playback Mode</span>
+                    <span className="text-xs text-zinc-400">Continuous shuffle without repeats until all eligible library tracks have played</span>
+                  </div>
                 </div>
+                <span className="text-[11px] font-mono text-zinc-500 bg-white/5 px-2.5 py-1 rounded-lg">Continuous Shuffle</span>
               </div>
-              <span className="text-[11px] font-mono text-zinc-500 bg-white/5 px-2.5 py-1 rounded-lg">Continuous Shuffle</span>
+
+              {/* Background Volume Slider */}
+              <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="w-4 h-4 text-[#FF4FA3]" />
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Background Music Volume</span>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-[#FF4FA3]">{bgmSettings.volume}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={bgmSettings.volume}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setBgmSettings({ ...bgmSettings, volume: val });
+                  }}
+                  onMouseUp={() => saveBgm(bgmSettings)}
+                  onTouchEnd={() => saveBgm(bgmSettings)}
+                  className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3] focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                />
+                <p className="text-[11px] text-zinc-500">
+                  Independent volume control for ambient background music. Does not affect host karaoke volume. Default is 25%.
+                </p>
+              </div>
+
+              {/* Crossfade Settings */}
+              <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Shuffle className="w-4 h-4 text-[#FF4FA3]" />
+                    <div>
+                      <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Enable Crossfade</span>
+                      <span className="text-xs text-zinc-400">Smoothly transition between ambient tracks.</span>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
+                    <input
+                      type="checkbox"
+                      checked={bgmSettings.crossfadeEnabled}
+                      onChange={(e) => {
+                        const updated = { ...bgmSettings, crossfadeEnabled: e.target.checked };
+                        setBgmSettings(updated);
+                        saveBgm(updated);
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FF4FA3]"></div>
+                  </label>
+                </div>
+                {bgmSettings.crossfadeEnabled && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Duration: {bgmSettings.crossfadeDuration}s</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="2"
+                      max="12"
+                      step="1"
+                      value={bgmSettings.crossfadeDuration}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setBgmSettings({ ...bgmSettings, crossfadeDuration: val });
+                      }}
+                      onMouseUp={() => saveBgm(bgmSettings)}
+                      onTouchEnd={() => saveBgm(bgmSettings)}
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3] focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Background Music Audio Mode */}
+              <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Music className="w-4 h-4 text-[#FF4FA3]" />
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Audio Mode</span>
+                  </div>
+                </div>
+                <select
+                  value={bgmSettings.audioMode}
+                  onChange={(e) => {
+                    setBgmSettings({ ...bgmSettings, audioMode: e.target.value as BackgroundMusicAudioMode });
+                  }}
+                  className="w-full bg-[#1A1C24] text-white text-xs p-2 rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                >
+                  <option value="both">Both (Original & Instrumental)</option>
+                  <option value="instrumental">Instrumental Only</option>
+                  <option value="original">Original Only</option>
+                </select>
+                <p className="text-[11px] text-zinc-500">
+                  Choose which audio variants to play for background music.
+                </p>
+              </div>
             </div>
 
-            {/* Background Volume Slider */}
-            <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Volume2 className="w-4 h-4 text-[#FF4FA3]" />
-                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Background Music Volume</span>
-                </div>
-                <span className="text-xs font-mono font-bold text-[#FF4FA3]">{bgmSettings.volume}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={bgmSettings.volume}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  setBgmSettings({ ...bgmSettings, volume: val });
-                }}
-                onMouseUp={() => saveBgm(bgmSettings)}
-                onTouchEnd={() => saveBgm(bgmSettings)}
-                className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3] focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
-              />
-              <p className="text-[11px] text-zinc-500">
-                Independent volume control for ambient background music. Does not affect host karaoke volume. Default is 25%.
-              </p>
+            <div className="flex items-center justify-between pt-2">
+              {bgmSavedMessage && (
+                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                  <Check className="w-4 h-4" />
+                  <span>{bgmSavedMessage}</span>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => saveBgm(bgmSettings)}
+                disabled={savingBgmSettings}
+                className="ml-auto px-6 py-2.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#FF4FA3]/20 flex items-center gap-2 transition-all disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                <span>{savingBgmSettings ? 'Saving...' : 'Save Background Music Settings'}</span>
+              </button>
             </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            {bgmSavedMessage && (
-              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                <Check className="w-4 h-4" />
-                <span>{bgmSavedMessage}</span>
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => saveBgm(bgmSettings)}
-              disabled={savingBgmSettings}
-              className="ml-auto px-6 py-2.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#FF4FA3]/20 flex items-center gap-2 transition-all disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              <span>{savingBgmSettings ? 'Saving...' : 'Save Background Music Settings'}</span>
-            </button>
           </div>
         </div>
       </section>

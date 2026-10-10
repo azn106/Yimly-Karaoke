@@ -1740,6 +1740,86 @@ test('Background Music Settings API & Persistence Suite', async () => {
   const emptyPlaylistSongs = await emptyPlaylistSongsRes.json();
   assert.strictEqual(Array.isArray(emptyPlaylistSongs), true);
   assert.strictEqual(emptyPlaylistSongs.length, 0, 'Unavailable or empty playlist must return empty array without error');
+
+  // 10. Background Music Audio Mode (Both, Instrumental Only, Original Only) Persistence & Filtering Suite
+  // Default audioMode must be 'both'
+  const defaultModeRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: 25, audioMode: 'both' } })
+  });
+  assert.strictEqual(defaultModeRes.status, 200);
+  const defaultModeData = await defaultModeRes.json();
+  assert.strictEqual(defaultModeData.settings.audioMode, 'both');
+
+  // Instrumental Only
+  const instOnlyRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: 25, audioMode: 'instrumental' } })
+  });
+  assert.strictEqual(instOnlyRes.status, 200);
+  const instOnlyData = await instOnlyRes.json();
+  assert.strictEqual(instOnlyData.settings.audioMode, 'instrumental');
+
+  // Original Only
+  const origOnlyRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: 25, audioMode: 'original' } })
+  });
+  assert.strictEqual(origOnlyRes.status, 200);
+  const origOnlyData = await origOnlyRes.json();
+  assert.strictEqual(origOnlyData.settings.audioMode, 'original');
+
+  // Test Filtering:
+  // We need songs with/without instrumental/original.
+  // Assuming the test database is already populated with songs that have various audio paths.
+  // Let's fetch all songs with audioMode=instrumental
+  const instSongsRes = await fetch(`${baseUrl}/api/karaoke/songs?audioMode=instrumental`);
+  assert.strictEqual(instSongsRes.status, 200);
+  const instSongs = await instSongsRes.json();
+  assert.ok(Array.isArray(instSongs));
+  for (const song of instSongs) {
+    assert.strictEqual(song.hasInstrumental, true, 'Instrumental mode should only return songs with instrumental versions');
+  }
+
+  // Fetch all songs with audioMode=original
+  const origSongsRes = await fetch(`${baseUrl}/api/karaoke/songs?audioMode=original`);
+  assert.strictEqual(origSongsRes.status, 200);
+  const origSongs = await origSongsRes.json();
+  assert.ok(Array.isArray(origSongs));
+  for (const song of origSongs) {
+    assert.strictEqual(song.hasOriginal, true, 'Original mode should only return songs with original versions');
+  }
+
+
+  // Set to Original Only
+  const origModeRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: 25, audioMode: 'original' } })
+  });
+  assert.strictEqual(origModeRes.status, 200);
+  const origModeData = await origModeRes.json();
+  assert.strictEqual(origModeData.settings.audioMode, 'original');
+
+  // Test client resolver audioMode parsing and fallback
+  assert.strictEqual(resolveBackgroundMusicSettings({}).audioMode, 'both');
+  assert.strictEqual(resolveBackgroundMusicSettings({ audioMode: 'instrumental' }).audioMode, 'instrumental');
+  assert.strictEqual(resolveBackgroundMusicSettings({ audioMode: 'original' }).audioMode, 'original');
+  assert.strictEqual(resolveBackgroundMusicSettings({ audioMode: 'invalid' }).audioMode, 'both');
+
+  // Test API song filtering by audioMode query parameter
+  const filteredInstSongsRes = await fetch(`${baseUrl}/api/karaoke/songs?audioMode=instrumental`);
+  assert.strictEqual(filteredInstSongsRes.status, 200);
+  const filteredInstSongs = await filteredInstSongsRes.json();
+  assert.strictEqual(Array.isArray(filteredInstSongs), true);
+
+  const filteredOrigSongsRes = await fetch(`${baseUrl}/api/karaoke/songs?audioMode=original`);
+  assert.strictEqual(filteredOrigSongsRes.status, 200);
+  const filteredOrigSongs = await filteredOrigSongsRes.json();
+  assert.strictEqual(Array.isArray(filteredOrigSongs), true);
 });
 
 test('Karaoke Startup Defaults & Room Playback Synchronization Suite', async () => {

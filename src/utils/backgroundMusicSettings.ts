@@ -1,17 +1,21 @@
-export type BackgroundMusicAudioMode = 'both' | 'instrumental' | 'original';
+export type BackgroundMusicAudioMode = 'instrumental' | 'original';
 
 export interface BackgroundMusicSettings {
   enabled: boolean;
   volume: number; // 0 to 100
   playlistId: string | null;
   audioMode: BackgroundMusicAudioMode;
+  crossfadeEnabled: boolean;
+  crossfadeDuration: number; // 2 to 12 seconds
 }
 
 export const DEFAULT_BACKGROUND_MUSIC_SETTINGS: BackgroundMusicSettings = {
   enabled: true,
   volume: 25,
   playlistId: null,
-  audioMode: 'both',
+  audioMode: 'original',
+  crossfadeEnabled: false,
+  crossfadeDuration: 5,
 };
 
 export const BACKGROUND_MUSIC_STORAGE_KEY = 'yimly_background_music_settings_v1';
@@ -43,13 +47,22 @@ export function resolveBackgroundMusicSettings(raw?: any): BackgroundMusicSettin
     }
   }
 
-  let audioMode: BackgroundMusicAudioMode = DEFAULT_BACKGROUND_MUSIC_SETTINGS.audioMode;
-  if (raw.audioMode === 'both' || raw.audioMode === 'instrumental' || raw.audioMode === 'original') {
+  const audioMode: BackgroundMusicAudioMode = DEFAULT_BACKGROUND_MUSIC_SETTINGS.audioMode;
+  if (raw.audioMode === 'instrumental' || raw.audioMode === 'original') {
     audioMode = raw.audioMode;
-  } else if (raw.audio === 'both' || raw.audio === 'instrumental' || raw.audio === 'original') {
+  } else if (raw.audio === 'instrumental' || raw.audio === 'original') {
     audioMode = raw.audio;
-  } else if (raw.mode === 'both' || raw.mode === 'instrumental' || raw.mode === 'original') {
+  } else if (raw.mode === 'instrumental' || raw.mode === 'original') {
     audioMode = raw.mode;
+  }
+
+  const crossfadeEnabled = typeof raw.crossfadeEnabled === 'boolean' 
+    ? raw.crossfadeEnabled 
+    : DEFAULT_BACKGROUND_MUSIC_SETTINGS.crossfadeEnabled;
+
+  let crossfadeDuration = DEFAULT_BACKGROUND_MUSIC_SETTINGS.crossfadeDuration;
+  if (typeof raw.crossfadeDuration === 'number' && !isNaN(raw.crossfadeDuration)) {
+    crossfadeDuration = Math.max(2, Math.min(12, Math.round(raw.crossfadeDuration)));
   }
 
   return {
@@ -57,6 +70,8 @@ export function resolveBackgroundMusicSettings(raw?: any): BackgroundMusicSettin
     volume,
     playlistId,
     audioMode,
+    crossfadeEnabled,
+    crossfadeDuration,
   };
 }
 

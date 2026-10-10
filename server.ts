@@ -72,6 +72,12 @@ setupDatabase().then(async () => {
   } catch (wErr) {
     console.error('Failed to initialize library watcher on startup:', wErr);
   }
+  try {
+    const { processingQueue } = await import('./server/lib/processing-queue.js');
+    await processingQueue.init();
+  } catch (pErr) {
+    console.error('Failed to initialize processing queue on startup:', pErr);
+  }
   isStarting = false;
 }).catch((err) => {
   console.error('🚨 CRITICAL DATABASE INITIALIZATION FAILED:', err);

@@ -880,10 +880,10 @@ export class DownloadQueueManager {
           const jobRec = await db.select().from(downloadJobs).where(eq(downloadJobs.id, track.jobId)).limit(1);
           if (jobRec.length > 0 && jobRec[0].libraryId) {
             const libraryId = jobRec[0].libraryId;
-            const { processDownloadedSong } = await import('./song-processor.js');
+            const { processingQueue } = await import('./processing-queue.js');
 
-            // Fire processing asynchronously; processDownloadedSong manages PROCESSING -> READY / FAILED
-            processDownloadedSong({
+            // Enqueue processing; processingQueue manages serial execution
+            processingQueue.enqueue({
               downloadTrackId: track.id,
               originalAudioPath: track.outputPath,
               libraryId,
@@ -891,8 +891,6 @@ export class DownloadQueueManager {
               artist: track.artist,
               album: track.album || undefined,
               duration: track.duration || undefined,
-            }).catch(err => {
-              console.error('[Downloader] Song processing trigger error:', err);
             });
           }
         } catch (err) {
