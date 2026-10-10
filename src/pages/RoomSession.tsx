@@ -790,7 +790,8 @@ export default function RoomSession() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const token = getAuthToken();
       const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
-      socket = new WebSocket(`${protocol}//${window.location.host}/ws/karaoke?sessionId=${sessionId}&isHost=${isHost}${tokenQuery}`);
+      const ctrlQuery = controllerId ? `&controllerId=${encodeURIComponent(controllerId)}` : '';
+      socket = new WebSocket(`${protocol}//${window.location.host}/ws/karaoke?sessionId=${sessionId}&isHost=${isHost}${tokenQuery}${ctrlQuery}`);
 
       socket.onopen = () => {
         // Re-fetch authoritative state on connect/reconnect
@@ -895,6 +896,9 @@ export default function RoomSession() {
               if (msg.payload?.settings) {
                 setBgmSettings(resolveBackgroundMusicSettings(msg.payload.settings));
               }
+              break;
+            case 'HOST_REASSIGNED':
+              fetchState();
               break;
             case 'SESSION_CLOSED':
               isClosedIntentionally = true;

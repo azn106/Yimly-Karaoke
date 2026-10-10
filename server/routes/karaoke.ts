@@ -18,12 +18,15 @@ import {
   getOrCreateRoom,
   broadcastLyricSettingsToSession,
   broadcastLyricSettingsToAllActiveRooms,
-  broadcastBackgroundMusicSettingsToAllActiveRooms
+  broadcastBackgroundMusicSettingsToAllActiveRooms,
+  broadcastToRoom,
+  updateRoomHostId
 } from '../ws/index.js';
 import { formatArtistDisplay, parseArtists } from '../lib/artist-utils.js';
 import { getSongArtistsMap } from './songs.js';
 import { findExistingSongRecord } from '../lib/scanner.js';
 import { DEFAULT_LYRICS_SETTINGS, resolveLyricsSettings, LyricsAppearanceSettings } from '../lib/lyrics-settings.js';
+import { withSessionLock } from '../lib/session-lock.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -406,8 +409,8 @@ const saveGlobalLyricsSettings = async (req: any, res: any) => {
   }
 };
 
-router.put('/settings/lyrics', saveGlobalLyricsSettings);
-router.post('/settings/lyrics', saveGlobalLyricsSettings);
+router.put('/settings/lyrics', requireAdmin, saveGlobalLyricsSettings);
+router.post('/settings/lyrics', requireAdmin, saveGlobalLyricsSettings);
 
 // Background Music Settings endpoints
 router.get('/settings/background-music', async (req, res) => {
@@ -425,15 +428,15 @@ router.get('/settings/background-music', async (req, res) => {
             playlistId = trimmed;
           }
         }
-        const audioMode = (parsed.audioMode === 'both' || parsed.audioMode === 'instrumental' || parsed.audioMode === 'original')
+        const audioMode = (parsed.audioMode === 'instrumental' || parsed.audioMode === 'original')
           ? parsed.audioMode
-          : 'both';
+          : 'original';
         return res.json({ settings: { enabled, volume, playlistId, audioMode } });
       } catch (e) {
         // ignore parse error
       }
     }
-    res.json({ settings: { enabled: true, volume: 25, playlistId: null, audioMode: 'both' } });
+    res.json({ settings: { enabled: true, volume: 25, playlistId: null, audioMode: 'original' } });
   } catch (error) {
     console.error('Failed to fetch background music settings:', error);
     res.status(500).json({ error: 'Failed to fetch background music settings' });
@@ -462,9 +465,9 @@ const saveBackgroundMusicSettingsHandler = async (req: any, res: any) => {
       }
     }
 
-    const audioMode = (raw.audioMode === 'both' || raw.audioMode === 'instrumental' || raw.audioMode === 'original')
+    const audioMode = (raw.audioMode === 'instrumental' || raw.audioMode === 'original')
       ? raw.audioMode
-      : 'both';
+      : 'original';
 
     const resolved = { enabled, volume, playlistId, audioMode };
     const jsonStr = JSON.stringify(resolved);
@@ -489,8 +492,8 @@ const saveBackgroundMusicSettingsHandler = async (req: any, res: any) => {
   }
 };
 
-router.put('/settings/background-music', saveBackgroundMusicSettingsHandler);
-router.post('/settings/background-music', saveBackgroundMusicSettingsHandler);
+router.put('/settings/background-music', requireAdmin, saveBackgroundMusicSettingsHandler);
+router.post('/settings/background-music', requireAdmin, saveBackgroundMusicSettingsHandler);
 
 // Karaoke Startup Defaults endpoints
 router.get(['/settings/karaoke-defaults', '/settings/defaults'], async (req, res) => {
@@ -549,8 +552,8 @@ const saveKaraokeDefaultsHandler = async (req: any, res: any) => {
   }
 };
 
-router.put(['/settings/karaoke-defaults', '/settings/defaults'], saveKaraokeDefaultsHandler);
-router.post(['/settings/karaoke-defaults', '/settings/defaults'], saveKaraokeDefaultsHandler);
+router.put(['/settings/karaoke-defaults', '/settings/defaults'], requireAdmin, saveKaraokeDefaultsHandler);
+router.post(['/settings/karaoke-defaults', '/settings/defaults'], requireAdmin, saveKaraokeDefaultsHandler);
 
 router.post('/sessions', async (req, res) => {
   try {
@@ -636,7 +639,7 @@ router.post('/sessions', async (req, res) => {
 
 router.post('/sessions/join', async (req, res) => {
   try {
-    const { roomCode, code, session, sessionId, displayName, username } = req.body;
+    const { roomCode, code, session, sessionId, displayName, username, controllerId: clientControllerId } = req.body;
     const rawInput = (roomCode || code || session || sessionId || '').toString().trim();
     if (!rawInput) {
       return res.status(400).json({ error: 'Room code is required' });
@@ -666,23 +669,63 @@ router.post('/sessions/join', async (req, res) => {
       return res.status(404).json({ error: 'Room not found or inactive' });
     }
 
+    const matchedSessionId = matchedSession[0].id;
+
     // A Karaoke Guest is NOT a Yimly User and must NEVER create a record in the users table.
     // If the caller is already authenticated as a real Yimly user, associate user.id.
     // Otherwise, associate guestName with this temporary controller only.
     const userId = user?.id || null;
     const guestName = !userId ? ((displayName || username || 'Guest').trim() || 'Guest') : null;
 
+    // Reconnection & Duplicate Join Prevention:
+    // 1. If client provided an existing controllerId for this session, reuse it
+    if (clientControllerId && typeof clientControllerId === 'string') {
+      const existingCtrl = await db.select().from(controllers).where(
+        and(eq(controllers.id, clientControllerId), eq(controllers.sessionId, matchedSessionId))
+      ).limit(1);
+
+      if (existingCtrl.length > 0) {
+        await db.update(controllers).set({
+          device,
+          connectionState: 'connected',
+          lastSeenTime: new Date(),
+          guestName: guestName || existingCtrl[0].guestName
+        }).where(eq(controllers.id, clientControllerId));
+
+        return res.json({ sessionId: matchedSessionId, controllerId: clientControllerId });
+      }
+    }
+
+    // 2. If logged in user already has a controller in this session, reuse it
+    if (userId) {
+      const existingUserCtrl = await db.select().from(controllers).where(
+        and(eq(controllers.userId, userId), eq(controllers.sessionId, matchedSessionId))
+      ).limit(1);
+
+      if (existingUserCtrl.length > 0) {
+        await db.update(controllers).set({
+          device,
+          connectionState: 'connected',
+          lastSeenTime: new Date()
+        }).where(eq(controllers.id, existingUserCtrl[0].id));
+
+        return res.json({ sessionId: matchedSessionId, controllerId: existingUserCtrl[0].id });
+      }
+    }
+
+    // 3. Otherwise create a new controller record
     const controllerId = crypto.randomUUID();
     await db.insert(controllers).values({
       id: controllerId,
-      sessionId: matchedSession[0].id,
+      sessionId: matchedSessionId,
       userId: userId,
       guestName: guestName,
       device: device,
+      connectionState: 'connected',
       lastSeenTime: new Date(),
     });
 
-    res.json({ sessionId: matchedSession[0].id, controllerId });
+    res.json({ sessionId: matchedSessionId, controllerId });
   } catch (error) {
     console.error('Failed to join room:', error);
     res.status(500).json({ error: 'Failed to join room' });
@@ -717,11 +760,84 @@ router.post('/sessions/:sessionId/end', async (req: any, res: any) => {
     
     await db.update(sessions).set({ status: 'closed' }).where(eq(sessions.id, sessionId));
     await db.delete(queueItems).where(eq(queueItems.sessionId, sessionId));
+    await db.update(controllers).set({ connectionState: 'disconnected' }).where(eq(controllers.sessionId, sessionId));
     closeSessionWS(sessionId);
     res.json({ success: true });
   } catch (error) {
     console.error('Failed to end session:', error);
     res.status(500).json({ error: 'Failed to end session' });
+  }
+});
+
+// Reassign Host Endpoint
+router.post('/sessions/:sessionId/reassign-host', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { newHostId } = req.body;
+
+    if (!newHostId || typeof newHostId !== 'number') {
+      return res.status(400).json({ error: 'Valid newHostId number is required' });
+    }
+
+    const sessionRes = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+    if (sessionRes.length === 0 || sessionRes[0].status !== 'active') {
+      return res.status(404).json({ error: 'Active session not found' });
+    }
+
+    const session = sessionRes[0];
+    const user = req.user;
+
+    if (!user || (user.role !== 'administrator' && session.hostId !== user.id)) {
+      return res.status(403).json({ error: 'Forbidden. Only the current host or an administrator can reassign host.' });
+    }
+
+    const targetUser = await db.select().from(users).where(eq(users.id, newHostId)).limit(1);
+    if (targetUser.length === 0) {
+      return res.status(400).json({ error: 'Target host user not found' });
+    }
+
+    await db.update(sessions).set({
+      hostId: newHostId,
+      updatedAt: new Date()
+    }).where(eq(sessions.id, sessionId));
+
+    updateRoomHostId(sessionId, newHostId);
+
+    broadcastToRoom(sessionId, {
+      type: 'HOST_REASSIGNED',
+      payload: {
+        newHostId,
+        newHostUsername: targetUser[0].username
+      }
+    });
+
+    res.json({ success: true, sessionId, newHostId, newHostUsername: targetUser[0].username });
+  } catch (error) {
+    console.error('Failed to reassign host:', error);
+    res.status(500).json({ error: 'Failed to reassign host' });
+  }
+});
+
+// Participant Leave Endpoint
+router.post('/sessions/:sessionId/leave', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { controllerId } = req.body || {};
+    const user = req.user;
+
+    if (controllerId) {
+      await db.update(controllers)
+        .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
+        .where(and(eq(controllers.id, controllerId), eq(controllers.sessionId, sessionId)));
+    } else if (user?.id) {
+      await db.update(controllers)
+        .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
+        .where(and(eq(controllers.userId, user.id), eq(controllers.sessionId, sessionId)));
+    }
+
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to process leave' });
   }
 });
 
@@ -1025,183 +1141,287 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
       return res.status(404).json({ error: 'Active session not found' });
     }
 
-    let userId: number | null = null;
-    let guestName: string | null = null;
+    return await withSessionLock(sessionId, async () => {
+      let userId: number | null = null;
+      let guestName: string | null = null;
 
-    if (user?.id) {
-      userId = user.id;
-    } else {
-      if (!controllerId) {
-        return res.status(403).json({ error: 'Valid controller ID or authentication required to queue songs in this room' });
-      }
-      const ctrl = await db.select().from(controllers).where(
-        and(eq(controllers.id, controllerId), eq(controllers.sessionId, sessionId))
-      ).limit(1);
-      if (ctrl.length === 0) {
-        return res.status(403).json({ error: 'Invalid or expired controller ID for this room' });
-      }
-      userId = ctrl[0].userId || null;
-      guestName = ctrl[0].guestName || (req.body?.guestName ? String(req.body.guestName).trim() : 'Guest');
-    }
-
-    let finalSongId: number | null = null;
-    let tempTitle: string | null = null;
-    let tempArtist: string | null = null;
-    let tempArtworkUrl: string | null = null;
-    let downloadJobId: string | null = null;
-    let downloadTrackId: string | null = null;
-    let downloadStatus: string | null = null;
-
-    if (songId) {
-      const song = await db.select().from(songs).where(eq(songs.id, Number(songId))).limit(1);
-      if (song.length === 0) {
-        return res.status(404).json({ error: 'Song not found' });
-      }
-      finalSongId = Number(songId);
-    } else if (req.body.track) {
-      const { track } = req.body;
-
-      // FIX 2: Check the existing Yimly library using the same song identity rules already used by the scanner.
-      // If the exact song already exists in the library, do NOT start a download or create a downloader job.
-      let existingLocalSong: any = null;
-      try {
-        const parsedArtistNames = parseArtists(track.artist);
-        const artistIds: number[] = [];
-        for (const aName of parsedArtistNames) {
-          const trimmed = aName.trim();
-          if (!trimmed) continue;
-          const matchedArtist = await db.select({ id: artists.id })
-            .from(artists)
-            .where(sql`LOWER(TRIM(${artists.name})) = LOWER(TRIM(${trimmed}))`)
-            .limit(1);
-          if (matchedArtist.length > 0) {
-            artistIds.push(matchedArtist[0].id);
+      if (user?.id) {
+        const isHostOrAdmin = Boolean(user.role === 'administrator' || user.id === session[0].hostId);
+        if (!isHostOrAdmin) {
+          const userCtrl = await db.select().from(controllers).where(
+            and(eq(controllers.userId, user.id), eq(controllers.sessionId, sessionId))
+          ).limit(1);
+          if (userCtrl.length === 0) {
+            const newCtrlId = crypto.randomUUID();
+            await db.insert(controllers).values({
+              id: newCtrlId,
+              sessionId,
+              userId: user.id,
+              guestName: null,
+              device: req.headers['user-agent'] || 'Unknown Device',
+              connectionState: 'connected',
+              lastSeenTime: new Date()
+            });
           }
         }
+        userId = user.id;
+      } else {
+        if (!controllerId) {
+          return res.status(403).json({ error: 'Valid controller ID or authentication required to queue songs in this room' });
+        }
+        const ctrl = await db.select().from(controllers).where(
+          and(eq(controllers.id, controllerId), eq(controllers.sessionId, sessionId))
+        ).limit(1);
+        if (ctrl.length === 0) {
+          return res.status(403).json({ error: 'Invalid or expired controller ID for this room' });
+        }
+        userId = ctrl[0].userId || null;
+        guestName = ctrl[0].guestName || (req.body?.guestName ? String(req.body.guestName).trim() : 'Guest');
+      }
 
-        if (artistIds.length > 0 && artistIds.length === parsedArtistNames.length) {
-          const allLibs = await db.select({ id: libraries.id }).from(libraries);
-          for (const lib of allLibs) {
-            const found = await findExistingSongRecord(lib.id, track.title, artistIds);
-            if (found) {
-              existingLocalSong = found;
-              break;
+      let finalSongId: number | null = null;
+      let tempTitle: string | null = null;
+      let tempArtist: string | null = null;
+      let tempArtworkUrl: string | null = null;
+      let downloadJobId: string | null = null;
+      let downloadTrackId: string | null = null;
+      let downloadStatus: string | null = null;
+
+      if (songId) {
+        const song = await db.select().from(songs).where(eq(songs.id, Number(songId))).limit(1);
+        if (song.length === 0) {
+          return res.status(404).json({ error: 'Song not found' });
+        }
+        finalSongId = Number(songId);
+      } else if (req.body.track) {
+        const { track } = req.body;
+
+        let existingLocalSong: any = null;
+        try {
+          const parsedArtistNames = parseArtists(track.artist);
+          const artistIds: number[] = [];
+          for (const aName of parsedArtistNames) {
+            const trimmed = aName.trim();
+            if (!trimmed) continue;
+            const matchedArtist = await db.select({ id: artists.id })
+              .from(artists)
+              .where(sql`LOWER(TRIM(${artists.name})) = LOWER(TRIM(${trimmed}))`)
+              .limit(1);
+            if (matchedArtist.length > 0) {
+              artistIds.push(matchedArtist[0].id);
             }
           }
-        }
-      } catch (scanErr) {
-        console.warn('[QUEUE] Error checking existing local library song:', scanErr);
-      }
 
-      if (existingLocalSong) {
-        finalSongId = existingLocalSong.id;
-        // Normal ready/pending local queue item directly with real songId:
-        tempTitle = null;
-        tempArtist = null;
-        tempArtworkUrl = null;
-        downloadJobId = null;
-        downloadTrackId = null;
-        downloadStatus = null;
-      } else {
-        tempTitle = track.title;
-        tempArtist = track.artist;
-        tempArtworkUrl = track.artworkUrl || null;
-        
-        // Prevent duplicate active downloads for the same requested track:
-        // If there is already an active queue item with downloadStatus === 'downloading' or 'processing' and same title and artist,
-        // reuse its downloadJobId and downloadTrackId instead of starting a new download job.
-        const dup = await db.select().from(queueItems).where(
-          and(
-            sql`(${queueItems.downloadStatus} = 'downloading' OR ${queueItems.downloadStatus} = 'processing')`,
-            eq(queueItems.tempTitle, track.title),
-            eq(queueItems.tempArtist, track.artist)
-          )
-        ).limit(1);
-
-        if (dup.length > 0 && dup[0].downloadJobId && dup[0].downloadTrackId) {
-          downloadJobId = dup[0].downloadJobId;
-          downloadTrackId = dup[0].downloadTrackId;
-          downloadStatus = dup[0].downloadStatus || 'downloading';
-        } else {
-          // 1. Resolve target library
-          let targetLib;
-          const allLibs = await db.select().from(libraries).limit(1);
-          if (allLibs.length > 0) {
-            targetLib = allLibs[0];
-          } else {
-            return res.status(400).json({ error: 'No media library configured in Yimly. Please configure a library in Settings first.' });
-          }
-
-          // 2. Read downloader settings from DB
-          const allSettings = await db.select().from(settings);
-          const settingsMap = new Map(allSettings.map((s) => [s.key, s.value]));
-          
-          let finalProviders = ['lrclib'];
-          if (settingsMap.has('downloader_lyrics_providers')) {
-            try {
-              const parsed = JSON.parse(settingsMap.get('downloader_lyrics_providers')!);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                finalProviders = parsed;
+          if (artistIds.length > 0 && artistIds.length === parsedArtistNames.length) {
+            const allLibs = await db.select({ id: libraries.id }).from(libraries);
+            for (const lib of allLibs) {
+              const found = await findExistingSongRecord(lib.id, track.title, artistIds);
+              if (found) {
+                existingLocalSong = found;
+                break;
               }
-            } catch (e) {}
+            }
           }
-
-          // 3. Queue download (enforce downloadLyrics: false for room downloads)
-          const activeJob = await downloadQueue.addJob({
-            playlistName: 'Karaoke Room Queue',
-            libraryId: targetLib.id,
-            libraryPath: targetLib.path,
-            format: (settingsMap.get('downloader_format') || 'mp3') as any,
-            quality: settingsMap.get('downloader_quality') || '320k',
-            embedMetadata: settingsMap.get('downloader_embed_metadata') !== 'false',
-            embedArtwork: settingsMap.get('downloader_embed_artwork') !== 'false',
-            downloadLyrics: false, // enforce lyrics disabled for room downloads
-            lyricsProviders: finalProviders,
-            folderStructure: settingsMap.get('downloader_folder_structure') || '{artist}/{artist} - {title}',
-            playlistFolder: false,
-            tracks: [{
-              title: track.title,
-              artist: track.artist,
-              album: track.album || 'Single',
-              duration: track.duration,
-              artworkUrl: track.artworkUrl,
-              sourceUrl: track.sourceUrl || null,
-            }],
-          });
-
-          downloadJobId = activeJob.id;
-          downloadTrackId = activeJob.tracks[0].id;
-          downloadStatus = 'downloading';
+        } catch (scanErr) {
+          console.warn('[QUEUE] Error checking existing local library song:', scanErr);
         }
+
+        if (existingLocalSong) {
+          finalSongId = existingLocalSong.id;
+          tempTitle = null;
+          tempArtist = null;
+          tempArtworkUrl = null;
+          downloadJobId = null;
+          downloadTrackId = null;
+          downloadStatus = null;
+        } else {
+          tempTitle = track.title;
+          tempArtist = track.artist;
+          tempArtworkUrl = track.artworkUrl || null;
+          
+          const dup = await db.select().from(queueItems).where(
+            and(
+              sql`(${queueItems.downloadStatus} = 'downloading' OR ${queueItems.downloadStatus} = 'processing')`,
+              eq(queueItems.tempTitle, track.title),
+              eq(queueItems.tempArtist, track.artist)
+            )
+          ).limit(1);
+
+          if (dup.length > 0 && dup[0].downloadJobId && dup[0].downloadTrackId) {
+            downloadJobId = dup[0].downloadJobId;
+            downloadTrackId = dup[0].downloadTrackId;
+            downloadStatus = dup[0].downloadStatus || 'downloading';
+          } else {
+            let targetLib;
+            const allLibs = await db.select().from(libraries).limit(1);
+            if (allLibs.length > 0) {
+              targetLib = allLibs[0];
+            } else {
+              return res.status(400).json({ error: 'No media library configured in Yimly. Please configure a library in Settings first.' });
+            }
+
+            const allSettings = await db.select().from(settings);
+            const settingsMap = new Map(allSettings.map((s) => [s.key, s.value]));
+            
+            let finalProviders = ['lrclib'];
+            if (settingsMap.has('downloader_lyrics_providers')) {
+              try {
+                const parsed = JSON.parse(settingsMap.get('downloader_lyrics_providers')!);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  finalProviders = parsed;
+                }
+              } catch (e) {}
+            }
+
+            const activeJob = await downloadQueue.addJob({
+              playlistName: 'Karaoke Room Queue',
+              libraryId: targetLib.id,
+              libraryPath: targetLib.path,
+              format: (settingsMap.get('downloader_format') || 'mp3') as any,
+              quality: settingsMap.get('downloader_quality') || '320k',
+              embedMetadata: settingsMap.get('downloader_embed_metadata') !== 'false',
+              embedArtwork: settingsMap.get('downloader_embed_artwork') !== 'false',
+              downloadLyrics: false,
+              lyricsProviders: finalProviders,
+              folderStructure: settingsMap.get('downloader_folder_structure') || '{artist}/{artist} - {title}',
+              playlistFolder: false,
+              tracks: [{
+                title: track.title,
+                artist: track.artist,
+                album: track.album || 'Single',
+                duration: track.duration,
+                artworkUrl: track.artworkUrl,
+                sourceUrl: track.sourceUrl || null,
+              }],
+            });
+
+            downloadJobId = activeJob.id;
+            downloadTrackId = activeJob.tracks[0].id;
+            downloadStatus = 'downloading';
+          }
+        }
+      } else {
+        return res.status(400).json({ error: 'Either songId or track metadata is required' });
       }
-    } else {
-      return res.status(400).json({ error: 'Either songId or track metadata is required' });
-    }
 
-    const existingQueue = await db.select().from(queueItems).where(eq(queueItems.sessionId, sessionId));
-    const nextPosition = existingQueue.length > 0 ? Math.max(...existingQueue.map(q => q.position)) + 1 : 1;
+      const existingQueue = await db.select({ position: queueItems.position }).from(queueItems).where(eq(queueItems.sessionId, sessionId));
+      const nextPosition = existingQueue.length > 0 ? Math.max(...existingQueue.map(q => q.position)) + 1 : 1;
 
-    const inserted = await db.insert(queueItems).values({
-      sessionId,
-      songId: finalSongId,
-      userId,
-      guestName,
-      addedAt: new Date(),
-      position: nextPosition,
-      tempTitle,
-      tempArtist,
-      tempArtworkUrl,
-      downloadJobId,
-      downloadTrackId,
-      downloadStatus,
-    }).returning();
+      const inserted = await db.insert(queueItems).values({
+        sessionId,
+        songId: finalSongId,
+        userId,
+        guestName,
+        addedAt: new Date(),
+        position: nextPosition,
+        tempTitle,
+        tempArtist,
+        tempArtworkUrl,
+        downloadJobId,
+        downloadTrackId,
+        downloadStatus,
+      }).returning();
 
-    notifyQueueUpdate(sessionId);
-    
-    res.json(inserted[0]);
+      notifyQueueUpdate(sessionId);
+      
+      res.json(inserted[0]);
+    });
   } catch (error) {
     console.error('[QUEUE] Failed to add to queue:', error);
     res.status(500).json({ error: 'Failed to add to queue' });
+  }
+});
+
+// Remove item from Queue (Host, Admin, or Requester)
+router.delete('/sessions/:sessionId/queue/:queueItemId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { sessionId, queueItemId } = req.params;
+    const { controllerId } = req.body || {};
+    const user = req.user;
+
+    const sessionRes = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+    if (sessionRes.length === 0 || sessionRes[0].status !== 'active') {
+      return res.status(404).json({ error: 'Active session not found' });
+    }
+    const session = sessionRes[0];
+
+    return await withSessionLock(sessionId, async () => {
+      const qItem = await db.select().from(queueItems).where(
+        and(eq(queueItems.id, Number(queueItemId)), eq(queueItems.sessionId, sessionId))
+      ).limit(1);
+
+      if (qItem.length === 0) {
+        return res.status(404).json({ error: 'Queue item not found' });
+      }
+
+      const isHostOrAdmin = Boolean(user && (user.role === 'administrator' || user.id === session.hostId));
+      let isOwner = false;
+      if (user?.id && qItem[0].userId === user.id) {
+        isOwner = true;
+      } else if (controllerId) {
+        const ctrl = await db.select().from(controllers).where(
+          and(eq(controllers.id, controllerId), eq(controllers.sessionId, sessionId))
+        ).limit(1);
+        if (ctrl.length > 0 && ctrl[0].guestName && ctrl[0].guestName === qItem[0].guestName) {
+          isOwner = true;
+        }
+      }
+
+      if (!isHostOrAdmin && !isOwner) {
+        return res.status(403).json({ error: 'Forbidden. Only the host, administrator, or song requester can remove this song from the queue.' });
+      }
+
+      const wasPlaying = qItem[0].status === 'playing';
+
+      await db.delete(queueItems).where(eq(queueItems.id, Number(queueItemId)));
+
+      if (wasPlaying) {
+        await advanceQueueBySessionId(sessionId);
+      } else {
+        notifyQueueUpdate(sessionId);
+      }
+
+      res.json({ success: true, deletedQueueItemId: Number(queueItemId) });
+    });
+  } catch (error) {
+    console.error('Failed to delete queue item:', error);
+    res.status(500).json({ error: 'Failed to delete queue item' });
+  }
+});
+
+// Reorder Queue Endpoint (Host Only)
+router.post('/sessions/:sessionId/queue/reorder', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { itemIds } = req.body;
+
+    if (!Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ error: 'itemIds array is required' });
+    }
+
+    const sessionRes = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+    if (sessionRes.length === 0 || sessionRes[0].status !== 'active') {
+      return res.status(404).json({ error: 'Active session not found' });
+    }
+    const session = sessionRes[0];
+    const user = req.user;
+
+    if (!user || (user.role !== 'administrator' && session.hostId !== user.id)) {
+      return res.status(403).json({ error: 'Forbidden. Only the room host can reorder the queue.' });
+    }
+
+    return await withSessionLock(sessionId, async () => {
+      for (let idx = 0; idx < itemIds.length; idx++) {
+        await db.update(queueItems)
+          .set({ position: idx + 1 })
+          .where(and(eq(queueItems.id, Number(itemIds[idx])), eq(queueItems.sessionId, sessionId)));
+      }
+      notifyQueueUpdate(sessionId);
+      res.json({ success: true });
+    });
+  } catch (error) {
+    console.error('Failed to reorder queue:', error);
+    res.status(500).json({ error: 'Failed to reorder queue' });
   }
 });
 

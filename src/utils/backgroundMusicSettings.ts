@@ -47,13 +47,17 @@ export function resolveBackgroundMusicSettings(raw?: any): BackgroundMusicSettin
     }
   }
 
-  const audioMode: BackgroundMusicAudioMode = DEFAULT_BACKGROUND_MUSIC_SETTINGS.audioMode;
-  if (raw.audioMode === 'instrumental' || raw.audioMode === 'original') {
-    audioMode = raw.audioMode;
-  } else if (raw.audio === 'instrumental' || raw.audio === 'original') {
-    audioMode = raw.audio;
-  } else if (raw.mode === 'instrumental' || raw.mode === 'original') {
-    audioMode = raw.mode;
+  // Exactly two modes: 'instrumental' | 'original'. Map legacy 'both' or invalid to 'original'.
+  let audioMode: BackgroundMusicAudioMode = DEFAULT_BACKGROUND_MUSIC_SETTINGS.audioMode;
+  if (raw.audioMode === 'instrumental' || raw.audio === 'instrumental' || raw.mode === 'instrumental') {
+    audioMode = 'instrumental';
+  } else if (raw.audioMode === 'original' || raw.audio === 'original' || raw.mode === 'original') {
+    audioMode = 'original';
+  } else if (raw.audioMode === 'both' || raw.audio === 'both' || raw.mode === 'both') {
+    // Map legacy 'both' value to Original Only
+    audioMode = 'original';
+  } else {
+    audioMode = 'original';
   }
 
   const crossfadeEnabled = typeof raw.crossfadeEnabled === 'boolean' 

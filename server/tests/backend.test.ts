@@ -1742,7 +1742,8 @@ test('Background Music Settings API & Persistence Suite', async () => {
   assert.strictEqual(emptyPlaylistSongs.length, 0, 'Unavailable or empty playlist must return empty array without error');
 
   // 10. Background Music Audio Mode (Both, Instrumental Only, Original Only) Persistence & Filtering Suite
-  // Default audioMode must be 'both'
+  // 10. Background Music Audio Mode (Instrumental Only, Original Only) Persistence & Filtering Suite
+  // Legacy 'both' must map to 'original' (Original Only)
   const defaultModeRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -1750,7 +1751,7 @@ test('Background Music Settings API & Persistence Suite', async () => {
   });
   assert.strictEqual(defaultModeRes.status, 200);
   const defaultModeData = await defaultModeRes.json();
-  assert.strictEqual(defaultModeData.settings.audioMode, 'both');
+  assert.strictEqual(defaultModeData.settings.audioMode, 'original', 'Legacy both mode must map to original');
 
   // Instrumental Only
   const instOnlyRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
@@ -1805,10 +1806,11 @@ test('Background Music Settings API & Persistence Suite', async () => {
   assert.strictEqual(origModeData.settings.audioMode, 'original');
 
   // Test client resolver audioMode parsing and fallback
-  assert.strictEqual(resolveBackgroundMusicSettings({}).audioMode, 'both');
+  assert.strictEqual(resolveBackgroundMusicSettings({}).audioMode, 'original');
+  assert.strictEqual(resolveBackgroundMusicSettings({ audioMode: 'both' }).audioMode, 'original');
   assert.strictEqual(resolveBackgroundMusicSettings({ audioMode: 'instrumental' }).audioMode, 'instrumental');
   assert.strictEqual(resolveBackgroundMusicSettings({ audioMode: 'original' }).audioMode, 'original');
-  assert.strictEqual(resolveBackgroundMusicSettings({ audioMode: 'invalid' }).audioMode, 'both');
+  assert.strictEqual(resolveBackgroundMusicSettings({ audioMode: 'invalid' }).audioMode, 'original');
 
   // Test API song filtering by audioMode query parameter
   const filteredInstSongsRes = await fetch(`${baseUrl}/api/karaoke/songs?audioMode=instrumental`);
@@ -1912,9 +1914,6 @@ test('Karaoke Startup Defaults & Room Playback Synchronization Suite', async () 
 
   // 6. Host and guest playback state remains correctly synchronised
   const guestWs = new WebSocket(`${wsUrl}/ws/karaoke?sessionId=${newRoom.id}`);
-  await new Promise<void>((resolve) => guestWs.on('open', () => resolve()));
-
-  // Wait for initial connection messages
   let guestInitialState: any = null;
   guestWs.on('message', (raw) => {
     try {
@@ -1924,6 +1923,7 @@ test('Karaoke Startup Defaults & Room Playback Synchronization Suite', async () 
       }
     } catch (e) {}
   });
+  await new Promise<void>((resolve) => guestWs.on('open', () => resolve()));
 
   await new Promise((r) => setTimeout(r, 120));
   assert.ok(guestInitialState, 'Guest must receive initial STATE_UPDATE');
@@ -3292,9 +3292,12 @@ test('Production Step #6: High Concurrency, Stress & Load Testing Suite', async 
   const stressAudioPath = path.join(stressMediaDir, 'stress_track.mp3');
   fsSync.writeFileSync(stressAudioPath, Buffer.alloc(10000, 0x41));
 
+  const [existingArtist] = await db.select().from(artists).limit(1);
+  const [existingLib] = await db.select().from(libraries).limit(1);
+
   const [stressSong] = await db.insert(songs).values({
-    libraryId: 1,
-    artistId: userAId,
+    libraryId: existingLib ? existingLib.id : 1,
+    artistId: existingArtist ? existingArtist.id : 1,
     title: 'Stress Audio Track',
     mainAudioPath: stressAudioPath,
     duration: 180,
@@ -3524,8 +3527,12 @@ test('Close server', async () => {
       testWss.close();
     } catch (e) {}
   }
+  if (typeof (server as any).closeAllConnections === 'function') {
+    (server as any).closeAllConnections();
+  }
   await new Promise<void>((resolve) => {
     server.close(() => resolve());
+    setTimeout(() => resolve(), 300);
   });
-  setTimeout(() => process.exit(0), 200);
+  setTimeout(() => process.exit(0), 100);
 });

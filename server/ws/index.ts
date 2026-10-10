@@ -1,8 +1,9 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { db } from '../db/index.js';
-import { sessions, queueItems, songs, artists, settings, users } from '../db/schema.js';
+import { sessions, queueItems, songs, artists, settings, users, controllers } from '../db/schema.js';
 import { eq, asc, and } from 'drizzle-orm';
 import { LyricsAppearanceSettings, DEFAULT_LYRICS_SETTINGS, resolveLyricsSettings } from '../lib/lyrics-settings.js';
+import { withSessionLock } from '../lib/session-lock.js';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev';
@@ -54,8 +55,10 @@ export interface RoomState {
   lyricSettings: LyricsAppearanceSettings;
   clients: Set<WebSocket>;
   hostClient: WebSocket | null;
+  hostId?: number;
   lastHostHeartbeat: number;
   isAdvancing?: boolean;
+  lastAdvanceTime?: number;
 }
 
 const activeRooms = new Map<string, RoomState>();
@@ -154,6 +157,12 @@ export async function getOrCreateRoom(sessionId: string): Promise<RoomState> {
       // ignore
     }
 
+    let initialHostId: number | undefined = undefined;
+    try {
+      const sess = await db.select({ hostId: sessions.hostId }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+      if (sess.length > 0) initialHostId = sess[0].hostId;
+    } catch (e) {}
+
     room = {
       playing: false,
       position: 0,
@@ -167,11 +176,19 @@ export async function getOrCreateRoom(sessionId: string): Promise<RoomState> {
       lyricSettings: initialLyricSettings,
       clients: new Set(),
       hostClient: null,
+      hostId: initialHostId,
       lastHostHeartbeat: Date.now(),
     };
     activeRooms.set(sessionId, room);
   }
   return room;
+}
+
+export function updateRoomHostId(sessionId: string, newHostId: number) {
+  const room = activeRooms.get(sessionId);
+  if (room) {
+    room.hostId = newHostId;
+  }
 }
 
 export function getRoomState(sessionId: string): RoomState | undefined {
@@ -184,6 +201,7 @@ export function setupWebSockets(wss: WebSocketServer) {
     const params = new URLSearchParams(url?.split('?')[1]);
     const sessionId = params.get('sessionId');
     const isHostRequested = params.get('isHost') === 'true';
+    const clientControllerId = params.get('controllerId');
 
     if (!sessionId) {
       ws.close(1008, 'Session ID required');
@@ -202,11 +220,42 @@ export function setupWebSockets(wss: WebSocketServer) {
     const authUser = await authenticateUser(token);
     const isVerifiedHost = Boolean(authUser && (authUser.role === 'administrator' || authUser.id === sessionRec[0].hostId));
 
+    if (isHostRequested && !token) {
+      ws.close(1008, 'Unauthorized: token required for host role');
+      return;
+    }
+
     // A client is only treated as host if verified by authentication
     const isHost = isHostRequested && isVerifiedHost;
+
+    // Room membership validation for non-hosts:
+    let verifiedControllerId: string | null = null;
+    if (!isHost) {
+      if (authUser) {
+        const userCtrl = await db.select().from(controllers).where(
+          and(eq(controllers.userId, authUser.id), eq(controllers.sessionId, sessionId))
+        ).limit(1);
+        if (userCtrl.length > 0) {
+          verifiedControllerId = userCtrl[0].id;
+        }
+      } else if (clientControllerId) {
+        const ctrl = await db.select().from(controllers).where(
+          and(eq(controllers.id, clientControllerId), eq(controllers.sessionId, sessionId))
+        ).limit(1);
+        if (ctrl.length === 0) {
+          ws.close(1008, 'Invalid or expired controller ID for this room');
+          return;
+        }
+        verifiedControllerId = ctrl[0].id;
+      }
+      // If client has neither authUser nor clientControllerId, allow connection as unprivileged guest viewer (isHost=false, controllerId=null)
+    }
+
     (ws as any).isHost = isHost;
+    (ws as any).isAdmin = authUser?.role === 'administrator';
     (ws as any).sessionId = sessionId;
     (ws as any).userId = authUser?.id || null;
+    (ws as any).controllerId = verifiedControllerId;
 
     const room = await getOrCreateRoom(sessionId);
     room.clients.add(ws);
@@ -220,6 +269,12 @@ export function setupWebSockets(wss: WebSocketServer) {
       } catch (e) {
         // ignore
       }
+    } else if (verifiedControllerId) {
+      try {
+        await db.update(controllers)
+          .set({ connectionState: 'connected', lastSeenTime: new Date() })
+          .where(eq(controllers.id, verifiedControllerId));
+      } catch (e) {}
     }
 
     // Send initial full state update
@@ -244,7 +299,7 @@ export function setupWebSockets(wss: WebSocketServer) {
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
-        const socketIsHost = (ws as any).isHost === true;
+        const socketIsHost = Boolean((ws as any).isAdmin || ((ws as any).userId && (ws as any).userId === room.hostId));
         
         switch (data.type) {
           case 'HEARTBEAT':
@@ -255,6 +310,12 @@ export function setupWebSockets(wss: WebSocketServer) {
               } catch (e) {
                 console.error('[WS] Failed to update session updatedAt on heartbeat:', e);
               }
+            } else if ((ws as any).controllerId) {
+              try {
+                await db.update(controllers)
+                  .set({ lastSeenTime: new Date(), connectionState: 'connected' })
+                  .where(eq(controllers.id, (ws as any).controllerId));
+              } catch (e) {}
             }
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ type: 'HEARTBEAT_ACK', timestamp: Date.now() }));
@@ -425,7 +486,9 @@ export function setupWebSockets(wss: WebSocketServer) {
           }
 
           case 'QUEUE_UPDATE':
-            broadcastToRoom(sessionId, { type: 'QUEUE_UPDATED' });
+            if (socketIsHost) {
+              broadcastToRoom(sessionId, { type: 'QUEUE_UPDATED' });
+            }
             break;
 
           case 'GET_STATE':
@@ -522,6 +585,12 @@ export function setupWebSockets(wss: WebSocketServer) {
       if ((ws as any).isHost && room.hostClient === ws) {
         room.hostClient = null;
       }
+      if ((ws as any).controllerId) {
+        db.update(controllers)
+          .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
+          .where(eq(controllers.id, (ws as any).controllerId))
+          .catch(() => {});
+      }
     });
 
     ws.on('error', (err) => {
@@ -529,6 +598,12 @@ export function setupWebSockets(wss: WebSocketServer) {
       room.clients.delete(ws);
       if ((ws as any).isHost && room.hostClient === ws) {
         room.hostClient = null;
+      }
+      if ((ws as any).controllerId) {
+        db.update(controllers)
+          .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
+          .where(eq(controllers.id, (ws as any).controllerId))
+          .catch(() => {});
       }
     });
   });
@@ -620,11 +695,16 @@ export async function advanceQueueBySessionId(sessionId: string) {
 }
 
 export async function advanceQueue(sessionId: string, room: RoomState) {
-  if (room.isAdvancing) return;
-  room.isAdvancing = true;
+  return await withSessionLock(sessionId, async () => {
+    const now = Date.now();
+    if (room.isAdvancing || (room.lastAdvanceTime && now - room.lastAdvanceTime < 400)) {
+      return;
+    }
+    room.isAdvancing = true;
+    room.lastAdvanceTime = now;
 
-  try {
-    // 1. Remove current playing or first pending from the queue in DB
+    try {
+      // 1. Remove current playing or first pending from the queue in DB
     if (room.currentQueueItemId) {
       await db.delete(queueItems)
         .where(eq(queueItems.id, room.currentQueueItemId));
@@ -723,6 +803,7 @@ export async function advanceQueue(sessionId: string, room: RoomState) {
   } finally {
     room.isAdvancing = false;
   }
+  });
 }
 
 /**
@@ -731,79 +812,81 @@ export async function advanceQueue(sessionId: string, room: RoomState) {
  * Otherwise, broadcasts QUEUE_UPDATED.
  */
 export async function checkAndAutoPlay(sessionId: string) {
-  try {
-    const room = await getOrCreateRoom(sessionId);
+  return await withSessionLock(sessionId, async () => {
+    try {
+      const room = await getOrCreateRoom(sessionId);
 
-    // Check if there is already a song actively playing in memory or DB
-    const currentlyPlayingInDB = await db.select().from(queueItems)
-      .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing')))
-      .limit(1);
+      // Check if there is already a song actively playing in memory or DB
+      const currentlyPlayingInDB = await db.select().from(queueItems)
+        .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing')))
+        .limit(1);
 
-    const isCurrentlyPlaying = (room.playing && room.currentSongId !== null) || currentlyPlayingInDB.length > 0;
+      const isCurrentlyPlaying = (room.playing && room.currentSongId !== null) || currentlyPlayingInDB.length > 0;
 
-    if (!isCurrentlyPlaying) {
-      // Look for first pending queue item in DB that is eligible to play:
-      // must have real songId, and not downloading/processing/failed (mirrors advanceQueue eligibility logic)
-      const pendingItems = await db.select().from(queueItems)
-        .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
-        .orderBy(asc(queueItems.position));
+      if (!isCurrentlyPlaying) {
+        // Look for first pending queue item in DB that is eligible to play:
+        // must have real songId, and not downloading/processing/failed (mirrors advanceQueue eligibility logic)
+        const pendingItems = await db.select().from(queueItems)
+          .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
+          .orderBy(asc(queueItems.position));
 
-      const itemToPlay = pendingItems.find(item => 
-        item.songId !== null && 
-        item.downloadStatus !== 'downloading' && 
-        item.downloadStatus !== 'processing' && 
-        item.downloadStatus !== 'failed'
-      );
+        const itemToPlay = pendingItems.find(item => 
+          item.songId !== null && 
+          item.downloadStatus !== 'downloading' && 
+          item.downloadStatus !== 'processing' && 
+          item.downloadStatus !== 'failed'
+        );
 
-      if (itemToPlay) {
-        await db.update(queueItems)
-          .set({ status: 'playing' })
-          .where(eq(queueItems.id, itemToPlay.id));
+        if (itemToPlay) {
+          await db.update(queueItems)
+            .set({ status: 'playing' })
+            .where(eq(queueItems.id, itemToPlay.id));
 
-        room.currentSongId = itemToPlay.songId;
-        room.currentQueueItemId = itemToPlay.id;
-        room.position = 0;
-        room.playing = true;
+          room.currentSongId = itemToPlay.songId;
+          room.currentQueueItemId = itemToPlay.id;
+          room.position = 0;
+          room.playing = true;
 
-        // Load song's saved lyricOffset
-        try {
-          const songRec = await db.select({ lyricOffset: songs.lyricOffset }).from(songs).where(eq(songs.id, itemToPlay.songId)).limit(1);
-          room.lyricOffset = songRec[0]?.lyricOffset ?? 0;
-        } catch (e) {
-          room.lyricOffset = 0;
+          // Load song's saved lyricOffset
+          try {
+            const songRec = await db.select({ lyricOffset: songs.lyricOffset }).from(songs).where(eq(songs.id, itemToPlay.songId)).limit(1);
+            room.lyricOffset = songRec[0]?.lyricOffset ?? 0;
+          } catch (e) {
+            room.lyricOffset = 0;
+          }
+
+          broadcastToRoom(sessionId, {
+            type: 'SONG_CHANGED',
+            payload: {
+              songId: room.currentSongId,
+              queueItemId: room.currentQueueItemId,
+              playing: true,
+              position: 0,
+              lyricOffset: room.lyricOffset
+            }
+          });
+
+          broadcastToRoom(sessionId, {
+            type: 'OFFSET_CHANGED',
+            payload: {
+              offset: room.lyricOffset,
+              songId: room.currentSongId
+            }
+          });
+
+          broadcastToRoom(sessionId, {
+            type: 'PLAYING',
+            payload: { position: 0 }
+          });
         }
-
-        broadcastToRoom(sessionId, {
-          type: 'SONG_CHANGED',
-          payload: {
-            songId: room.currentSongId,
-            queueItemId: room.currentQueueItemId,
-            playing: true,
-            position: 0,
-            lyricOffset: room.lyricOffset
-          }
-        });
-
-        broadcastToRoom(sessionId, {
-          type: 'OFFSET_CHANGED',
-          payload: {
-            offset: room.lyricOffset,
-            songId: room.currentSongId
-          }
-        });
-
-        broadcastToRoom(sessionId, {
-          type: 'PLAYING',
-          payload: { position: 0 }
-        });
       }
-    }
 
-    broadcastToRoom(sessionId, { type: 'QUEUE_UPDATED' });
-  } catch (err) {
-    console.error('[WS] Error checking and auto-playing queue:', err);
-    broadcastToRoom(sessionId, { type: 'QUEUE_UPDATED' });
-  }
+      broadcastToRoom(sessionId, { type: 'QUEUE_UPDATED' });
+    } catch (err) {
+      console.error('[WS] Error checking and auto-playing queue:', err);
+      broadcastToRoom(sessionId, { type: 'QUEUE_UPDATED' });
+    }
+  });
 }
 
 export function notifyQueueUpdate(sessionId: string) {

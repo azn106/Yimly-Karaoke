@@ -330,25 +330,21 @@ export async function handleAudioStream(req: express.Request, res: express.Respo
       return res.status(404).json({ error: 'Song not found' });
     }
 
-    let audioPath = song[0].mainAudioPath;
-    let fallbackPath: string | null = null;
+    let audioPath: string | null = null;
 
-    if (type === 'instrumental' && song[0].instrumentalAudioPath) {
+    if (type === 'instrumental') {
       audioPath = song[0].instrumentalAudioPath;
-      if (song[0].mainAudioPath) {
-        fallbackPath = song[0].mainAudioPath;
+      if (!audioPath || typeof audioPath !== 'string' || audioPath.trim().length === 0) {
+        return res.status(404).json({ error: 'Instrumental audio track not available for this song' });
       }
-    } else if (!audioPath && song[0].instrumentalAudioPath) {
-      audioPath = song[0].instrumentalAudioPath;
-    } else if (audioPath && song[0].instrumentalAudioPath) {
-      fallbackPath = song[0].instrumentalAudioPath;
-    }
-
-    if (!audioPath || typeof audioPath !== 'string' || audioPath.trim().length === 0) {
-      if (fallbackPath) {
-        audioPath = fallbackPath;
-        fallbackPath = null;
-      } else {
+    } else if (type === 'original' || type === 'main') {
+      audioPath = song[0].mainAudioPath;
+      if (!audioPath || typeof audioPath !== 'string' || audioPath.trim().length === 0) {
+        return res.status(404).json({ error: 'Original audio track not available for this song' });
+      }
+    } else {
+      audioPath = song[0].mainAudioPath || song[0].instrumentalAudioPath;
+      if (!audioPath || typeof audioPath !== 'string' || audioPath.trim().length === 0) {
         return res.status(404).json({ error: 'Audio file not found' });
       }
     }
@@ -361,19 +357,7 @@ export async function handleAudioStream(req: express.Request, res: express.Respo
       await fs.promises.access(resolvedPath, fs.constants.R_OK);
       stat = await fs.promises.stat(resolvedPath);
     } catch (accessErr: any) {
-      if (fallbackPath) {
-        try {
-          const fallbackResolved = path.resolve(fallbackPath);
-          await fs.promises.access(fallbackResolved, fs.constants.R_OK);
-          stat = await fs.promises.stat(fallbackResolved);
-          resolvedPath = fallbackResolved;
-          console.warn(`[AUDIO STREAM] Requested audio track inaccessible for song #${id}, falling back to alternative track.`);
-        } catch (fallbackErr) {
-          return res.status(404).json({ error: 'Audio file not found or inaccessible on disk' });
-        }
-      } else {
-        return res.status(404).json({ error: 'Audio file not found or inaccessible on disk' });
-      }
+      return res.status(404).json({ error: 'Audio file not found or inaccessible on disk' });
     }
 
     if (!stat.isFile()) {
