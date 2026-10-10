@@ -3519,6 +3519,34 @@ test('Production Step #9: Security Hardening Audit Suite', async () => {
   assert.strictEqual(lastStatus, 429, 'Rate limiter must return HTTP 429 Too Many Requests after exceeding max limit');
 });
 
+test('Production Step #10: Security Regression Tests', async () => {
+  // 1. Create Host Session for User A
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` }
+  });
+  const room = await createRes.json();
+  const sessionId = room.id;
+
+  // 2. Try to add song to queue without Authorization (should fail with 401)
+  const [testSong] = await db.select().from(songs).limit(1);
+  const songId = testSong ? testSong.id : 1;
+  
+  const addQueueRes = await fetch(`${baseUrl}/api/karaoke/sessions/${sessionId}/queue`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ songId })
+  });
+  assert.strictEqual(addQueueRes.status, 401, 'Queue addition without authorization must return 401');
+
+  // 3. Try to skip track without Authorization (should fail with 401)
+  const skipRes = await fetch(`${baseUrl}/api/karaoke/sessions/${sessionId}/skip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  assert.strictEqual(skipRes.status, 401, 'Skip request without authorization must return 401');
+});
+
 test('Close server', async () => {
   const { libraryWatcher } = await import('../lib/watcher.js');
   libraryWatcher.stopAll();

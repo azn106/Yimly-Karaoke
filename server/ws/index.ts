@@ -934,7 +934,7 @@ export function broadcastBackgroundMusicSettingsToAllActiveRooms(newSettings: {
   enabled: boolean;
   volume: number;
   playlistId: string | null;
-  audioMode?: 'both' | 'instrumental' | 'original';
+  audioMode?: 'instrumental' | 'original';
 }) {
   for (const sessionId of activeRooms.keys()) {
     broadcastToRoom(sessionId, {

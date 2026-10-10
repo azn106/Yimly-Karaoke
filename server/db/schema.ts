@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -71,7 +71,11 @@ export const songs = sqliteTable('songs', {
   lrcOffset: integer('lrc_offset').notNull().default(0),
   elrcOffset: integer('elrc_offset').notNull().default(0),
   lyricOffset: integer('lyric_offset').notNull().default(0),
-});
+}, (table) => ({
+  titleIdx: index('songs_title_idx').on(table.title),
+  artistIdx: index('songs_artist_id_idx').on(table.artistId),
+  albumIdx: index('songs_album_id_idx').on(table.albumId),
+}));
 
 export const lyrics = sqliteTable('lyrics', {
   id: integer('id').primaryKey({ autoIncrement: true }),

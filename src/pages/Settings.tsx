@@ -1658,7 +1658,6 @@ export default function Settings() {
                   }}
                   className="w-full bg-[#1A1C24] text-white text-xs p-2 rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
                 >
-                  <option value="both">Both (Original & Instrumental)</option>
                   <option value="instrumental">Instrumental Only</option>
                   <option value="original">Original Only</option>
                 </select>
