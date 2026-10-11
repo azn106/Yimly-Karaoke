@@ -38,8 +38,8 @@ export const isPublicRoute = (req: Request): boolean => {
     return true;
   }
 
-  // Public Karaoke session validation, state query, leave, heartbeat, lyrics-settings for room participants
-  if (/^\/api\/karaoke\/sessions\/[^\/]+\/(validate|state|leave|heartbeat|lyrics-settings)$/.test(url)) {
+  // Public Karaoke session validation, state query, leave, heartbeat, lyrics-settings, queue for room participants (skip requires host auth)
+  if (/^\/api\/karaoke\/sessions\/[^\/]+\/(validate|state|leave|heartbeat|lyrics-settings|queue)$/.test(url)) {
     return true;
   }
 

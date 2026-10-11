@@ -52,6 +52,19 @@ if %ERRORLEVEL% neq 0 (
 echo Repository and Docker verified.
 echo.
 
+echo.
+
+:: [1.5/5] Performing backup...
+echo [1.5/5] Performing backup...
+bash scripts/backup.sh
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Backup failed. Update aborted to protect data.
+    echo.
+    pause
+    exit /b 1
+)
+echo.
+
 :: [2/5] Pulling latest GitHub changes...
 echo [2/5] Pulling latest GitHub changes...
 git pull

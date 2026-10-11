@@ -3537,9 +3537,9 @@ test('Production Step #10: Security Regression Tests', async () => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ songId })
   });
-  assert.strictEqual(addQueueRes.status, 401, 'Queue addition without authorization must return 401');
+  assert.strictEqual(addQueueRes.status, 403, 'Queue addition without authorization must return 403');
 
-  // 3. Try to skip track without Authorization (should fail with 401)
+  // 3. Try to skip track without Authorization (should fail with 401 Unauthorized)
   const skipRes = await fetch(`${baseUrl}/api/karaoke/sessions/${sessionId}/skip`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
