@@ -12,9 +12,27 @@ echo "[Backup] Starting backup at $TIMESTAMP"
 
 mkdir -p "$BACKUP_DIR"
 
-# 1. Stop container to ensure DB consistency
-echo "[Backup] Stopping Yimly container for consistent backup..."
-docker compose stop yimly
+WAS_RUNNING=false
+if docker compose -f compose.yaml ps --status running --services 2>/dev/null | grep -q "^yimly$"; then
+    WAS_RUNNING=true
+fi
+
+cleanup() {
+    local exit_code=$?
+    if [ "$WAS_RUNNING" = true ]; then
+        echo "[Backup] Ensuring Yimly container is restarted..."
+        docker compose -f compose.yaml start yimly >/dev/null 2>&1 || true
+    fi
+    exit $exit_code
+}
+
+trap cleanup EXIT
+
+# 1. Stop container to ensure DB consistency if running
+if [ "$WAS_RUNNING" = true ]; then
+    echo "[Backup] Stopping Yimly container for consistent backup..."
+    docker compose -f compose.yaml stop yimly
+fi
 
 # 2. Perform backup
 # We back up the data and media directories based on the mounts defined in compose.yaml
@@ -26,17 +44,11 @@ if tar -czf "$BACKUP_FILE" ./data ./media; then
     else
         echo "[Backup] Integrity verification FAILED!"
         rm -f "$BACKUP_FILE"
-        docker compose start yimly
         exit 1
     fi
 else
     echo "[Backup] Backup failed!"
-    docker compose start yimly
     exit 1
 fi
-
-# 3. Restart container
-echo "[Backup] Restarting Yimly container..."
-docker compose start yimly
 
 echo "[Backup] Backup process complete."

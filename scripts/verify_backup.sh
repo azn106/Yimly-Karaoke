@@ -33,5 +33,6 @@ if [ -f "$RESTORE_DIR/data/yimly.db" ] && [ -f "$RESTORE_DIR/media/test.mp3" ]; 
     exit 0
 else
     echo "[Test] Backup/Restore verification FAILED!"
+    rm -rf "$TEST_ROOT"
     exit 1
 fi
