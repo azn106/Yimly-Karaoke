@@ -1585,10 +1585,16 @@ export default function Settings() {
                   value={bgmSettings.volume}
                   onChange={(e) => {
                     const val = parseInt(e.target.value, 10);
-                    setBgmSettings({ ...bgmSettings, volume: val });
+                    setBgmSettings(prev => ({ ...prev, volume: val }));
                   }}
-                  onMouseUp={() => saveBgm(bgmSettings)}
-                  onTouchEnd={() => saveBgm(bgmSettings)}
+                  onMouseUp={(e) => {
+                    const val = parseInt((e.target as HTMLInputElement).value, 10);
+                    saveBgm({ ...bgmSettings, volume: val });
+                  }}
+                  onTouchEnd={(e) => {
+                    const val = parseInt((e.target as HTMLInputElement).value, 10);
+                    saveBgm({ ...bgmSettings, volume: val });
+                  }}
                   className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3] focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
                 />
                 <p className="text-[11px] text-zinc-500">
@@ -1633,10 +1639,16 @@ export default function Settings() {
                       value={bgmSettings.crossfadeDuration}
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
-                        setBgmSettings({ ...bgmSettings, crossfadeDuration: val });
+                        setBgmSettings(prev => ({ ...prev, crossfadeDuration: val }));
                       }}
-                      onMouseUp={() => saveBgm(bgmSettings)}
-                      onTouchEnd={() => saveBgm(bgmSettings)}
+                      onMouseUp={(e) => {
+                        const val = parseInt((e.target as HTMLInputElement).value, 10);
+                        saveBgm({ ...bgmSettings, crossfadeDuration: val });
+                      }}
+                      onTouchEnd={(e) => {
+                        const val = parseInt((e.target as HTMLInputElement).value, 10);
+                        saveBgm({ ...bgmSettings, crossfadeDuration: val });
+                      }}
                       className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3] focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
                     />
                   </div>

@@ -1712,6 +1712,57 @@ test('Background Music Settings API & Persistence Suite', async () => {
   const nullPlaylistData = await nullPlaylistRes.json();
   assert.strictEqual(nullPlaylistData.settings.playlistId, null);
 
+  // 7.5. Test Crossfade settings persistence, GET retrieval, and duration clamping
+  const crossfadeRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { enabled: true, volume: 25, crossfadeEnabled: true, crossfadeDuration: 8 } })
+  });
+  assert.strictEqual(crossfadeRes.status, 200);
+  const crossfadeData = await crossfadeRes.json();
+  assert.strictEqual(crossfadeData.settings.crossfadeEnabled, true);
+  assert.strictEqual(crossfadeData.settings.crossfadeDuration, 8);
+
+  // Verify GET retrieves the persisted crossfade settings
+  const getCrossfadeRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.strictEqual(getCrossfadeRes.status, 200);
+  const getCrossfadeData = await getCrossfadeRes.json();
+  assert.strictEqual(getCrossfadeData.settings.crossfadeEnabled, true);
+  assert.strictEqual(getCrossfadeData.settings.crossfadeDuration, 8);
+
+  // Test clamping below minimum duration (< 2s should clamp to 2s)
+  const minClampRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { crossfadeEnabled: true, crossfadeDuration: 0 } })
+  });
+  assert.strictEqual(minClampRes.status, 200);
+  const minClampData = await minClampRes.json();
+  assert.strictEqual(minClampData.settings.crossfadeDuration, 2, 'Duration below 2 must clamp to 2');
+
+  // Test clamping above maximum duration (> 12s should clamp to 12s)
+  const maxClampRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { crossfadeEnabled: true, crossfadeDuration: 99 } })
+  });
+  assert.strictEqual(maxClampRes.status, 200);
+  const maxClampData = await maxClampRes.json();
+  assert.strictEqual(maxClampData.settings.crossfadeDuration, 12, 'Duration above 12 must clamp to 12');
+
+  // Test default duration fallback when omitted or non-numeric
+  const defaultDurationRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ settings: { crossfadeEnabled: false, crossfadeDuration: 'invalid' } })
+  });
+  assert.strictEqual(defaultDurationRes.status, 200);
+  const defaultDurationData = await defaultDurationRes.json();
+  assert.strictEqual(defaultDurationData.settings.crossfadeEnabled, false);
+  assert.strictEqual(defaultDurationData.settings.crossfadeDuration, 5, 'Invalid duration must fallback to default 5');
+
   // 8. Test client resolver backward compatibility and fallback logic
   const { resolveBackgroundMusicSettings, DEFAULT_BACKGROUND_MUSIC_SETTINGS } = await import('../../src/utils/backgroundMusicSettings.js');
   assert.strictEqual(DEFAULT_BACKGROUND_MUSIC_SETTINGS.playlistId, null);
@@ -2811,11 +2862,11 @@ test('Production Step #2: Karaoke Security, Server-Side Permissions & Room Isola
   });
   assert.strictEqual(nonHostSkipRes.status, 403, 'Non-host user must be denied from skipping in another room');
 
-  // 4b. Unauthenticated client attempting skip in Room A -> 403
+  // 4b. Unauthenticated client attempting skip in Room A -> 401
   const unauthSkipRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/skip`, {
     method: 'POST'
   });
-  assert.strictEqual(unauthSkipRes.status, 403, 'Unauthenticated client must be denied from skipping tracks');
+  assert.strictEqual(unauthSkipRes.status, 401, 'Unauthenticated client must be denied from skipping tracks with 401');
 
   // 4c. User B attempting heartbeat in Room A -> 403
   const nonHostHbRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/heartbeat`, {
