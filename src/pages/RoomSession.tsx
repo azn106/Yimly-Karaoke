@@ -1832,7 +1832,11 @@ export default function RoomSession() {
   // Determine if Room is in a genuine active karaoke playback state (a valid ready song is present or playing).
   // A queued song that is downloading, processing, or waiting for playable media does NOT activate karaoke
   // and MUST NOT stop background music.
-  const isKaraokeActive = Boolean(currentSong);
+  // Determine if Room is in a genuine active karaoke playback state (a valid ready song is present or playing).
+  // A queued song that is downloading, processing, or waiting for playable media does NOT activate karaoke
+  // and MUST NOT stop background music.
+  const isKaraokeActive = Boolean(activePlaying);
+
 
   // Background Music Playback Coordinator Effect
   useEffect(() => {
