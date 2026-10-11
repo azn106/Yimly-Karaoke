@@ -1,6 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: Ensure execution from repository root directory
+cd /d "%~dp0"
+
 title Yimly - Update
 
 echo ========================================
@@ -9,7 +12,7 @@ echo ========================================
 echo.
 
 :: [1/5] Checking repository...
-echo [1/5] Checking repository...
+echo [1/5] Checking repository and environment...
 where git >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Git is not installed or not found in PATH.
@@ -52,25 +55,29 @@ if %ERRORLEVEL% neq 0 (
 echo Repository and Docker verified.
 echo.
 
-echo.
-
-:: [1.5/5] Performing backup...
-echo [1.5/5] Performing backup...
-bash scripts/backup.sh
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Backup failed. Update aborted to protect data.
-    echo.
-    pause
-    exit /b 1
-)
-echo.
-
 :: [2/5] Pulling latest GitHub changes...
 echo [2/5] Pulling latest GitHub changes...
 git pull
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Failed to pull changes from remote GitHub repository.
     echo Please check your network connection and Git credentials.
+    echo.
+    pause
+    exit /b 1
+)
+echo.
+
+:: [2.5/5] Normalizing shell script line endings...
+echo [2.5/5] Normalizing shell script line endings to Unix LF...
+powershell -Command "Get-ChildItem -Path 'scripts' -Filter '*.sh' | ForEach-Object { $content = Get-Content $_.FullName -Raw; $content = $content -replace \"`r`n\", \"`n\"; Set-Content -NoNewline -Path $_.FullName -Value $content }"
+echo Line endings normalized.
+echo.
+
+:: [1.5/5] Performing backup (Bootstrap Safety Gate)...
+echo [1.5/5] Performing backup...
+bash scripts/backup.sh
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Backup failed. Update aborted to protect data. Running application left untouched.
     echo.
     pause
     exit /b 1
