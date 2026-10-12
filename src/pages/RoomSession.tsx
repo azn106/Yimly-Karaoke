@@ -741,9 +741,7 @@ export default function RoomSession() {
         }
         if (data.playback) {
           if (typeof data.playback.playing === 'boolean') {
-            if (!isHost || !audioRef.current || audioRef.current.paused || data.playback.playing) {
-              setPlaying(data.playback.playing);
-            }
+            setPlaying(data.playback.playing);
           }
           if (data.playback.variant) {
             setVariant(data.playback.variant);
@@ -812,11 +810,7 @@ export default function RoomSession() {
             case 'HEARTBEAT_ACK':
               break;
             case 'STATE_UPDATE':
-              if (typeof msg.payload?.playing === 'boolean') {
-                if (!isHost || !audioRef.current || audioRef.current.paused || msg.payload.playing) {
-                  setPlaying(msg.payload.playing);
-                }
-              }
+              if (typeof msg.payload?.playing === 'boolean') setPlaying(msg.payload.playing);
               if (msg.payload?.variant) setVariant(msg.payload.variant);
               if (msg.payload?.lyricsFormat) {
                 setLyricsFormat(msg.payload.lyricsFormat);
@@ -1884,12 +1878,11 @@ export default function RoomSession() {
 
   // High-frequency smooth animation loop for lyric sweep and position
   useEffect(() => {
-    if (!isHost) return;
+    if (!isHost || !playing) return;
     let rafId: number;
     const updateLoop = () => {
       if (audioRef.current && !audioRef.current.paused) {
         setCurrentTime(audioRef.current.currentTime);
-        setPlaying(prev => prev ? prev : true);
       }
       rafId = requestAnimationFrame(updateLoop);
     };
@@ -1897,7 +1890,7 @@ export default function RoomSession() {
     return () => {
       cancelAnimationFrame(rafId);
     };
-  }, [isHost]);
+  }, [isHost, playing]);
 
   const handleSeek = (e: ChangeEvent<HTMLInputElement>) => {
     if (!isHost || !audioRef.current) return;

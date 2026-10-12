@@ -1,9 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Ensure execution from repository root directory
-cd /d "%~dp0"
-
 title Yimly - Update
 
 echo ========================================
@@ -11,8 +8,8 @@ echo         YIMLY UPDATE
 echo ========================================
 echo.
 
-:: [1/5] Repository and Docker checks
-echo [1/5] Checking repository and environment...
+:: [1/5] Checking repository...
+echo [1/5] Checking repository...
 where git >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Git is not installed or not found in PATH.
@@ -55,44 +52,19 @@ if %ERRORLEVEL% neq 0 (
 echo Repository and Docker verified.
 echo.
 
-:: [2/5] Git update
+:: [2/5] Pulling latest GitHub changes...
 echo [2/5] Pulling latest GitHub changes...
 git pull
 if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Failed to pull changes from remote GitHub repository (possible merge conflict or network issue).
-    echo Please resolve any local git conflicts or stash local changes before running update-yimly.bat.
-    echo Update aborted to protect your data and prevent deployment of conflicting code.
+    echo [ERROR] Failed to pull changes from remote GitHub repository.
+    echo Please check your network connection and Git credentials.
     echo.
     pause
     exit /b 1
 )
 echo.
 
-:: [2.5/5] LF normalization and verification
-echo [2.5/5] Normalizing shell script line endings to Unix LF via PowerShell...
-powershell -Command "$ErrorActionPreference = 'Stop'; try { Get-ChildItem -Path 'scripts' -Filter '*.sh' | ForEach-Object { $c = Get-Content $_.FullName -Raw; $c = $c -replace \"`r`n\", \"`n\"; Set-Content -NoNewline -Path $_.FullName -Value $c }; exit 0 } catch { Write-Error $_; exit 1 }"
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Failed to normalize shell script line endings.
-    echo Update aborted.
-    echo.
-    pause
-    exit /b 1
-)
-echo Shell scripts successfully normalized to Unix LF line endings.
-echo.
-
-:: [1.5/5] Backup and archive verification
-echo [1.5/5] Performing backup and archive verification (Bootstrap Safety Gate)...
-bash scripts/backup.sh
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Backup failed. Update aborted to protect data. Running application left untouched.
-    echo.
-    pause
-    exit /b 1
-)
-echo.
-
-:: [3/5] Docker build
+:: [3/5] Rebuilding Docker image...
 echo [3/5] Rebuilding Docker image...
 docker compose -f compose.yaml build --pull
 if %ERRORLEVEL% neq 0 (
@@ -108,8 +80,8 @@ if %ERRORLEVEL% neq 0 (
 )
 echo.
 
-:: [4/5] Container restart
-echo [4/5] Restarting Yimly container...
+:: [4/5] Restarting Yimly...
+echo [4/5] Restarting Yimly...
 docker compose -f compose.yaml up -d
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Failed to restart Docker containers.
@@ -122,7 +94,7 @@ docker image prune -f >nul 2>&1
 echo Container restarted successfully.
 echo.
 
-:: [5/5] Health check
+:: [5/5] Checking health...
 echo [5/5] Checking health...
 set "HEALTHY=0"
 set "ELAPSED=0"

@@ -431,14 +431,12 @@ router.get('/settings/background-music', async (req, res) => {
         const audioMode = (parsed.audioMode === 'instrumental' || parsed.audioMode === 'original')
           ? parsed.audioMode
           : 'original';
-        const crossfadeEnabled = typeof parsed.crossfadeEnabled === 'boolean' ? parsed.crossfadeEnabled : false;
-        const crossfadeDuration = typeof parsed.crossfadeDuration === 'number' && !isNaN(parsed.crossfadeDuration) ? Math.max(2, Math.min(12, Math.round(parsed.crossfadeDuration))) : 5;
-        return res.json({ settings: { enabled, volume, playlistId, audioMode, crossfadeEnabled, crossfadeDuration } });
+        return res.json({ settings: { enabled, volume, playlistId, audioMode } });
       } catch (e) {
         // ignore parse error
       }
     }
-    res.json({ settings: { enabled: true, volume: 25, playlistId: null, audioMode: 'original', crossfadeEnabled: false, crossfadeDuration: 5 } });
+    res.json({ settings: { enabled: true, volume: 25, playlistId: null, audioMode: 'original' } });
   } catch (error) {
     console.error('Failed to fetch background music settings:', error);
     res.status(500).json({ error: 'Failed to fetch background music settings' });
@@ -471,19 +469,7 @@ const saveBackgroundMusicSettingsHandler = async (req: any, res: any) => {
       ? raw.audioMode
       : 'original';
 
-    const crossfadeEnabled = typeof raw.crossfadeEnabled === 'boolean'
-      ? raw.crossfadeEnabled
-      : (raw.crossfadeEnabled === 'true' || raw.crossfadeEnabled === 1 || raw.crossfadeEnabled === '1' ? true : raw.crossfadeEnabled === 'false' || raw.crossfadeEnabled === 0 || raw.crossfadeEnabled === '0' ? false : false);
-
-    let crossfadeDuration = 5;
-    if (typeof raw.crossfadeDuration === 'number' && !isNaN(raw.crossfadeDuration)) {
-      crossfadeDuration = Math.max(2, Math.min(12, Math.round(raw.crossfadeDuration)));
-    } else if (typeof raw.crossfadeDuration === 'string' && raw.crossfadeDuration.trim() !== '') {
-      const parsed = parseInt(raw.crossfadeDuration, 10);
-      if (!isNaN(parsed)) crossfadeDuration = Math.max(2, Math.min(12, parsed));
-    }
-
-    const resolved = { enabled, volume, playlistId, audioMode, crossfadeEnabled, crossfadeDuration };
+    const resolved = { enabled, volume, playlistId, audioMode };
     const jsonStr = JSON.stringify(resolved);
 
     const existing = await db.select().from(settings).where(eq(settings.key, 'background_music_settings')).limit(1);

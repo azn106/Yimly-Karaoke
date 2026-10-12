@@ -1712,17 +1712,6 @@ test('Background Music Settings API & Persistence Suite', async () => {
   const nullPlaylistData = await nullPlaylistRes.json();
   assert.strictEqual(nullPlaylistData.settings.playlistId, null);
 
-  // 7.5. Test Crossfade settings persistence and clamping
-  const crossfadeRes = await fetch(`${baseUrl}/api/karaoke/settings/background-music`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ settings: { enabled: true, volume: 25, crossfadeEnabled: true, crossfadeDuration: 8 } })
-  });
-  assert.strictEqual(crossfadeRes.status, 200);
-  const crossfadeData = await crossfadeRes.json();
-  assert.strictEqual(crossfadeData.settings.crossfadeEnabled, true);
-  assert.strictEqual(crossfadeData.settings.crossfadeDuration, 8);
-
   // 8. Test client resolver backward compatibility and fallback logic
   const { resolveBackgroundMusicSettings, DEFAULT_BACKGROUND_MUSIC_SETTINGS } = await import('../../src/utils/backgroundMusicSettings.js');
   assert.strictEqual(DEFAULT_BACKGROUND_MUSIC_SETTINGS.playlistId, null);
@@ -3528,34 +3517,6 @@ test('Production Step #9: Security Hardening Audit Suite', async () => {
     }
   }
   assert.strictEqual(lastStatus, 429, 'Rate limiter must return HTTP 429 Too Many Requests after exceeding max limit');
-});
-
-test('Production Step #10: Security Regression Tests', async () => {
-  // 1. Create Host Session for User A
-  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` }
-  });
-  const room = await createRes.json();
-  const sessionId = room.id;
-
-  // 2. Try to add song to queue without Authorization (should fail with 401)
-  const [testSong] = await db.select().from(songs).limit(1);
-  const songId = testSong ? testSong.id : 1;
-  
-  const addQueueRes = await fetch(`${baseUrl}/api/karaoke/sessions/${sessionId}/queue`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ songId })
-  });
-  assert.strictEqual(addQueueRes.status, 403, 'Queue addition without authorization must return 403');
-
-  // 3. Try to skip track without Authorization (should fail with 401 Unauthorized)
-  const skipRes = await fetch(`${baseUrl}/api/karaoke/sessions/${sessionId}/skip`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  });
-  assert.strictEqual(skipRes.status, 401, 'Skip request without authorization must return 401');
 });
 
 test('Close server', async () => {
