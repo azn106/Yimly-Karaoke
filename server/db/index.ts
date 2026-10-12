@@ -36,7 +36,7 @@ export let databaseCorrupted = false;
 export let databaseErrorMessage: string | null = null;
 
 // Run migrations on startup and check for corruption
-export async function setupDatabase() {
+export async function setupDatabase(migrationsFolderOverride?: string) {
   const currentDataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
   const currentDbPath = path.join(currentDataDir, 'yimly.db');
   if (dbPath !== currentDbPath) {
@@ -45,7 +45,9 @@ export async function setupDatabase() {
     db = drizzle(sqlite, { schema });
   }
 
-  const migrationsFolder = path.resolve(process.cwd(), 'server/db/migrations');
+  const migrationsFolder = migrationsFolderOverride
+    ? path.resolve(migrationsFolderOverride)
+    : path.resolve(process.cwd(), 'server/db/migrations');
   
   let isCorrupt = false;
   let corruptionReason = '';
