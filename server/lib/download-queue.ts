@@ -177,7 +177,7 @@ export class DownloadQueueManager {
   }
 
   public getConcurrency(): number {
-    return 1;
+    return this.maxConcurrency;
   }
 
   public async init() {
