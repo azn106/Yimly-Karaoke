@@ -159,6 +159,17 @@ test('Interrupted migration recovery: unrecorded tables and indexes survive and 
   await rawSqlite.execute('CREATE TABLE queue_items (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, session_id text NOT NULL, song_id integer NOT NULL, user_id integer NOT NULL, added_at integer NOT NULL, position integer NOT NULL, status text NOT NULL);');
   await rawSqlite.execute('CREATE TABLE song_artists (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, song_id integer NOT NULL, artist_id integer NOT NULL, position integer NOT NULL);');
 
+  // Seed representative existing records so the interrupted migration proves data preservation.
+  await rawSqlite.execute("INSERT INTO libraries (id, name, path, last_scan) VALUES (1, 'Keep Library', '/keep', 100);");
+  await rawSqlite.execute("INSERT INTO artists (id, name, artwork_path) VALUES (1, 'Keep Artist', NULL);");
+  await rawSqlite.execute("INSERT INTO albums (id, artist_id, title, year, artwork_path) VALUES (1, 1, 'Keep Album', 2020, NULL);");
+  await rawSqlite.execute("INSERT INTO users (id, username, password, role, created_at, updated_at) VALUES (1, 'keep-user', 'hash', 'user', 100, 100);");
+  await rawSqlite.execute("INSERT INTO sessions (id, room_code, host_id, host_device, status, created_at, updated_at) VALUES ('keep-session', 'KEEP1', 1, 'host', 'closed', 100, 100);");
+  await rawSqlite.execute("INSERT INTO controllers (id, session_id, user_id, device, last_seen_time) VALUES ('keep-controller', 'keep-session', 1, 'phone', 100);");
+  await rawSqlite.execute("INSERT INTO songs (id, library_id, artist_id, album_id, title, main_audio_path, instrumental_audio_path, duration, track_number, disc_number, genre, year, variant, file_size, format, artwork_path) VALUES (1, 1, 1, 1, 'Keep Song', '/keep/song.mp3', NULL, 180, 1, 1, NULL, 2020, 'original', 1000, 'mp3', NULL);");
+  await rawSqlite.execute("INSERT INTO lyrics (id, song_id, lrc_path) VALUES (1, 1, '/keep/song.lrc');");
+  await rawSqlite.execute("INSERT INTO queue_items (id, session_id, song_id, user_id, added_at, position, status) VALUES (1, 'keep-session', 1, 1, 100, 0, 'pending');");
+
   // Simulate an interrupted migration where download_jobs and favorites were already created,
   // but migration 0007 was interrupted before completing
   await rawSqlite.execute('CREATE TABLE download_jobs (id text PRIMARY KEY NOT NULL, playlist_name text, type text DEFAULT "playlist" NOT NULL, status text DEFAULT "queued" NOT NULL, library_id integer, library_path text NOT NULL, format text DEFAULT "mp3" NOT NULL, quality text DEFAULT "320k" NOT NULL, embed_metadata integer DEFAULT 1 NOT NULL, embed_artwork integer DEFAULT 1 NOT NULL, download_lyrics integer DEFAULT 1 NOT NULL, lyrics_providers text, folder_structure text DEFAULT "artist/album" NOT NULL, playlist_folder integer DEFAULT 0 NOT NULL, total_count integer DEFAULT 0 NOT NULL, completed_count integer DEFAULT 0 NOT NULL, failed_count integer DEFAULT 0 NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL);');
@@ -170,6 +181,16 @@ test('Interrupted migration recovery: unrecorded tables and indexes survive and 
   process.env.DATA_DIR = testDir;
   const dbModule = await import('../db/index.js');
   await dbModule.setupDatabase();
+
+  const retainedSong = await dbModule.sqlite.execute("SELECT title FROM songs WHERE id = 1;");
+  assert.strictEqual(retainedSong.rows[0]?.title, 'Keep Song', 'Existing song must survive migration recovery');
+  const retainedController = await dbModule.sqlite.execute("SELECT session_id FROM controllers WHERE id = 'keep-controller';");
+  assert.strictEqual(retainedController.rows[0]?.session_id, 'keep-session', 'Existing controller relationship must survive recovery');
+  const retainedLyrics = await dbModule.sqlite.execute("SELECT lrc_path FROM lyrics WHERE id = 1;");
+  assert.strictEqual(retainedLyrics.rows[0]?.lrc_path, '/keep/song.lrc', 'Existing lyrics path must survive recovery');
+  const retainedQueueItem = await dbModule.sqlite.execute("SELECT song_id, session_id FROM queue_items WHERE id = 1;");
+  assert.strictEqual(retainedQueueItem.rows[0]?.song_id, 1, 'Existing queue item song relationship must survive recovery');
+  assert.strictEqual(retainedQueueItem.rows[0]?.session_id, 'keep-session', 'Existing queue item session relationship must survive recovery');
 
   const integrity = await dbModule.sqlite.execute('PRAGMA integrity_check;');
   assert.strictEqual(Object.values(integrity.rows[0])[0], 'ok', 'Integrity check must pass after recovery');
@@ -209,6 +230,9 @@ test('Interrupted migration recovery: orphaned table rebuild staging tables reco
   await rawSqlite.execute('CREATE TABLE lyrics (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, song_id integer NOT NULL, lrc_path text NOT NULL);');
   await rawSqlite.execute('CREATE TABLE queue_items (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, session_id text NOT NULL, song_id integer NOT NULL, user_id integer NOT NULL, added_at integer NOT NULL, position integer NOT NULL, status text NOT NULL);');
   await rawSqlite.execute('CREATE TABLE song_artists (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, song_id integer NOT NULL, artist_id integer NOT NULL, position integer NOT NULL);');
+
+  await rawSqlite.execute("INSERT INTO users (id, username, password, role, created_at, updated_at) VALUES (1, 'stage-user', 'hash', 'user', 100, 100);");
+  await rawSqlite.execute("INSERT INTO sessions (id, room_code, host_id, host_device, status, created_at, updated_at) VALUES ('sess1', 'STAGE1', 1, 'host', 'closed', 100, 100);");
 
   // Simulate interrupted rebuild case: __new_controllers exists with data, but controllers was already dropped
   await rawSqlite.execute('CREATE TABLE __new_controllers (id text PRIMARY KEY NOT NULL, session_id text NOT NULL, user_id integer, guest_name text, device text NOT NULL, connection_state text NOT NULL, last_seen_time integer NOT NULL);');
