@@ -1,4 +1,4 @@
-CREATE TABLE `download_jobs` (
+CREATE TABLE IF NOT EXISTS `download_jobs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`playlist_name` text,
 	`type` text DEFAULT 'playlist' NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE `download_jobs` (
 	FOREIGN KEY (`library_id`) REFERENCES `libraries`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE TABLE `download_track_jobs` (
+CREATE TABLE IF NOT EXISTS `download_track_jobs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`job_id` text NOT NULL,
 	`title` text NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE `download_track_jobs` (
 	FOREIGN KEY (`job_id`) REFERENCES `download_jobs`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE TABLE `favorites` (
+CREATE TABLE IF NOT EXISTS `favorites` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` integer NOT NULL,
 	`song_id` integer NOT NULL,
@@ -53,8 +53,8 @@ CREATE TABLE `favorites` (
 	FOREIGN KEY (`song_id`) REFERENCES `songs`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `favorites_user_id_song_id_idx` ON `favorites` (`user_id`,`song_id`);--> statement-breakpoint
-CREATE TABLE `playlist_shares` (
+CREATE UNIQUE INDEX IF NOT EXISTS `favorites_user_id_song_id_idx` ON `favorites` (`user_id`,`song_id`);--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS `playlist_shares` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`playlist_id` integer NOT NULL,
 	`user_id` integer NOT NULL,
@@ -64,8 +64,8 @@ CREATE TABLE `playlist_shares` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `playlist_shares_user_id_playlist_id_idx` ON `playlist_shares` (`user_id`,`playlist_id`);--> statement-breakpoint
-CREATE TABLE `playlist_songs` (
+CREATE UNIQUE INDEX IF NOT EXISTS `playlist_shares_user_id_playlist_id_idx` ON `playlist_shares` (`user_id`,`playlist_id`);--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS `playlist_songs` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`playlist_id` integer NOT NULL,
 	`song_id` integer NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE `playlist_songs` (
 	FOREIGN KEY (`song_id`) REFERENCES `songs`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE TABLE `playlists` (
+CREATE TABLE IF NOT EXISTS `playlists` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` integer NOT NULL,
 	`name` text NOT NULL,
@@ -85,15 +85,6 @@ CREATE TABLE `playlists` (
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE TABLE `song_artists` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`song_id` integer NOT NULL,
-	`artist_id` integer NOT NULL,
-	`position` integer DEFAULT 0 NOT NULL,
-	FOREIGN KEY (`song_id`) REFERENCES `songs`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`artist_id`) REFERENCES `artists`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 PRAGMA foreign_keys=OFF;--> statement-breakpoint
@@ -122,7 +113,7 @@ CREATE TABLE `__new_controllers` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-INSERT INTO `__new_controllers`("id", "session_id", "user_id", "guest_name", "device", "connection_state", "last_seen_time") SELECT "id", "session_id", "user_id", "guest_name", "device", "connection_state", "last_seen_time" FROM `controllers`;--> statement-breakpoint
+INSERT INTO `__new_controllers`("id", "session_id", "user_id", "guest_name", "device", "connection_state", "last_seen_time") SELECT "id", "session_id", "user_id", NULL, "device", 'connected', "last_seen_time" FROM `controllers`;--> statement-breakpoint
 DROP TABLE `controllers`;--> statement-breakpoint
 ALTER TABLE `__new_controllers` RENAME TO `controllers`;--> statement-breakpoint
 CREATE TABLE `__new_lyrics` (
@@ -133,7 +124,7 @@ CREATE TABLE `__new_lyrics` (
 	FOREIGN KEY (`song_id`) REFERENCES `songs`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-INSERT INTO `__new_lyrics`("id", "song_id", "lrc_path", "elrc_path") SELECT "id", "song_id", "lrc_path", "elrc_path" FROM `lyrics`;--> statement-breakpoint
+INSERT INTO `__new_lyrics`("id", "song_id", "lrc_path", "elrc_path") SELECT "id", "song_id", "lrc_path", NULL FROM `lyrics`;--> statement-breakpoint
 DROP TABLE `lyrics`;--> statement-breakpoint
 ALTER TABLE `__new_lyrics` RENAME TO `lyrics`;--> statement-breakpoint
 CREATE TABLE `__new_queue_items` (
@@ -156,7 +147,7 @@ CREATE TABLE `__new_queue_items` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-INSERT INTO `__new_queue_items`("id", "session_id", "song_id", "user_id", "guest_name", "added_at", "position", "status", "temp_title", "temp_artist", "temp_artwork_url", "download_job_id", "download_track_id", "download_status") SELECT "id", "session_id", "song_id", "user_id", "guest_name", "added_at", "position", "status", "temp_title", "temp_artist", "temp_artwork_url", "download_job_id", "download_track_id", "download_status" FROM `queue_items`;--> statement-breakpoint
+INSERT INTO `__new_queue_items`("id", "session_id", "song_id", "user_id", "guest_name", "added_at", "position", "status", "temp_title", "temp_artist", "temp_artwork_url", "download_job_id", "download_track_id", "download_status") SELECT "id", "session_id", "song_id", "user_id", NULL, "added_at", "position", "status", NULL, NULL, NULL, NULL, NULL, NULL FROM `queue_items`;--> statement-breakpoint
 DROP TABLE `queue_items`;--> statement-breakpoint
 ALTER TABLE `__new_queue_items` RENAME TO `queue_items`;--> statement-breakpoint
 CREATE TABLE `__new_sessions` (
@@ -171,10 +162,10 @@ CREATE TABLE `__new_sessions` (
 	FOREIGN KEY (`host_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-INSERT INTO `__new_sessions`("id", "room_code", "host_id", "host_device", "status", "lyric_settings", "created_at", "updated_at") SELECT "id", "room_code", "host_id", "host_device", "status", "lyric_settings", "created_at", "updated_at" FROM `sessions`;--> statement-breakpoint
+INSERT INTO `__new_sessions`("id", "room_code", "host_id", "host_device", "status", "lyric_settings", "created_at", "updated_at") SELECT "id", "room_code", "host_id", "host_device", "status", NULL, "created_at", "updated_at" FROM `sessions`;--> statement-breakpoint
 DROP TABLE `sessions`;--> statement-breakpoint
 ALTER TABLE `__new_sessions` RENAME TO `sessions`;--> statement-breakpoint
-CREATE UNIQUE INDEX `sessions_room_code_unique` ON `sessions` (`room_code`);--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS `sessions_room_code_unique` ON `sessions` (`room_code`);--> statement-breakpoint
 CREATE TABLE `__new_songs` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`library_id` integer NOT NULL,
@@ -200,9 +191,9 @@ CREATE TABLE `__new_songs` (
 	FOREIGN KEY (`album_id`) REFERENCES `albums`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-INSERT INTO `__new_songs`("id", "library_id", "artist_id", "album_id", "title", "main_audio_path", "instrumental_audio_path", "duration", "track_number", "disc_number", "genre", "year", "variant", "file_size", "format", "artwork_path", "lrc_offset", "elrc_offset", "lyric_offset") SELECT "id", "library_id", "artist_id", "album_id", "title", "main_audio_path", "instrumental_audio_path", "duration", "track_number", "disc_number", "genre", "year", "variant", "file_size", "format", "artwork_path", "lrc_offset", "elrc_offset", "lyric_offset" FROM `songs`;--> statement-breakpoint
+INSERT INTO `__new_songs`("id", "library_id", "artist_id", "album_id", "title", "main_audio_path", "instrumental_audio_path", "duration", "track_number", "disc_number", "genre", "year", "variant", "file_size", "format", "artwork_path", "lrc_offset", "elrc_offset", "lyric_offset") SELECT "id", "library_id", "artist_id", "album_id", "title", "main_audio_path", "instrumental_audio_path", "duration", "track_number", "disc_number", "genre", "year", "variant", "file_size", "format", "artwork_path", 0, 0, 0 FROM `songs`;--> statement-breakpoint
 DROP TABLE `songs`;--> statement-breakpoint
 ALTER TABLE `__new_songs` RENAME TO `songs`;--> statement-breakpoint
-CREATE INDEX `songs_title_idx` ON `songs` (`title`);--> statement-breakpoint
-CREATE INDEX `songs_artist_id_idx` ON `songs` (`artist_id`);--> statement-breakpoint
-CREATE INDEX `songs_album_id_idx` ON `songs` (`album_id`);
+CREATE INDEX IF NOT EXISTS `songs_title_idx` ON `songs` (`title`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `songs_artist_id_idx` ON `songs` (`artist_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `songs_album_id_idx` ON `songs` (`album_id`);

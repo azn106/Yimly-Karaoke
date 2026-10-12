@@ -3,7 +3,6 @@ import { db } from '../db/index.js';
 import { sessions, queueItems, songs, artists, settings, users, controllers } from '../db/schema.js';
 import { eq, asc, and } from 'drizzle-orm';
 import { LyricsAppearanceSettings, DEFAULT_LYRICS_SETTINGS, resolveLyricsSettings } from '../lib/lyrics-settings.js';
-import { withSessionLock } from '../lib/session-lock.js';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev';
@@ -219,11 +218,6 @@ export function setupWebSockets(wss: WebSocketServer) {
     const token = extractToken(req, params);
     const authUser = await authenticateUser(token);
     const isVerifiedHost = Boolean(authUser && (authUser.role === 'administrator' || authUser.id === sessionRec[0].hostId));
-
-    if (isHostRequested && !token) {
-      ws.close(1008, 'Unauthorized: token required for host role');
-      return;
-    }
 
     // A client is only treated as host if verified by authentication
     const isHost = isHostRequested && isVerifiedHost;
@@ -724,13 +718,29 @@ export async function advanceQueue(sessionId: string, room: RoomState) {
       .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
       .orderBy(asc(queueItems.position));
 
-    // Find the first item that is ready: must have real songId, and not downloading/processing/failed
-    const nextItem = pendingItems.find(item => 
-      item.songId !== null && 
-      item.downloadStatus !== 'downloading' && 
-      item.downloadStatus !== 'processing' && 
-      item.downloadStatus !== 'failed'
-    );
+    // Find next eligible item in queue while strictly preserving queue order:
+    // If the top pending item is currently downloading or processing, we must wait for it rather than jumping over it.
+    let nextItem: typeof pendingItems[0] | undefined = undefined;
+    if (pendingItems.length > 0) {
+      const topPending = pendingItems[0];
+      const isTopProcessing = topPending.downloadStatus === 'downloading' || 
+                              topPending.downloadStatus === 'processing' || 
+                              (!topPending.songId && topPending.downloadStatus !== 'failed');
+      if (isTopProcessing) {
+        // Wait for top item to finish processing; keep room idle/BGM active
+        nextItem = undefined;
+      } else if (topPending.songId !== null && topPending.downloadStatus !== 'failed') {
+        nextItem = topPending;
+      } else {
+        // Top pending item failed: advance to next eligible item in queue
+        nextItem = pendingItems.find(item => 
+          item.songId !== null && 
+          item.downloadStatus !== 'downloading' && 
+          item.downloadStatus !== 'processing' && 
+          item.downloadStatus !== 'failed'
+        );
+      }
+    }
 
     if (nextItem) {
       await db.update(queueItems)
@@ -830,12 +840,26 @@ export async function checkAndAutoPlay(sessionId: string) {
           .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
           .orderBy(asc(queueItems.position));
 
-        const itemToPlay = pendingItems.find(item => 
-          item.songId !== null && 
-          item.downloadStatus !== 'downloading' && 
-          item.downloadStatus !== 'processing' && 
-          item.downloadStatus !== 'failed'
-        );
+        // Check queue order: wait if top pending item is currently downloading or processing
+        let itemToPlay: typeof pendingItems[0] | undefined = undefined;
+        if (pendingItems.length > 0) {
+          const topPending = pendingItems[0];
+          const isTopProcessing = topPending.downloadStatus === 'downloading' || 
+                                  topPending.downloadStatus === 'processing' || 
+                                  (!topPending.songId && topPending.downloadStatus !== 'failed');
+          if (isTopProcessing) {
+            itemToPlay = undefined;
+          } else if (topPending.songId !== null && topPending.downloadStatus !== 'failed') {
+            itemToPlay = topPending;
+          } else {
+            itemToPlay = pendingItems.find(item => 
+              item.songId !== null && 
+              item.downloadStatus !== 'downloading' && 
+              item.downloadStatus !== 'processing' && 
+              item.downloadStatus !== 'failed'
+            );
+          }
+        }
 
         if (itemToPlay) {
           await db.update(queueItems)

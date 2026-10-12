@@ -152,7 +152,7 @@ export async function getYtDlpPath(): Promise<string> {
 }
 
 export class DownloadQueueManager {
-  private maxConcurrency: number = 4;
+  private maxConcurrency: number = 1;
   private activeWorkers: number = 0;
   private memoryJobs = new Map<string, ActiveDownloadJob>();
   private activeChildProcesses = new Map<string, ChildProcess>();
@@ -171,13 +171,11 @@ export class DownloadQueueManager {
   }
 
   public setConcurrency(concurrency: number) {
-    if (concurrency >= 1 && concurrency <= 16) {
-      this.maxConcurrency = concurrency;
-    }
+    this.maxConcurrency = 1;
   }
 
   public getConcurrency(): number {
-    return this.maxConcurrency;
+    return 1;
   }
 
   public async init() {
@@ -883,7 +881,7 @@ export class DownloadQueueManager {
             const { processingQueue } = await import('./processing-queue.js');
 
             // Enqueue processing; processingQueue manages serial execution
-            processingQueue.enqueue({
+            await processingQueue.enqueue({
               downloadTrackId: track.id,
               originalAudioPath: track.outputPath,
               libraryId,

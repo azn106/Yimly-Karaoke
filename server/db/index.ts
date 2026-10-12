@@ -24,7 +24,7 @@ if (!fs.existsSync(fontsDir)) {
   fs.mkdirSync(fontsDir, { recursive: true });
 }
 
-const dbPath = path.join(dataDir, 'yimly.db');
+export let dbPath = path.join(dataDir, 'yimly.db');
 
 export let sqlite = createClient({
   url: `file:${dbPath}`,
@@ -37,6 +37,14 @@ export let databaseErrorMessage: string | null = null;
 
 // Run migrations on startup and check for corruption
 export async function setupDatabase() {
+  const currentDataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
+  const currentDbPath = path.join(currentDataDir, 'yimly.db');
+  if (dbPath !== currentDbPath) {
+    dbPath = currentDbPath;
+    sqlite = createClient({ url: `file:${dbPath}` });
+    db = drizzle(sqlite, { schema });
+  }
+
   const migrationsFolder = path.resolve(process.cwd(), 'server/db/migrations');
   
   let isCorrupt = false;
@@ -109,13 +117,42 @@ export async function setupDatabase() {
     return;
   }
 
+  // Check and recover from any partially completed table rebuilds (__new_<table>)
+  const rebuildTables = ['albums', 'controllers', 'lyrics', 'queue_items', 'sessions', 'songs'];
+  for (const table of rebuildTables) {
+    try {
+      const resNew = await sqlite.execute(`SELECT name FROM sqlite_master WHERE type='table' AND name='__new_${table}';`);
+      const resOrig = await sqlite.execute(`SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';`);
+      const hasNew = Boolean(resNew.rows && resNew.rows.length > 0);
+      const hasOrig = Boolean(resOrig.rows && resOrig.rows.length > 0);
+      if (hasNew && !hasOrig) {
+        // Original table was dropped before rename could complete; recover by completing the rename
+        console.warn(`[Recovery] Recovering interrupted rebuild: renaming __new_${table} to ${table}`);
+        await sqlite.execute(`ALTER TABLE __new_${table} RENAME TO ${table};`);
+      } else if (hasNew && hasOrig) {
+        // Staging table left behind while original remains intact; remove incomplete staging table
+        console.warn(`[Recovery] Cleaning up incomplete staging table: __new_${table}`);
+        await sqlite.execute(`DROP TABLE __new_${table};`);
+      }
+    } catch (cleanupErr) {
+      console.warn(`[Recovery] Notice during table rebuild recovery for ${table}:`, cleanupErr);
+    }
+  }
+
   // Check if migrations folder exists before running migrate to avoid crashing if it's not generated yet
   if (fs.existsSync(migrationsFolder)) {
     try {
       await migrate(db, { migrationsFolder });
       console.log('Database migrations applied successfully.');
-    } catch (error) {
-      console.error('Error applying migrations:', error);
+    } catch (error: any) {
+      const errorMessage = error?.message || String(error);
+      console.error('========================================================================');
+      console.error('🚨 CRITICAL DATABASE MIGRATION ERROR');
+      console.error(`Database Path: ${dbPath}`);
+      console.error(`Error: ${errorMessage}`);
+      console.error('Action taken: Stopped database initialization due to migration failure.');
+      console.error('========================================================================');
+      throw new Error(`Database migration failed: ${errorMessage}`);
     }
   } else {
     console.warn('Migrations folder not found, skipping migrations.');

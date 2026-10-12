@@ -19,6 +19,7 @@
     "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-react": "^5.0.4",
     "bcryptjs": "^3.0.3",
+    "caniuse-lite": "^1.0.30001815",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.2",
@@ -54,7 +55,6 @@
     "tailwindcss": "^4.1.14",
     "terser": "^5.51.2",
     "tsx": "^4.21.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "typescript": "~5.8.2"
   }
 }

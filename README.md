@@ -91,7 +91,23 @@ Or double-click `update-yimly.bat` in File Explorer.
 4. Cleans up obsolete build artifacts safely (`docker image prune -f`)
 5. Verifies container health
 
-> **Note on Data Safety:** The update script **never** deletes or resets your SQLite database (`./data/yimly.db`) or media library (`./media`).
+> **Note on Data Safety:** The update script **never** deletes or resets your SQLite database (`./data/yimly.db`) or media library (`./media`). It now automatically backs up these files to `./backups/` before any update.
+
+---
+
+### Rollback Procedure
+
+If an update causes issues, you can restore your previous deployment:
+
+1. **Restore Data:**
+   * Stop the container: `docker compose stop yimly`
+   * Navigate to the `./backups/` directory.
+   * Extract the last known-good backup (`tar -xzf yimly_backup_YYYYMMDD_HHMMSS.tar.gz`) into the root directory, overwriting the current `./data` and `./media` folders.
+   * Start the container: `docker compose start yimly`
+
+2. **Rollback Image (if required):**
+   * If the application code is the cause, revert the repository to the previous commit: `git checkout <previous_commit_hash>`
+   * Rebuild and restart: `docker compose up -d --build`
 
 ---
 
