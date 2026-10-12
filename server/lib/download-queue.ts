@@ -4,7 +4,7 @@ import { promisify } from 'util';
 import { execFile, exec, ChildProcess } from 'child_process';
 import NodeID3 from 'node-id3';
 import { db } from '../db/index.js';
-import { downloadJobs, downloadTrackJobs, libraries, settings, queueItems } from '../db/schema.js';
+import { downloadJobs, downloadTrackJobs, libraries, queueItems } from '../db/schema.js';
 import { eq, and, asc, inArray, sql } from 'drizzle-orm';
 import { scanLibrary } from './scanner.js';
 import { fetchLyrics, saveLrcSidecar, stripLrcTimestamps } from './lyrics.js';
@@ -170,7 +170,9 @@ export class DownloadQueueManager {
     }
   }
 
-  public setConcurrency(concurrency: number) {
+  public setConcurrency(_concurrency: number) {
+    // Song downloads and their downstream processing must share one server-wide slot.
+    // Do not allow a persisted legacy setting to increase concurrency.
     this.maxConcurrency = 1;
   }
 
@@ -183,14 +185,8 @@ export class DownloadQueueManager {
     this.initialized = true;
 
     try {
-      // Read custom concurrency setting if stored
-      const concSetting = await db.select().from(settings).where(eq(settings.key, 'downloader_concurrency')).limit(1);
-      if (concSetting[0]?.value) {
-        const val = parseInt(concSetting[0].value, 10);
-        if (!isNaN(val) && val >= 1 && val <= 16) {
-          this.maxConcurrency = val;
-        }
-      }
+      // Keep the global pipeline serial even if a legacy concurrency setting exists.
+      this.maxConcurrency = 1;
 
       // Recover incomplete jobs from database
       const pendingJobs = await db.select().from(downloadJobs).where(
