@@ -226,7 +226,7 @@ test('2. Unauthorized users and guests cannot execute host-only actions', async 
   const noAuthSkip = await fetch(`${baseUrl}/api/karaoke/sessions/${sessionId}/skip`, {
     method: 'POST'
   });
-  assert.ok(noAuthSkip.status === 401 || noAuthSkip.status === 403, 'Unauthenticated skip must be rejected');
+  assert.strictEqual(noAuthSkip.status, 403, 'Unauthenticated skip must be rejected');
 
   // B. Attacker (non-host user) tries to skip track -> 403 Forbidden
   const attackerSkip = await fetch(`${baseUrl}/api/karaoke/sessions/${sessionId}/skip`, {
@@ -651,5 +651,4 @@ test('Close Karaoke Permissions Test Server', async () => {
   await new Promise<void>((resolve) => {
     server.close(() => resolve());
   });
-  setTimeout(() => process.exit(0), 100);
 });

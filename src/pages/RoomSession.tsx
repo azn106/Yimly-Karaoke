@@ -215,12 +215,6 @@ export default function RoomSession() {
   const bgmShuffleQueueRef = useRef<number[]>([]);
   const bgmCurrentIndexRef = useRef<number>(0);
   const [bgmCurrentSong, setBgmCurrentSong] = useState<{ id: number; title: string; artist: string; hasOriginal?: boolean; hasInstrumental?: boolean; variant?: string } | null>(null);
-  const [deck1Song, setDeck1Song] = useState<{ id: number; title: string; artist: string; hasOriginal?: boolean; hasInstrumental?: boolean; variant?: string } | null>(null);
-  const [deck2Song, setDeck2Song] = useState<{ id: number; title: string; artist: string; hasOriginal?: boolean; hasInstrumental?: boolean; variant?: string } | null>(null);
-  const activeBgmDeckRef = useRef<1 | 2>(1);
-  const crossfadeInProgressRef = useRef<boolean>(false);
-  const fadeTimersRef = useRef<Map<HTMLAudioElement, NodeJS.Timeout>>(new Map());
-  const userPausedRef = useRef<boolean>(false);
   const [bgmIsActive, setBgmIsActive] = useState<boolean>(false);
   const bgmSavedPosRef = useRef<{ songId: number | null; time: number }>({ songId: null, time: 0 });
 
@@ -747,12 +741,8 @@ export default function RoomSession() {
         }
         if (data.playback) {
           if (typeof data.playback.playing === 'boolean') {
-            if (!isHost) {
+            if (!isHost || !audioRef.current || audioRef.current.paused || data.playback.playing) {
               setPlaying(data.playback.playing);
-            } else if (audioRef.current) {
-              if (userPausedRef.current || audioRef.current.paused) {
-                setPlaying(false);
-              }
             }
           }
           if (data.playback.variant) {
@@ -823,10 +813,8 @@ export default function RoomSession() {
               break;
             case 'STATE_UPDATE':
               if (typeof msg.payload?.playing === 'boolean') {
-                if (!isHost) {
+                if (!isHost || !audioRef.current || audioRef.current.paused || msg.payload.playing) {
                   setPlaying(msg.payload.playing);
-                } else if (audioRef.current && (userPausedRef.current || audioRef.current.paused)) {
-                  setPlaying(false);
                 }
               }
               if (msg.payload?.variant) setVariant(msg.payload.variant);
@@ -852,17 +840,10 @@ export default function RoomSession() {
               fetchState();
               break;
             case 'PLAYING':
-              if (!isHost) {
-                setPlaying(true);
-              }
+              setPlaying(true);
               break;
             case 'PAUSED':
-              if (!isHost) {
-                setPlaying(false);
-              } else if (audioRef.current && !audioRef.current.paused) {
-                try { audioRef.current.pause(); } catch (e) {}
-                setPlaying(false);
-              }
+              setPlaying(false);
               break;
             case 'RESTARTED':
               if (audioRef.current) {
@@ -1023,40 +1004,16 @@ export default function RoomSession() {
 
   // Determine current song: only select an item that has a valid songId and is eligible to play.
   // Prefer an item with status === 'playing', followed by an eligible pending item.
-  // Do not select items that are downloading, processing, or failed, and preserve queue order.
-  const activePlaying = queue.find(q => 
-    q.status === 'playing' && 
-    q.songId !== null && 
-    q.songId !== undefined && 
-    q.downloadStatus !== 'downloading' && 
-    q.downloadStatus !== 'processing' && 
-    q.downloadStatus !== 'failed'
-  );
-
-  const pendingEligible = (() => {
-    if (activePlaying) return null;
-    const firstPending = queue.find(q => q.status === 'pending');
-    if (!firstPending) return null;
-    const isTopProcessing = firstPending.downloadStatus === 'downloading' || 
-                            firstPending.downloadStatus === 'processing' || 
-                            (!firstPending.songId && firstPending.downloadStatus !== 'failed');
-    if (isTopProcessing) {
-      return null;
-    }
-    if (firstPending.songId !== null && firstPending.songId !== undefined && firstPending.downloadStatus !== 'failed') {
-      return firstPending;
-    }
-    return queue.find(q => 
+  // Do not select items that are downloading, processing, or failed, and do not fall back to queue[0].
+  const currentSong = queue.find(q => q.status === 'playing' && q.songId !== null && q.songId !== undefined) ||
+    queue.find(q => 
       q.status === 'pending' && 
       q.songId !== null && 
       q.songId !== undefined && 
       q.downloadStatus !== 'downloading' && 
       q.downloadStatus !== 'processing' && 
       q.downloadStatus !== 'failed'
-    ) || null;
-  })();
-
-  const currentSong = activePlaying || pendingEligible;
+    );
 
   // Fetch song details and lyrics whenever currentSong changes
   useEffect(() => {
@@ -1071,11 +1028,9 @@ export default function RoomSession() {
     }
     lastSongIdRef.current = currentSong?.songId ?? null;
 
-    // Reset lyrics, position, and clear previous audio error upon song switch
+    // Reset lyrics and clear previous audio error upon song switch
     setLyrics([]);
-    setCurrentTime(0);
     setAudioError(null);
-    userPausedRef.current = false;
 
     if (currentSong?.songId) {
       const songId = currentSong.songId;
@@ -1127,9 +1082,6 @@ export default function RoomSession() {
     } else {
       setCurrentSongDetails(null);
       setLyrics([]);
-      setCurrentTime(0);
-      setPlaying(false);
-      userPausedRef.current = false;
     }
 
     return () => {
@@ -1414,70 +1366,39 @@ export default function RoomSession() {
     }
   }, []);
 
-  const clearFadeTimer = useCallback((audio: HTMLAudioElement) => {
-    const timer = fadeTimersRef.current.get(audio);
-    if (timer) {
-      clearInterval(timer);
-      fadeTimersRef.current.delete(audio);
-    }
-  }, []);
-
-  const clearAllFadeTimers = useCallback(() => {
-    fadeTimersRef.current.forEach(timer => clearInterval(timer));
-    fadeTimersRef.current.clear();
-  }, []);
-
-  const fadeOut = useCallback((audio: HTMLAudioElement, durationMs: number) => {
-    clearFadeTimer(audio);
-    const startVol = audio.volume;
-    if (startVol <= 0 || durationMs <= 0) {
-      try { audio.pause(); } catch (e) {}
-      audio.volume = 0;
-      return;
-    }
-    const intervalMs = 50;
-    const steps = Math.max(1, Math.round(durationMs / intervalMs));
-    const step = startVol / steps;
+  const fadeOut = useCallback((audio: HTMLAudioElement, duration: number) => {
+    let startVol = audio.volume;
+    const step = startVol / (duration / 50); // 50ms intervals
     const timer = setInterval(() => {
       if (audio.volume > step) {
-        audio.volume = Math.max(0, audio.volume - step);
+        audio.volume -= step;
       } else {
-        audio.volume = 0;
-        try { audio.pause(); } catch (e) {}
-        clearFadeTimer(audio);
+        audio.pause();
+        audio.volume = startVol;
+        clearInterval(timer);
       }
-    }, intervalMs);
-    fadeTimersRef.current.set(audio, timer);
-  }, [clearFadeTimer]);
+    }, 50);
+  }, []);
 
-  const fadeIn = useCallback((audio: HTMLAudioElement, durationMs: number, targetVol: number) => {
-    clearFadeTimer(audio);
+  const fadeIn = useCallback((audio: HTMLAudioElement, duration: number, targetVol: number) => {
     audio.volume = 0;
     safePlayBgm(audio);
-    if (targetVol <= 0 || durationMs <= 0) {
-      audio.volume = targetVol;
-      return;
-    }
-    const intervalMs = 50;
-    const steps = Math.max(1, Math.round(durationMs / intervalMs));
-    const step = targetVol / steps;
+    const step = targetVol / (duration / 50);
     const timer = setInterval(() => {
       if (audio.volume < targetVol - step) {
-        audio.volume = Math.min(targetVol, audio.volume + step);
+        audio.volume += step;
       } else {
         audio.volume = targetVol;
-        clearFadeTimer(audio);
+        clearInterval(timer);
       }
-    }, intervalMs);
-    fadeTimersRef.current.set(audio, timer);
-  }, [safePlayBgm, clearFadeTimer]);
+    }, 50);
+  }, [safePlayBgm]);
 
   // Host Control actions
   const togglePlay = () => {
     if (!isHost) return;
     const nextPlaying = !playing;
     setPlaying(nextPlaying);
-    userPausedRef.current = !nextPlaying;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: nextPlaying ? 'PLAY' : 'PAUSE' }));
     }
@@ -1496,10 +1417,6 @@ export default function RoomSession() {
 
   const handleSkip = async () => {
     if (!isHost) return;
-    userPausedRef.current = false;
-    if (audioRef.current) {
-      try { audioRef.current.pause(); } catch (e) {}
-    }
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'SKIP' }));
     } else if (sessionId) {
@@ -1514,7 +1431,6 @@ export default function RoomSession() {
 
   const handleRestart = () => {
     if (!isHost) return;
-    userPausedRef.current = false;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'RESTART' }));
     }
@@ -1829,14 +1745,8 @@ export default function RoomSession() {
     };
   }, [isHost, bgmSettings.playlistId, bgmSettings.audioMode, generateShuffledQueue]);
 
-  // Determine if Room is in a genuine active karaoke playback state (a valid ready song is present or playing).
-  // A queued song that is downloading, processing, or waiting for playable media does NOT activate karaoke
-  // and MUST NOT stop background music.
-  // Determine if Room is in a genuine active karaoke playback state (a valid ready song is present or playing).
-  // A queued song that is downloading, processing, or waiting for playable media does NOT activate karaoke
-  // and MUST NOT stop background music.
-  const isKaraokeActive = Boolean(activePlaying);
-
+  // Determine if Room is in a genuine idle, empty-queue state
+  const isKaraokeActive = !!currentSong || playing || queue.some(q => q.status === 'playing' || (q.status === 'pending' && q.downloadStatus !== 'failed'));
 
   // Background Music Playback Coordinator Effect
   useEffect(() => {
@@ -1848,25 +1758,21 @@ export default function RoomSession() {
 
     // Apply configured background music volume dynamically
     const targetVol = Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100));
+    bgmAudio1.volume = targetVol;
+    bgmAudio2.volume = targetVol;
 
     // If karaoke is active or BGM is disabled or no library tracks:
     // Background music MUST be paused immediately.
     if (isKaraokeActive || !bgmSettings.enabled || bgmLibrary.length === 0) {
-      clearAllFadeTimers();
-      crossfadeInProgressRef.current = false;
       [bgmAudio1, bgmAudio2].forEach(audio => {
         if (!audio.paused) {
           bgmSavedPosRef.current = {
             songId: bgmCurrentSong?.id ?? null,
             time: audio.currentTime
           };
-          if (isKaraokeActive && bgmSettings.crossfadeEnabled) {
-            fadeOut(audio, (bgmSettings.crossfadeDuration || 5) * 1000);
-          } else {
-            try {
-              audio.pause();
-            } catch (e) {}
-          }
+          try {
+            audio.pause();
+          } catch (e) {}
         }
       });
       setBgmIsActive(false);
@@ -1884,47 +1790,39 @@ export default function RoomSession() {
     if (!bgmCurrentSong) {
       const targetId = bgmShuffleQueueRef.current[bgmCurrentIndexRef.current];
       const found = bgmLibrary.find(t => t.id === targetId) || bgmLibrary[0];
-      setDeck1Song(found);
       setBgmCurrentSong(found);
-      activeBgmDeckRef.current = 1;
       return; // Will re-run once bgmCurrentSong state updates
     }
 
     // Resume or play the background track
     setBgmIsActive(true);
-    const activeAudio = activeBgmDeckRef.current === 1 ? bgmAudio1 : bgmAudio2;
-
-    if (activeAudio.paused && !crossfadeInProgressRef.current) {
-      if (bgmSavedPosRef.current.songId === bgmCurrentSong.id && bgmSavedPosRef.current.time > 0) {
-        try {
-          if (Math.abs(activeAudio.currentTime - bgmSavedPosRef.current.time) > 0.5) {
-            activeAudio.currentTime = bgmSavedPosRef.current.time;
+    
+    if (bgmSettings.crossfadeEnabled) {
+      // Crossfade logic
+      const durationMs = bgmSettings.crossfadeDuration * 1000;
+      
+      // Start BGM with crossfade if currently paused
+      if (bgmAudio1.paused) {
+          fadeIn(bgmAudio1, durationMs, targetVol);
+      }
+    } else {
+        if (bgmAudio1.paused) {
+          // If we have saved position for this same song, restore it
+          if (bgmSavedPosRef.current.songId === bgmCurrentSong.id && bgmSavedPosRef.current.time > 0) {
+            try {
+              if (Math.abs(bgmAudio1.currentTime - bgmSavedPosRef.current.time) > 0.5) {
+                bgmAudio1.currentTime = bgmSavedPosRef.current.time;
+              }
+            } catch (e) {}
           }
-        } catch (e) {}
-      }
-      if (bgmSettings.crossfadeEnabled) {
-        const durationMs = bgmSettings.crossfadeDuration * 1000;
-        fadeIn(activeAudio, durationMs, targetVol);
-      } else {
-        activeAudio.volume = targetVol;
-        safePlayBgm(activeAudio);
-      }
-    } else if (!crossfadeInProgressRef.current) {
-      activeAudio.volume = targetVol;
+          safePlayBgm(bgmAudio1);
+        }
     }
-  }, [isHost, isKaraokeActive, bgmSettings.enabled, bgmSettings.volume, bgmSettings.crossfadeEnabled, bgmSettings.crossfadeDuration, bgmLibrary, bgmCurrentSong, safePlayBgm, fadeIn, fadeOut, clearAllFadeTimers, generateShuffledQueue]);
-
-  // Cleanup fade timers on component unmount
-  useEffect(() => {
-    return () => {
-      clearAllFadeTimers();
-    };
-  }, [clearAllFadeTimers]);
+  }, [isHost, isKaraokeActive, bgmSettings.enabled, bgmSettings.volume, bgmLibrary, bgmCurrentSong, safePlayBgm, generateShuffledQueue]);
 
   // Handler when a background music track finishes naturally: advance continuous shuffle
   const handleBgmEnded = useCallback(() => {
     if (!isHost || bgmLibrary.length === 0) return;
-    if (crossfadeInProgressRef.current) return;
 
     let nextIdx = bgmCurrentIndexRef.current + 1;
     if (nextIdx >= bgmShuffleQueueRef.current.length) {
@@ -1936,44 +1834,36 @@ export default function RoomSession() {
     const nextSongId = bgmShuffleQueueRef.current[nextIdx];
     const nextTrack = bgmLibrary.find(t => t.id === nextSongId) || bgmLibrary[0];
 
+    // Crossfade Logic:
+    // 1. Identify which audio ref is currently playing and which is not
     const audio1 = bgmAudioRef1.current;
     const audio2 = bgmAudioRef2.current;
     if (!audio1 || !audio2) return;
 
-    const currentDeck = activeBgmDeckRef.current;
-    const activeRef = currentDeck === 1 ? audio1 : audio2;
-    const nextRef = currentDeck === 1 ? audio2 : audio1;
-    const nextDeck: 1 | 2 = currentDeck === 1 ? 2 : 1;
+    // Assuming we toggle between 1 and 2
+    // Full implementation needs state to track activeRef
+    const activeRef = audio1.paused ? audio2 : audio1;
+    const inactiveRef = audio1.paused ? audio1 : audio2;
 
-    // Load next track into the inactive deck
-    if (nextDeck === 1) {
-      setDeck1Song(nextTrack);
-    } else {
-      setDeck2Song(nextTrack);
-    }
-
+    // Load next track into inactiveRef
+    inactiveRef.src = `/api/songs/${nextTrack.id}/audio?type=${bgmSettings.audioMode}`;
+    inactiveRef.load();
+    
+    // Crossfade (Fade out active, Fade in inactive)
     const targetVol = Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100));
-
     if (bgmSettings.crossfadeEnabled) {
-      crossfadeInProgressRef.current = true;
-      const durationMs = bgmSettings.crossfadeDuration * 1000;
-      fadeOut(activeRef, durationMs);
-      fadeIn(nextRef, durationMs, targetVol);
-      setTimeout(() => {
-        crossfadeInProgressRef.current = false;
-      }, durationMs + 200);
+        const durationMs = bgmSettings.crossfadeDuration * 1000;
+        fadeOut(activeRef, durationMs);
+        fadeIn(inactiveRef, durationMs, targetVol);
     } else {
-      clearFadeTimer(activeRef);
-      try { activeRef.pause(); } catch (e) {}
-      activeRef.volume = targetVol;
-      nextRef.volume = targetVol;
-      safePlayBgm(nextRef);
+        activeRef.pause();
+        activeRef.volume = targetVol;
+        safePlayBgm(inactiveRef);
     }
 
-    activeBgmDeckRef.current = nextDeck;
     bgmSavedPosRef.current = { songId: nextTrack.id, time: 0 };
     setBgmCurrentSong(nextTrack);
-  }, [isHost, bgmLibrary, bgmCurrentSong?.id, generateShuffledQueue, bgmSettings.crossfadeEnabled, bgmSettings.crossfadeDuration, bgmSettings.volume, fadeOut, fadeIn, safePlayBgm, clearFadeTimer]);
+  }, [isHost, bgmLibrary, bgmCurrentSong?.id, generateShuffledQueue, bgmSettings.audioMode, bgmSettings.crossfadeEnabled, bgmSettings.crossfadeDuration, bgmSettings.volume, fadeOut, fadeIn, safePlayBgm]);
 
   // Handler for BGM audio errors (e.g. file missing on disk)
   const handleBgmError = useCallback(() => {
@@ -1987,28 +1877,27 @@ export default function RoomSession() {
       safePlay(audioRef.current);
     }
     if (isHost && !isKaraokeActive && bgmSettings.enabled) {
-      const activeAudio = activeBgmDeckRef.current === 1 ? bgmAudioRef1.current : bgmAudioRef2.current;
-      if (activeAudio) safePlayBgm(activeAudio);
+      if (bgmAudioRef1.current) safePlayBgm(bgmAudioRef1.current);
+      if (bgmAudioRef2.current) safePlayBgm(bgmAudioRef2.current);
     }
   };
 
   // High-frequency smooth animation loop for lyric sweep and position
   useEffect(() => {
-    if (!isHost || !playing || !currentSong) return;
+    if (!isHost) return;
     let rafId: number;
     const updateLoop = () => {
       if (audioRef.current && !audioRef.current.paused) {
         setCurrentTime(audioRef.current.currentTime);
-        rafId = requestAnimationFrame(updateLoop);
+        setPlaying(prev => prev ? prev : true);
       }
+      rafId = requestAnimationFrame(updateLoop);
     };
     rafId = requestAnimationFrame(updateLoop);
     return () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
+      cancelAnimationFrame(rafId);
     };
-  }, [isHost, playing, currentSong?.songId]);
+  }, [isHost]);
 
   const handleSeek = (e: ChangeEvent<HTMLInputElement>) => {
     if (!isHost || !audioRef.current) return;
@@ -2693,13 +2582,9 @@ export default function RoomSession() {
                 <div className="w-16 h-16 rounded-3xl bg-[#12131D] border border-white/10 flex items-center justify-center mx-auto mb-5 shadow-xl">
                   <Music className="w-8 h-8 text-[#FF4FA3]" />
                 </div>
-                <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-2">
-                  {queue.length > 0 ? 'Processing Next Song...' : 'Queue is Empty'}
-                </h2>
+                <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-2">Queue is Empty</h2>
                 <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">
-                  {queue.length > 0
-                    ? 'Background music will play while song media is prepared...'
-                    : 'Waiting for someone to choose a song...'}
+                  Waiting for someone to choose a song...
                 </p>
 
                 {bgmSettings.enabled && bgmCurrentSong && (
@@ -2800,13 +2685,6 @@ export default function RoomSession() {
               src={currentSong && currentSong.songId ? `/api/songs/${currentSong.songId}/audio?type=${variant}` : undefined}
               preload="auto"
               playsInline
-              onPlay={() => {
-                setPlaying(true);
-                userPausedRef.current = false;
-              }}
-              onPause={() => {
-                setPlaying(false);
-              }}
               onTimeUpdate={() => {
                 if (audioRef.current) {
                   setCurrentTime(audioRef.current.currentTime);
@@ -2850,7 +2728,7 @@ export default function RoomSession() {
             <>
               <audio
                 ref={bgmAudioRef1}
-                src={deck1Song ? `/api/songs/${deck1Song.id}/audio?type=${bgmSettings.audioMode}` : undefined}
+                src={bgmCurrentSong ? `/api/songs/${bgmCurrentSong.id}/audio?type=${bgmSettings.audioMode}` : undefined}
                 preload="auto"
                 playsInline
                 className="hidden"
@@ -2859,7 +2737,7 @@ export default function RoomSession() {
               />
               <audio
                 ref={bgmAudioRef2}
-                src={deck2Song ? `/api/songs/${deck2Song.id}/audio?type=${bgmSettings.audioMode}` : undefined}
+                src={bgmCurrentSong ? `/api/songs/${bgmCurrentSong.id}/audio?type=${bgmSettings.audioMode}` : undefined}
                 preload="auto"
                 playsInline
                 className="hidden"
