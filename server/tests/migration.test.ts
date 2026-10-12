@@ -96,30 +96,35 @@ test('Migration safety: populated database retains records and relationships', a
   fs.rmSync(testDir + '_2', { recursive: true, force: true });
 });
 
-test('Migration safety: deliberately failed migration causes setupDatabase to throw and fail startup', async () => {
+test('Migration safety: a failed migration makes setupDatabase reject startup', async () => {
   const testDir = path.resolve(process.cwd(), 'data/test_migration_failure_isolated');
-  if (fs.existsSync(testDir)) {
-    fs.rmSync(testDir, { recursive: true, force: true });
-  }
+  if (fs.existsSync(testDir)) fs.rmSync(testDir, { recursive: true, force: true });
   fs.mkdirSync(testDir, { recursive: true });
 
   const badMigrationsDir = path.join(testDir, 'bad_migrations');
-  fs.mkdirSync(badMigrationsDir, { recursive: true });
+  const metaDir = path.join(badMigrationsDir, 'meta');
+  fs.mkdirSync(metaDir, { recursive: true });
   fs.writeFileSync(path.join(badMigrationsDir, '0000_invalid.sql'), 'INVALID SQL SYNTAX;');
+  fs.writeFileSync(path.join(metaDir, '_journal.json'), JSON.stringify({
+    version: '7',
+    dialect: 'sqlite',
+    entries: [{
+      idx: 0,
+      version: '6',
+      when: 1787360339586,
+      tag: '0000_invalid',
+      breakpoints: true
+    }]
+  }, null, 2));
 
-  const { createClient } = await import('@libsql/client');
-  const { drizzle } = await import('drizzle-orm/libsql');
-  const { migrate } = await import('drizzle-orm/libsql/migrator');
+  process.env.DATA_DIR = testDir;
+  const dbModule = await import('../db/index.js');
+  await assert.rejects(
+    () => dbModule.setupDatabase(badMigrationsDir),
+    /Database migration failed/
+  );
 
-  const dbPath = path.join(testDir, 'yimly.db');
-  const sqlite = createClient({ url: `file:${dbPath}` });
-  const db = drizzle(sqlite, { schema });
-
-  await assert.rejects(async () => {
-    await migrate(db, { migrationsFolder: badMigrationsDir });
-  }, /Can't find meta\/_journal.json file|syntax error|sqlite/i);
-
-  sqlite.close();
+  await dbModule.sqlite.close();
   fs.rmSync(testDir, { recursive: true, force: true });
 });
 
