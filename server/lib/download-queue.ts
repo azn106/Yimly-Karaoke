@@ -542,14 +542,15 @@ export class DownloadQueueManager {
         this.activeWorkers++;
         // Start processing this track asynchronously
         this.processTrack(nextJob, nextTrack).finally(async () => {
-          this.activeWorkers--;
           try {
-            // Job-level finalization, including the library scan, must finish before
-            // another global pipeline is allowed to start.
+            // Keep the worker slot occupied through job finalization. Releasing it
+            // before the awaited DB/library work finishes lets another concurrent
+            // pumpQueue() call start a second global pipeline too early.
             await this.checkJobCompletion(nextJob!);
           } catch (err) {
             console.error('[Downloader] Job finalization failed:', err);
           } finally {
+            this.activeWorkers--;
             this.pumpQueue();
           }
         });
