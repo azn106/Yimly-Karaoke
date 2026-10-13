@@ -58,6 +58,8 @@ test('public route exemptions reject lyric offset writes but allow scoped guest 
 
   assert.equal(isPublicRoute(req('PUT', '/api/songs/12/lyrics/offset')), false);
   assert.equal(isPublicRoute(req('POST', '/api/karaoke/sessions/session-123/queue')), true);
+  assert.equal(isPublicRoute(req('DELETE', '/api/karaoke/sessions/session-123/queue/42')), true);
+  assert.equal(isPublicRoute(req('DELETE', '/api/karaoke/sessions/session-123/queue/not-a-number')), false);
   assert.equal(isPublicRoute(req('POST', '/api/karaoke/sessions/session-123/delete')), false);
 });
 
