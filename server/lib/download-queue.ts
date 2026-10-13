@@ -621,6 +621,14 @@ export class DownloadQueueManager {
             } catch {}
           }
 
+          if (job.status === 'cancelled') {
+            track.status = 'failed';
+            track.progress = 0;
+            track.error = 'Job cancelled by user';
+            await this.persistTrackUpdate(track);
+            return;
+          }
+
           track.status = 'completed';
           track.progress = 100;
           track.outputPath = finalDestFile;
