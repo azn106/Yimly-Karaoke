@@ -170,5 +170,7 @@ export async function processDownloadedSong(req: ProcessSongRequest): Promise<vo
     } catch (dbErr) {
       console.error('[SongProcessor] Failed to update queue item to failed status:', dbErr);
     }
+    // Propagate the failure so the download manager cannot report this track as successful.
+    throw procErr;
   }
 }
