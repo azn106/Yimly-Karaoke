@@ -56,6 +56,7 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
   visibleLines: 3,
   highlightCurrentLine: true,
   animationDuration: 0.25,
+  elrcDisplayLeadInMs: 0,
   elrcTransition: 'smooth_sweep',
   elrcHighlightMode: 'smooth_sweep',
   wordHighlightAnimation: 'smooth',
@@ -125,6 +126,7 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
     visibleLines: [1, 3, 5].includes(parsed.visibleLines) ? parsed.visibleLines : DEFAULT_LYRICS_SETTINGS.visibleLines,
     highlightCurrentLine: typeof parsed.highlightCurrentLine === 'boolean' ? parsed.highlightCurrentLine : DEFAULT_LYRICS_SETTINGS.highlightCurrentLine,
     animationDuration: typeof parsed.animationDuration === 'number' && !isNaN(parsed.animationDuration) ? parsed.animationDuration : DEFAULT_LYRICS_SETTINGS.animationDuration,
+    elrcDisplayLeadInMs: typeof parsed.elrcDisplayLeadInMs === 'number' && Number.isFinite(parsed.elrcDisplayLeadInMs) ? Math.max(0, Math.min(5000, Math.round(parsed.elrcDisplayLeadInMs))) : (DEFAULT_LYRICS_SETTINGS.elrcDisplayLeadInMs ?? 0),
     elrcTransition: (() => {
       const rawMode = parsed.elrcTransition || parsed.elrcHighlightMode;
       if (rawMode === 'progressive_sweeping' || rawMode === 'smooth_sweep') return 'smooth_sweep';
