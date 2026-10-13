@@ -3745,6 +3745,19 @@ test('WebSocket ignores malformed playback synchronization payloads', async () =
   });
 });
 
+test('session expiry host detection follows reassigned host, not stale host socket', async () => {
+  const { hasActiveHostConnection } = await import('../ws/index.js');
+  const formerHostSocket = { readyState: 1, userId: userAId, isAdmin: false };
+  const newHostSocket = { readyState: 1, userId: userBId, isAdmin: false };
+  const room = { clients: new Set([formerHostSocket, newHostSocket]) } as any;
+
+  assert.equal(hasActiveHostConnection(room, userBId), true, 'The reassigned host socket should keep the room active');
+  assert.equal(hasActiveHostConnection(room, 999999), false, 'An old host socket alone must not keep the room active');
+
+  newHostSocket.readyState = 3;
+  assert.equal(hasActiveHostConnection(room, userBId), false, 'A closed new-host socket must not count as active');
+});
+
 test('Close server', async () => {
   const { libraryWatcher } = await import('../lib/watcher.js');
   libraryWatcher.stopAll();
