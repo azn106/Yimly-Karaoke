@@ -344,7 +344,11 @@ export function setupWebSockets(wss: WebSocketServer) {
               console.warn(`[WS] Unauthorized non-host attempted SEEK on session ${sessionId}`);
               break;
             }
-            room.position = data.payload.position;
+            {
+              const position = Number(data.payload?.position);
+              if (!Number.isFinite(position) || position < 0) break;
+              room.position = position;
+            }
             broadcastToRoom(sessionId, { type: 'SEEKED', payload: { position: room.position } });
             break;
 
@@ -353,8 +357,12 @@ export function setupWebSockets(wss: WebSocketServer) {
               console.warn(`[WS] Unauthorized non-host attempted SYNC on session ${sessionId}`);
               break;
             }
-            room.position = data.payload.position;
-            room.playing = data.payload.playing;
+            {
+              const position = Number(data.payload?.position);
+              if (!Number.isFinite(position) || position < 0 || typeof data.payload?.playing !== 'boolean') break;
+              room.position = position;
+              room.playing = data.payload.playing;
+            }
             broadcastToRoom(sessionId, { type: 'SYNC', payload: { position: room.position, playing: room.playing } });
             break;
 
@@ -381,8 +389,14 @@ export function setupWebSockets(wss: WebSocketServer) {
               console.warn(`[WS] Unauthorized non-host attempted VARIANT_CHANGED on session ${sessionId}`);
               break;
             }
+            if (data.payload?.variant !== 'original' && data.payload?.variant !== 'instrumental') break;
+            if (data.payload.position !== undefined) {
+              const position = Number(data.payload.position);
+              if (!Number.isFinite(position) || position < 0) break;
+              room.position = position;
+            }
+            if (data.payload.playing !== undefined && typeof data.payload.playing !== 'boolean') break;
             room.variant = data.payload.variant;
-            if (data.payload.position !== undefined) room.position = data.payload.position;
             if (data.payload.playing !== undefined) room.playing = data.payload.playing;
             broadcastToRoom(sessionId, { 
               type: 'VARIANT_CHANGED', 
