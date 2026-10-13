@@ -1,171 +1,115 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal EnableExtensions
 
-:: Ensure execution from repository root directory
 cd /d "%~dp0"
-
 title Yimly - Update
 
 echo ========================================
-echo         YIMLY UPDATE
+echo           YIMLY UPDATE
 echo ========================================
 echo.
 
-:: [1/5] Repository and Docker checks
-echo [1/5] Checking repository and environment...
+echo [1/5] Checking Git...
 where git >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Git is not installed or not found in PATH.
-    echo Please install Git for Windows to enable repository updates.
-    echo https://git-scm.com/download/win
-    echo.
-    pause
-    exit /b 1
+if errorlevel 1 (
+    echo [ERROR] Git is not installed or not in PATH.
+    echo Install Git for Windows: https://git-scm.com/download/win
+    goto FAILED
 )
 
+echo [2/5] Checking Docker and Compose...
 where docker >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Docker is not installed or not found in PATH.
-    echo Please ensure Docker Desktop is installed and running.
-    echo.
-    pause
-    exit /b 1
+if errorlevel 1 (
+    echo [ERROR] Docker is not installed or not in PATH.
+    goto FAILED
+)
+
+docker info >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Docker Desktop is not running. Start Docker Desktop and retry.
+    goto FAILED
 )
 
 docker compose version >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    docker-compose version >nul 2>&1
-    if %ERRORLEVEL% neq 0 (
-        echo [ERROR] Docker Compose is not available.
-        echo Please ensure Docker Desktop is running with Docker Compose enabled.
-        echo.
-        pause
-        exit /b 1
-    )
+if errorlevel 1 (
+    echo [ERROR] Docker Compose is unavailable. Update Docker Desktop and retry.
+    goto FAILED
 )
 
 docker network inspect cloudflared_bridge >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] External Docker network 'cloudflared_bridge' does not exist.
-    echo Manual Cloudflare network setup is required.
-    echo.
-    pause
-    exit /b 1
+if errorlevel 1 (
+    echo [ERROR] External Docker network "cloudflared_bridge" does not exist.
+    echo Start your Cloudflare tunnel stack or create the network before updating.
+    goto FAILED
 )
-echo Repository and Docker verified.
-echo.
 
-:: [2/5] Git update
-echo [2/5] Pulling latest GitHub changes...
-git pull
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Failed to pull changes from remote GitHub repository (possible merge conflict or network issue).
-    echo Please resolve any local git conflicts or stash local changes before running update-yimly.bat.
-    echo Update aborted to protect your data and prevent deployment of conflicting code.
-    echo.
-    pause
-    exit /b 1
+echo [3/5] Checking Git branch and pulling main...
+for /f "delims=" %%B in ('git branch --show-current') do set "CURRENT_BRANCH=%%B"
+if not "%CURRENT_BRANCH%"=="main" (
+    echo [ERROR] This checkout is on branch "%CURRENT_BRANCH%", not "main".
+    echo Switch to main and make sure local changes are committed before retrying.
+    goto FAILED
 )
-echo.
 
-:: [2.5/5] LF normalization and verification
-echo [2.5/5] Normalizing shell script line endings to Unix LF via PowerShell...
-powershell -Command "$ErrorActionPreference = 'Stop'; try { Get-ChildItem -Path 'scripts' -Filter '*.sh' | ForEach-Object { $c = Get-Content $_.FullName -Raw; $c = $c -replace \"`r`n\", \"`n\"; Set-Content -NoNewline -Path $_.FullName -Value $c }; exit 0 } catch { Write-Error $_; exit 1 }"
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Failed to normalize shell script line endings.
-    echo Update aborted.
-    echo.
-    pause
-    exit /b 1
+git pull --ff-only origin main
+if errorlevel 1 (
+    echo [ERROR] Could not update from origin/main.
+    echo Check your internet connection and resolve any local Git changes first.
+    goto FAILED
 )
-echo Shell scripts successfully normalized to Unix LF line endings.
-echo.
 
-:: [1.5/5] Backup and archive verification
-echo [1.5/5] Performing backup and archive verification (Bootstrap Safety Gate)...
-bash scripts/backup.sh
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Backup failed. Update aborted to protect data. Running application left untouched.
-    echo.
-    pause
-    exit /b 1
-)
 echo.
-
-:: [3/5] Docker build
-echo [3/5] Rebuilding Docker image...
+echo [4/5] Building the latest Yimly image...
 docker compose -f compose.yaml build --pull
-if %ERRORLEVEL% neq 0 (
-    echo [WARNING] Build with --pull had a notice, attempting standard build...
-    docker compose -f compose.yaml build
-    if %ERRORLEVEL% neq 0 (
-        echo [ERROR] Docker image build failed.
-        echo Review the error messages above for details.
-        echo.
-        pause
-        exit /b 1
-    )
-)
-echo.
-
-:: [4/5] Container restart
-echo [4/5] Restarting Yimly container...
-docker compose -f compose.yaml up -d
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Failed to restart Docker containers.
-    echo.
-    pause
-    exit /b 1
+if errorlevel 1 (
+    echo [ERROR] Docker build failed. The existing container has not been replaced.
+    goto FAILED
 )
 
-docker image prune -f >nul 2>&1
-echo Container restarted successfully.
 echo.
+echo [5/5] Restarting Yimly with the updated image...
+docker compose -f compose.yaml up -d --force-recreate
+if errorlevel 1 (
+    echo [ERROR] Yimly failed to start. Recent logs:
+    docker compose -f compose.yaml logs --tail=100 yimly
+    goto FAILED
+)
 
-:: [5/5] Health check
-echo [5/5] Checking health...
-set "HEALTHY=0"
-set "ELAPSED=0"
+echo.
+echo Waiting for Yimly health check (up to 90 seconds)...
+set /a ELAPSED=0
 
 :HEALTH_LOOP
-if !ELAPSED! geq 60 goto HEALTH_FAILED
-
-set /a "ELAPSED+=5"
-echo Waiting for Yimly health... !ELAPSED!s
-timeout /t 5 >nul
-
-for /f "delims=" %%s in ('docker inspect --format="{{.State.Health.Status}}" yimly 2^>nul') do (
-    if "%%s"=="healthy" (
-        set "HEALTHY=1"
-        goto HEALTH_PASSED
-    )
-    if "%%s"=="unhealthy" (
-        goto HEALTH_FAILED
-    )
-)
+for /f "delims=" %%S in ('docker inspect --format="{{.State.Health.Status}}" yimly 2^>nul') do set "HEALTH_STATUS=%%S"
+if "%HEALTH_STATUS%"=="healthy" goto HEALTH_PASSED
+if "%HEALTH_STATUS%"=="unhealthy" goto HEALTH_FAILED
+if %ELAPSED% GEQ 90 goto HEALTH_FAILED
+timeout /t 5 /nobreak >nul
+set /a ELAPSED+=5
+echo Waiting... %ELAPSED%s
 goto HEALTH_LOOP
 
 :HEALTH_FAILED
-echo Yimly health check: FAILED
+echo.
+echo [ERROR] Yimly did not become healthy.
 docker compose -f compose.yaml ps
 docker compose -f compose.yaml logs --tail=100 yimly
-exit /b 1
+goto FAILED
 
 :HEALTH_PASSED
-echo Yimly health check: HEALTHY
 echo.
 echo ========================================
-echo Yimly update complete.
+echo       YIMLY UPDATE COMPLETE
 echo ========================================
-echo.
 docker compose -f compose.yaml ps
 echo.
-echo Yimly Networking Summary:
-echo - Compose Service: yimly
-echo - Docker Network: cloudflared_bridge
-echo - Network Alias: yimly
-echo - Internal Port: 3000
-echo - Published Host Ports: None
-echo - Cloudflare Tunnel Target: http://yimly:3000
+pause
+exit /b 0
+
+:FAILED
+echo.
+echo Update did not complete. Review the error above.
+echo Your persistent data/media folders were not intentionally deleted.
 echo.
 pause
+exit /b 1
