@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { db } from '../db/index.js';
-import { songs, artists, albums, lyrics, songArtists, playlistSongs, favorites, queueItems } from '../db/schema.js';
-import { eq, like, or, inArray, asc } from 'drizzle-orm';
+import { songs, artists, albums, lyrics, songArtists, playlistSongs, favorites, queueItems, sessions } from '../db/schema.js';
+import { eq, like, or, inArray, asc, and } from 'drizzle-orm';
 import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import { formatArtistDisplay, cleanupOrphanedRecords } from '../lib/artist-utils.js';
 import { broadcastSongOffsetToRooms } from '../ws/index.js';
@@ -246,7 +246,7 @@ router.get('/:id', async (req, res) => {
     const elrcOffsetVal = typeof songRec[0].elrcOffset === 'number' ? songRec[0].elrcOffset : (songRec[0].lyricOffset ?? 0);
     const hasInstrumental = !!(songRec[0].instrumentalAudioPath && fs.existsSync(songRec[0].instrumentalAudioPath));
 
-    res.json({
+    const responseSong: Record<string, any> = {
       ...songRec[0],
       artist: formatArtistDisplay(trackArtists.length > 0 ? trackArtists : songRec[0].artist),
       artists: trackArtists,
@@ -257,7 +257,13 @@ router.get('/:id', async (req, res) => {
       lrcOffset: lrcOffsetVal,
       elrcOffset: elrcOffsetVal,
       lyricOffset: songRec[0].lyricOffset ?? 0,
-    });
+    };
+    // Guests need API playback endpoints, not server filesystem paths.
+    if (!(req as AuthenticatedRequest).user) {
+      delete responseSong.mainAudioPath;
+      delete responseSong.instrumentalAudioPath;
+    }
+    res.json(responseSong);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch song details' });
   }
@@ -752,6 +758,20 @@ const updateSongLyricOffset = async (req: any, res: any) => {
       if (req.body?.elrcOffset !== undefined) {
         newElrcOffset = Math.round(Number(req.body.elrcOffset));
         updateObj.elrcOffset = newElrcOffset;
+      }
+    }
+
+    const user = (req as AuthenticatedRequest).user;
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Authentication required to update lyric offsets' });
+    }
+    if (user.role !== 'administrator') {
+      const hostedSessions = await db.select({ id: sessions.id })
+        .from(sessions)
+        .where(and(eq(sessions.hostId, user.id), eq(sessions.status, 'active')))
+        .limit(1);
+      if (hostedSessions.length === 0) {
+        return res.status(403).json({ error: 'Only an active room host or administrator can update lyric offsets' });
       }
     }
 
