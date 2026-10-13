@@ -43,7 +43,8 @@ if errorlevel 1 (
     goto FAILED
 )
 
-echo [3/5] Checking Git branch and pulling main...
+echo [3/6] Checking Git branch...
+
 for /f "delims=" %%B in ('git branch --show-current') do set "CURRENT_BRANCH=%%B"
 if not "%CURRENT_BRANCH%"=="main" (
     echo [ERROR] This checkout is on branch "%CURRENT_BRANCH%", not "main".
@@ -51,15 +52,38 @@ if not "%CURRENT_BRANCH%"=="main" (
     goto FAILED
 )
 
+echo.
+echo [4/6] Backing up persistent data and media...
+echo Stopping Yimly briefly so SQLite data is consistent...
+docker compose -f compose.yaml stop yimly
+if errorlevel 1 (
+    echo [ERROR] Could not stop Yimly safely; no backup was attempted.
+    goto FAILED
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\backup-yimly.ps1"
+if errorlevel 1 (
+    echo [ERROR] Backup failed. Restarting the existing Yimly container.
+    docker compose -f compose.yaml start yimly
+    goto FAILED
+)
+docker compose -f compose.yaml start yimly
+if errorlevel 1 (
+    echo [ERROR] Backup succeeded but Yimly could not be restarted before update.
+    docker compose -f compose.yaml logs --tail=100 yimly
+    goto FAILED
+)
+
+echo.
+echo [5/6] Pulling latest main...
 git pull --ff-only origin main
 if errorlevel 1 (
-    echo [ERROR] Could not update from origin/main.
+    echo [ERROR] Could not update from origin/main. Existing application remains in place.
     echo Check your internet connection and resolve any local Git changes first.
     goto FAILED
 )
 
 echo.
-echo [4/5] Building the latest Yimly image...
+echo [6/6] Building the latest Yimly image...
 docker compose -f compose.yaml build --pull
 if errorlevel 1 (
     echo [ERROR] Docker build failed. The existing container has not been replaced.
@@ -67,7 +91,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [5/5] Restarting Yimly with the updated image...
+echo Restarting Yimly with the updated image...
 docker compose -f compose.yaml up -d --force-recreate
 if errorlevel 1 (
     echo [ERROR] Yimly failed to start. Recent logs:
