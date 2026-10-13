@@ -2846,7 +2846,38 @@ test('Production Step #2: Karaoke Security, Server-Side Permissions & Room Isola
   });
   assert.strictEqual(validGuestQueueRes.status, 200, 'Valid controller in Room A can queue song in Room A');
 
-  // 3e. Authenticated User A queues in Room A -> 200
+  // 3e. Two guests with the same display name must still have distinct queue ownership.
+  const sameNameJoinRes = await fetch(`${baseUrl}/api/karaoke/sessions/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roomCode: roomA.roomCode, displayName: 'Guest In Room A' })
+  });
+  assert.strictEqual(sameNameJoinRes.status, 200);
+  const sameNameGuest = await sameNameJoinRes.json();
+
+  const sameNameQueueRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/queue`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ songId, controllerId: sameNameGuest.controllerId })
+  });
+  assert.strictEqual(sameNameQueueRes.status, 200);
+  const sameNameQueueItem = await sameNameQueueRes.json();
+
+  const removeOtherGuestItemRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/queue/${sameNameQueueItem.id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ controllerId: guestA.controllerId })
+  });
+  assert.strictEqual(removeOtherGuestItemRes.status, 403, 'Guest with a matching display name must not remove another guest\'s queue item');
+
+  const removeOwnGuestItemRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/queue/${sameNameQueueItem.id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ controllerId: sameNameGuest.controllerId })
+  });
+  assert.strictEqual(removeOwnGuestItemRes.status, 200, 'Guest must be able to remove their own queue item with their controller credential');
+
+  // 3f. Authenticated User A queues in Room A -> 200
   const validUserQueueRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/queue`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
