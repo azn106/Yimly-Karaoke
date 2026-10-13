@@ -842,9 +842,23 @@ router.post('/sessions/:sessionId/leave', async (req: AuthenticatedRequest, res)
     const user = req.user;
 
     if (controllerId) {
+      // An authenticated account may only mark its own controller disconnected
+      // (or an administrator may manage room participants). Guest clients use
+      // their unguessable controller ID as a bearer credential.
+      const controller = await db.select().from(controllers).where(
+        and(eq(controllers.id, String(controllerId)), eq(controllers.sessionId, sessionId))
+      ).limit(1);
+
+      if (controller.length === 0) {
+        return res.status(404).json({ error: 'Controller not found in this session' });
+      }
+      if (user?.id && user.role !== 'administrator' && controller[0].userId !== user.id) {
+        return res.status(403).json({ error: 'Forbidden. You can only disconnect your own controller.' });
+      }
+
       await db.update(controllers)
         .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
-        .where(and(eq(controllers.id, controllerId), eq(controllers.sessionId, sessionId)));
+        .where(and(eq(controllers.id, String(controllerId)), eq(controllers.sessionId, sessionId)));
     } else if (user?.id) {
       await db.update(controllers)
         .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
