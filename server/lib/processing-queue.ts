@@ -28,21 +28,27 @@ export class ProcessingQueueManager {
     if (this.isProcessing || this.queue.length === 0) return;
 
     this.isProcessing = true;
-    const entry = this.queue.shift()!;
-    const { request } = entry;
-
     try {
-      console.log(`[ProcessingQueue] Starting processing for "${request.title}"`);
-      await this.processSong(request);
-      console.log(`[ProcessingQueue] Finished processing for "${request.title}"`);
-      entry.resolve();
-    } catch (err) {
-      console.error(`[ProcessingQueue] Failed processing for "${request.title}":`, err);
-      entry.reject(err);
+      // Drain serially in a loop, avoiding recursive pump calls for long queues.
+      while (this.queue.length > 0) {
+        const entry = this.queue.shift()!;
+        const { request } = entry;
+
+        try {
+          console.log(`[ProcessingQueue] Starting processing for "${request.title}"`);
+          await this.processSong(request);
+          console.log(`[ProcessingQueue] Finished processing for "${request.title}"`);
+          entry.resolve();
+        } catch (err) {
+          console.error(`[ProcessingQueue] Failed processing for "${request.title}":`, err);
+          entry.reject(err);
+        }
+      }
     } finally {
       this.isProcessing = false;
-      // Await the next pump so the queue's own async work is observed.
-      await this.pumpQueue();
+      // Close the enqueue race between the final empty check and releasing the
+      // processing flag. If an entry arrived during that window, pump it now.
+      if (this.queue.length > 0) void this.pumpQueue();
     }
   }
 }
