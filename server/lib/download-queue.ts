@@ -807,12 +807,28 @@ export class DownloadQueueManager {
           }
         }
 
+        // Cancellation may happen while lyrics or artwork are being fetched. Do not
+        // publish a file or start downstream song processing after cancellation.
+        if (job.status === 'cancelled') {
+          track.status = 'failed';
+          track.progress = 0;
+          track.error = 'Job cancelled by user';
+          try {
+            if (fs.existsSync(tmpJobDir)) {
+              fs.rmSync(tmpJobDir, { recursive: true, force: true });
+            }
+          } catch {}
+          await this.persistTrackUpdate(track);
+          return;
+        }
+
         // Ensure destination artist directory exists
         if (!fs.existsSync(artistDir)) {
           fs.mkdirSync(artistDir, { recursive: true });
         }
 
-        // Move to final library destination
+        // Move to final library destination. Keep this synchronous section free of
+        // awaits so cancelJob cannot interleave between the final check and publish.
         fs.copyFileSync(downloadedAudioPath, finalDestFile);
 
         // Save LRC sidecar if lyrics available
