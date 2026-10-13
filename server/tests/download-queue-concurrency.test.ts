@@ -60,3 +60,32 @@ test('public route exemptions reject lyric offset writes but allow scoped guest 
   assert.equal(isPublicRoute(req('POST', '/api/karaoke/sessions/session-123/queue')), true);
   assert.equal(isPublicRoute(req('POST', '/api/karaoke/sessions/session-123/delete')), false);
 });
+
+
+test('processing queue settles every enqueue when a track ID is repeated', async () => {
+  let active = 0;
+  let maximumActive = 0;
+  let completed = 0;
+
+  const processor = async () => {
+    active++;
+    maximumActive = Math.max(maximumActive, active);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    active--;
+    completed++;
+  };
+
+  const queue = new ProcessingQueueManager(processor);
+  const request: ProcessSongRequest = {
+    downloadTrackId: 'same-track',
+    originalAudioPath: '/tmp/same-track.mp3',
+    libraryId: 1,
+    title: 'Same Track',
+    artist: 'Test Artist',
+  };
+
+  await Promise.all([queue.enqueue(request), queue.enqueue(request)]);
+
+  assert.equal(completed, 2, 'Both queued entries must complete');
+  assert.equal(maximumActive, 1, 'Repeated IDs must still be processed serially');
+});
