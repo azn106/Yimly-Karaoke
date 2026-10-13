@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 import fsSync from 'fs';
 import path from 'path';
 import { db, setupDatabase } from '../db/index.js';
-import { users, libraries, artists, albums, songs, favorites, playlists, playlistSongs, lyrics, queueItems, settings } from '../db/schema.js';
+import { users, libraries, artists, albums, songs, favorites, playlists, playlistSongs, lyrics, queueItems, settings, sessions, controllers } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 import playlistsRoutes from '../routes/playlists.js';
@@ -3627,6 +3627,43 @@ test('Production Step #10: Security Regression Tests', async () => {
     headers: { 'Content-Type': 'application/json' }
   });
   assert.strictEqual(skipRes.status, 401, 'Skip request without authorization must return 401');
+});
+
+test('session leave endpoint cannot disconnect another authenticated user controller', async () => {
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ roomName: 'Leave ownership regression' })
+  });
+  assert.equal(createRes.status, 200);
+  const room = await createRes.json();
+
+  const controllerId = `leave-owner-regression-${Date.now()}`;
+  await db.insert(controllers).values({
+    id: controllerId,
+    sessionId: room.id,
+    userId: userBId,
+    guestName: null,
+    device: 'regression-test',
+    connectionState: 'connected',
+    lastSeenTime: new Date(),
+  });
+
+  const leaveRes = await fetch(`${baseUrl}/api/karaoke/sessions/${room.id}/leave`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ controllerId })
+  });
+  assert.equal(leaveRes.status, 403, 'A different authenticated user must not disconnect this controller');
+
+  const [controllerAfter] = await db.select().from(controllers).where(eq(controllers.id, controllerId)).limit(1);
+  assert.equal(controllerAfter.connectionState, 'connected', 'Rejected leave request must not change controller state');
+
+  await db.delete(controllers).where(eq(controllers.id, controllerId));
+  await fetch(`${baseUrl}/api/karaoke/sessions/${room.id}/end`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenA}` }
+  });
 });
 
 test('Close server', async () => {
