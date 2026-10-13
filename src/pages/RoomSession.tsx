@@ -1849,6 +1849,23 @@ export default function RoomSession() {
     bgmTransitionRafRef.current = requestAnimationFrame(ramp);
   }, [isHost, bgmTransitionTrack, bgmActiveDeck, isKaraokeActive, bgmSettings.enabled, bgmSettings.volume, bgmSettings.crossfadeDuration, safePlayBgm]);
 
+  const handleBgmTransitionError = useCallback(() => {
+    console.warn('[BGM] Incoming crossfade track failed; continuing the current track.');
+    if (bgmTransitionRafRef.current !== null) cancelAnimationFrame(bgmTransitionRafRef.current);
+    bgmTransitionRafRef.current = null;
+    bgmTransitioningRef.current = false;
+    bgmTransitionNextIndexRef.current = null;
+    const outgoing = bgmActiveDeck === 'primary' ? bgmAudioRef.current : bgmSecondaryAudioRef.current;
+    const incoming = bgmActiveDeck === 'primary' ? bgmSecondaryAudioRef.current : bgmAudioRef.current;
+    if (outgoing) outgoing.volume = Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100));
+    if (incoming) { try { incoming.pause(); } catch {} incoming.volume = 0; }
+    setBgmTransitionTrack(null);
+  }, [bgmActiveDeck, bgmSettings.volume]);
+
+  useEffect(() => () => {
+    if (bgmTransitionRafRef.current !== null) cancelAnimationFrame(bgmTransitionRafRef.current);
+  }, []);
+
   const handleBgmTimeUpdate = useCallback(() => {
     if (!isHost || !bgmSettings.enabled || isKaraokeActive || !bgmSettings.crossfadeEnabled || bgmLibrary.length < 2 || bgmTransitioningRef.current || bgmTransitionTrack) return;
     const active = bgmActiveDeck === 'primary' ? bgmAudioRef.current : bgmSecondaryAudioRef.current;
@@ -2780,7 +2797,7 @@ export default function RoomSession() {
                 }}
                 onTimeUpdate={bgmActiveDeck === 'primary' ? handleBgmTimeUpdate : undefined}
                 onEnded={handleBgmEnded}
-                onError={handleBgmError}
+                onError={() => bgmActiveDeck === 'secondary' && bgmTransitionTrack ? handleBgmTransitionError() : handleBgmError()}
                 className="hidden"
               />
               <audio
@@ -2795,7 +2812,7 @@ export default function RoomSession() {
                 }}
                 onTimeUpdate={bgmActiveDeck === 'secondary' ? handleBgmTimeUpdate : undefined}
                 onEnded={handleBgmEnded}
-                onError={handleBgmError}
+                onError={() => bgmActiveDeck === 'primary' && bgmTransitionTrack ? handleBgmTransitionError() : handleBgmError()}
                 className="hidden"
               />
             </>
