@@ -1894,14 +1894,16 @@ export default function RoomSession() {
   const isPlaybackActive = playing || currentTime > 0.05;
   const activeOffset = lyricsFormat === 'elrc' ? elrcOffset : lrcOffset;
   const adjustedTime = currentTime + (activeOffset / 1000);
+  // Advance line display only; word highlighting retains the original eLRC timestamps.
+  const lineDisplayTime = adjustedTime + (lyricsFormat === 'elrc' ? (lyricsSettings.elrcDisplayLeadInMs ?? 0) / 1000 : 0);
 
   // Active lyric index: only valid if playback has started AND adjustedTime has reached the first lyric's timestamp
   const firstLyricTime = lyrics[0]?.time ?? 0;
   let activeLyricIndex = -1;
-  if (isPlaybackActive && lyrics.length > 0 && adjustedTime >= firstLyricTime) {
+  if (isPlaybackActive && lyrics.length > 0 && lineDisplayTime >= firstLyricTime) {
     activeLyricIndex = lyrics.findIndex((l, idx) => {
       const nextLine = lyrics[idx + 1];
-      return adjustedTime >= l.time && (!nextLine || adjustedTime < nextLine.time);
+      return lineDisplayTime >= l.time && (!nextLine || lineDisplayTime < nextLine.time);
     });
   }
 
