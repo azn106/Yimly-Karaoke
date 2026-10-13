@@ -9,7 +9,7 @@ echo           YIMLY UPDATE
 echo ========================================
 echo.
 
-echo [1/5] Checking Git...
+echo [1/6] Checking Git...
 where git >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Git is not installed or not in PATH.
@@ -17,7 +17,7 @@ if errorlevel 1 (
     goto FAILED
 )
 
-echo [2/5] Checking Docker and Compose...
+echo [2/6] Checking Docker and Compose...
 where docker >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Docker is not installed or not in PATH.
