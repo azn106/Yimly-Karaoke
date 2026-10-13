@@ -876,7 +876,13 @@ export class DownloadQueueManager {
             const libraryId = jobRec[0].libraryId;
             const { processingQueue } = await import('./processing-queue.js');
 
-            // Enqueue processing; processingQueue manages serial execution
+            // Persist a recoverable in-progress marker before downstream processing.
+            // Startup recovery resets this transient status to queued if the server crashes.
+            await db.update(downloadTrackJobs).set({
+              status: 'tagging',
+              updatedAt: new Date(),
+            }).where(eq(downloadTrackJobs.id, track.id));
+
             await processingQueue.enqueue({
               downloadTrackId: track.id,
               originalAudioPath: track.outputPath,
@@ -886,18 +892,25 @@ export class DownloadQueueManager {
               album: track.album || undefined,
               duration: track.duration || undefined,
             });
+
+            await db.update(downloadTrackJobs).set({
+              status: 'completed',
+              progress: 100,
+              error: null,
+              updatedAt: new Date(),
+            }).where(eq(downloadTrackJobs.id, track.id));
           }
         } catch (err: any) {
           console.error('[Downloader] Song processing failed:', err);
           track.status = 'failed';
           track.progress = 0;
           track.error = sanitizeErrorMessage(`Audio processing failed: ${err?.message || err}`);
-          track.updatedAt = new Date();
+          const failedAt = new Date();
           await db.update(downloadTrackJobs).set({
             status: 'failed',
             progress: 0,
             error: track.error,
-            updatedAt: track.updatedAt,
+            updatedAt: failedAt,
           }).where(eq(downloadTrackJobs.id, track.id));
           await db.update(queueItems).set({ downloadStatus: 'failed' })
             .where(eq(queueItems.downloadTrackId, track.id));
