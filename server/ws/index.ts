@@ -195,6 +195,14 @@ export function getRoomState(sessionId: string): RoomState | undefined {
   return activeRooms.get(sessionId);
 }
 
+export function hasActiveHostConnection(room: RoomState | undefined, sessionHostId: number | null | undefined): boolean {
+  if (!room) return false;
+  return [...room.clients].some((client: any) =>
+    client.readyState === WebSocket.OPEN &&
+    (client.isAdmin || (client.userId && client.userId === sessionHostId))
+  );
+}
+
 export function setupWebSockets(wss: WebSocketServer) {
   wss.on('connection', async (ws, req) => {
     const url = req.url;
@@ -649,10 +657,7 @@ export function setupWebSockets(wss: WebSocketServer) {
         const room = activeRooms.get(sess.id);
         // Host ownership can change while the former host socket remains open.
         // Determine presence from the current session host ID, not the stale hostClient pointer.
-        const hasActiveHost = Boolean(room && [...room.clients].some((client: any) =>
-          client.readyState === WebSocket.OPEN &&
-          (client.isAdmin || (client.userId && client.userId === sess.hostId))
-        ));
+        const hasActiveHost = hasActiveHostConnection(room, sess.hostId);
         const lastHeartbeat = room?.lastHostHeartbeat || (sess.updatedAt ? new Date(sess.updatedAt).getTime() : 0);
         const createdAt = sess.createdAt ? new Date(sess.createdAt).getTime() : 0;
         
