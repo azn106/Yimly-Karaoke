@@ -3666,6 +3666,43 @@ test('session leave endpoint cannot disconnect another authenticated user contro
   });
 });
 
+test('WebSocket cannot grant host privileges from isHost query parameter alone', async () => {
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ roomName: 'WebSocket host spoof regression' })
+  });
+  assert.equal(createRes.status, 200);
+  const roomData = await createRes.json();
+
+  const { WebSocket } = await import('ws');
+  const { getRoomState } = await import('../ws/index.js');
+  const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/karaoke?sessionId=${roomData.id}&isHost=true&token=${tokenB}`;
+  const client = new WebSocket(wsUrl);
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('WebSocket connection timed out')), 3000);
+    client.once('open', () => {
+      clearTimeout(timeout);
+      client.send(JSON.stringify({ type: 'PLAY' }));
+      resolve();
+    });
+    client.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(getRoomState(roomData.id)?.playing, false, 'A non-host must not control playback by setting isHost=true');
+
+  client.close();
+  await fetch(`${baseUrl}/api/karaoke/sessions/${roomData.id}/end`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenA}` }
+  });
+});
+
 test('Close server', async () => {
   const { libraryWatcher } = await import('../lib/watcher.js');
   libraryWatcher.stopAll();
