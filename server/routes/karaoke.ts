@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { withSessionLock } from '../lib/session-lock.js';
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -31,29 +32,6 @@ import { DEFAULT_LYRICS_SETTINGS, resolveLyricsSettings, LyricsAppearanceSetting
 const router = Router();
 router.use(requireAuth);
 
-// Serialize queue mutations per room. The promise chain is process-local and
-// always releases the next waiter, even when a request handler throws.
-const sessionLockTails = new Map<string, Promise<void>>();
-
-async function withSessionLock<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
-  const previous = sessionLockTails.get(sessionId) ?? Promise.resolve();
-  let release!: () => void;
-  const current = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-
-  sessionLockTails.set(sessionId, current);
-  await previous;
-
-  try {
-    return await operation();
-  } finally {
-    release();
-    if (sessionLockTails.get(sessionId) === current) {
-      sessionLockTails.delete(sessionId);
-    }
-  }
-}
 
 const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
 const fontsDir = path.join(dataDir, 'fonts');
