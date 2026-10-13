@@ -2819,7 +2819,6 @@ export default function RoomSession() {
                 src={(bgmActiveDeck === 'primary' ? bgmCurrentSong : bgmTransitionTrack) ? `/api/songs/${(bgmActiveDeck === 'primary' ? bgmCurrentSong : bgmTransitionTrack)!.id}/audio?type=${bgmSettings.audioMode}` : undefined}
                 preload="auto"
                 playsInline
-                volume={bgmActiveDeck === 'primary' ? Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100)) : 0}
                 onCanPlay={() => {
                   if (bgmActiveDeck === 'primary' && !isKaraokeActive && bgmSettings.enabled && bgmAudioRef.current?.paused && !bgmTransitionTrack) safePlayBgm(bgmAudioRef.current);
                   if (bgmActiveDeck === 'secondary' && bgmTransitionTrack) startBgmCrossfade();
@@ -2834,7 +2833,6 @@ export default function RoomSession() {
                 src={(bgmActiveDeck === 'secondary' ? bgmCurrentSong : bgmTransitionTrack) ? `/api/songs/${(bgmActiveDeck === 'secondary' ? bgmCurrentSong : bgmTransitionTrack)!.id}/audio?type=${bgmSettings.audioMode}` : undefined}
                 preload="auto"
                 playsInline
-                volume={bgmActiveDeck === 'secondary' ? Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100)) : 0}
                 onCanPlay={() => {
                   if (bgmActiveDeck === 'secondary' && !isKaraokeActive && bgmSettings.enabled && bgmSecondaryAudioRef.current?.paused && !bgmTransitionTrack) safePlayBgm(bgmSecondaryAudioRef.current);
                   if (bgmActiveDeck === 'primary' && bgmTransitionTrack) startBgmCrossfade();
