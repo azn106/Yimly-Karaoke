@@ -933,7 +933,7 @@ export class DownloadQueueManager {
             // Cancellation can arrive while the serialized Demucs/FFmpeg/indexing
             // pipeline is running. Do not overwrite the cancelled job's failed-track
             // state with completed when that in-flight pipeline eventually settles.
-            if (isCancelledJob(job)) {
+            if (this.memoryJobs.get(track.jobId)?.status === 'cancelled') {
               track.status = 'failed';
               track.progress = 0;
               track.error = 'Job cancelled by user';
