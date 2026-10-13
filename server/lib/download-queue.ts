@@ -86,6 +86,11 @@ export interface ActiveDownloadJob {
   updatedAt: Date;
 }
 
+// Keep cancellation checks visible to TypeScript after awaits, where mutable job state may change.
+function isCancelledJob(job: ActiveDownloadJob): boolean {
+  return job.status === 'cancelled';
+}
+
 export function sanitizeFilename(str: string): string {
   if (!str) return 'Unknown';
   const cleaned = str.replace(/[/\\?%*:|"<>]/g, '').trim().replace(/^\.+|\.+$/g, '');
@@ -587,7 +592,7 @@ export class DownloadQueueManager {
   }
 
   private async processTrack(job: ActiveDownloadJob, track: ActiveTrackJob) {
-    if (job.status === 'cancelled') {
+    if (isCancelledJob(job)) {
       track.status = 'failed';
       track.error = 'Job cancelled by user';
       await this.persistTrackUpdate(track);
@@ -624,7 +629,7 @@ export class DownloadQueueManager {
             } catch {}
           }
 
-          if (job.status === 'cancelled') {
+          if (isCancelledJob(job)) {
             track.status = 'failed';
             track.progress = 0;
             track.error = 'Job cancelled by user';
@@ -820,7 +825,7 @@ export class DownloadQueueManager {
 
         // Cancellation may happen while lyrics or artwork are being fetched. Do not
         // publish a file or start downstream song processing after cancellation.
-        if (job.status === 'cancelled') {
+        if (isCancelledJob(job)) {
           track.status = 'failed';
           track.progress = 0;
           track.error = 'Job cancelled by user';
