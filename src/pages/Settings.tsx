@@ -1090,6 +1090,38 @@ export default function Settings() {
                 </div>
               </div>
 
+              {/* eLRC Playback Line Lead-In */}
+              <div className="pt-4 border-t border-white/10">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 max-w-2xl">
+                  <div>
+                    <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
+                      Extra eLRC Display Lead (ms)
+                    </label>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Show each eLRC line this many milliseconds earlier during playback. This does not change word highlighting or rewrite the eLRC file.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <input
+                      type="number"
+                      min={0}
+                      max={5000}
+                      step={50}
+                      value={lyricsSettings.elrcDisplayLeadInMs ?? 0}
+                      onChange={(e) => {
+                        const value = Number.parseInt(e.target.value, 10);
+                        updateSetting((prev) => ({
+                          ...prev,
+                          elrcDisplayLeadInMs: Number.isFinite(value) ? Math.max(0, Math.min(5000, value)) : 0,
+                        }));
+                      }}
+                      className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#FF4FA3]"
+                    />
+                    <span className="text-xs text-zinc-400 font-mono font-medium">ms</span>
+                  </div>
+                </div>
+              </div>
+
               {/* ELRC Transition Mode */}
               <div className="pt-4 border-t border-white/10">
                 <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">
