@@ -211,6 +211,12 @@ export default function RoomSession() {
 
   // Background Music State & Controller (Host Only)
   const bgmAudioRef = useRef<HTMLAudioElement>(null);
+  const bgmSecondaryAudioRef = useRef<HTMLAudioElement>(null);
+  const [bgmActiveDeck, setBgmActiveDeck] = useState<'primary' | 'secondary'>('primary');
+  const [bgmTransitionTrack, setBgmTransitionTrack] = useState<{ id: number; title: string; artist: string; hasOriginal?: boolean; hasInstrumental?: boolean; variant?: string } | null>(null);
+  const bgmTransitioningRef = useRef(false);
+  const bgmTransitionNextIndexRef = useRef<number | null>(null);
+  const bgmTransitionRafRef = useRef<number | null>(null);
   const [bgmSettings, setBgmSettings] = useState<BackgroundMusicSettings>(getBackgroundMusicSettings);
   const [bgmLibrary, setBgmLibrary] = useState<Array<{ id: number; title: string; artist: string; hasOriginal?: boolean; hasInstrumental?: boolean; variant?: string }>>([]);
   const bgmShuffleQueueRef = useRef<number[]>([]);
@@ -1748,63 +1754,119 @@ export default function RoomSession() {
   useEffect(() => {
     if (!isHost) return;
 
-    const bgmAudio = bgmAudioRef.current;
-    if (!bgmAudio) return;
+    const activeAudio = bgmActiveDeck === 'primary' ? bgmAudioRef.current : bgmSecondaryAudioRef.current;
+    const inactiveAudio = bgmActiveDeck === 'primary' ? bgmSecondaryAudioRef.current : bgmAudioRef.current;
+    if (!activeAudio) return;
 
-    // Apply configured background music volume dynamically
     const targetVol = Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100));
-    bgmAudio.volume = targetVol;
+    activeAudio.volume = targetVol;
+    if (inactiveAudio && !bgmTransitioningRef.current) inactiveAudio.volume = 0;
 
-    // If karaoke is active or BGM is disabled or no library tracks:
-    // Background music MUST be paused immediately.
     if (isKaraokeActive || !bgmSettings.enabled || bgmLibrary.length === 0) {
-      if (!bgmAudio.paused) {
-        // Save exact playback position and current track identity
-        bgmSavedPosRef.current = {
-          songId: bgmCurrentSong?.id ?? null,
-          time: bgmAudio.currentTime
-        };
-        try {
-          bgmAudio.pause();
-        } catch (e) {}
+      // Karaoke takes priority. Cancel an in-flight transition and preserve the
+      // outgoing track position so BGM can resume where it was interrupted.
+      if (bgmTransitionRafRef.current !== null) cancelAnimationFrame(bgmTransitionRafRef.current);
+      bgmTransitionRafRef.current = null;
+      bgmTransitioningRef.current = false;
+      bgmTransitionNextIndexRef.current = null;
+      setBgmTransitionTrack(null);
+      for (const deck of [bgmAudioRef.current, bgmSecondaryAudioRef.current]) {
+        if (!deck) continue;
+        if (deck === activeAudio && !deck.paused) {
+          bgmSavedPosRef.current = { songId: bgmCurrentSong?.id ?? null, time: deck.currentTime };
+        }
+        try { deck.pause(); } catch {}
+        deck.volume = 0;
       }
       setBgmIsActive(false);
       return;
     }
 
-    // Karaoke is NOT active, BGM is enabled, and library has tracks.
-    // Ensure shuffle queue is populated
     if (bgmShuffleQueueRef.current.length === 0) {
       bgmShuffleQueueRef.current = generateShuffledQueue(bgmLibrary);
       bgmCurrentIndexRef.current = 0;
     }
 
-    // If no BGM track is mounted, pick the current one from the shuffle queue
     if (!bgmCurrentSong) {
       const targetId = bgmShuffleQueueRef.current[bgmCurrentIndexRef.current];
-      const found = bgmLibrary.find(t => t.id === targetId) || bgmLibrary[0];
-      setBgmCurrentSong(found);
-      return; // Will re-run once bgmCurrentSong state updates
+      setBgmCurrentSong(bgmLibrary.find(t => t.id === targetId) || bgmLibrary[0]);
+      return;
     }
 
-    // Resume or play the background track
     setBgmIsActive(true);
-    if (bgmAudio.paused) {
-      // If we have saved position for this same song, restore it
+    if (activeAudio.paused) {
       if (bgmSavedPosRef.current.songId === bgmCurrentSong.id && bgmSavedPosRef.current.time > 0) {
         try {
-          if (Math.abs(bgmAudio.currentTime - bgmSavedPosRef.current.time) > 0.5) {
-            bgmAudio.currentTime = bgmSavedPosRef.current.time;
-          }
-        } catch (e) {}
+          if (Math.abs(activeAudio.currentTime - bgmSavedPosRef.current.time) > 0.5) activeAudio.currentTime = bgmSavedPosRef.current.time;
+        } catch {}
       }
-      safePlayBgm(bgmAudio);
+      safePlayBgm(activeAudio);
     }
-  }, [isHost, isKaraokeActive, bgmSettings.enabled, bgmSettings.volume, bgmLibrary, bgmCurrentSong, safePlayBgm, generateShuffledQueue]);
+  }, [isHost, isKaraokeActive, bgmSettings.enabled, bgmSettings.volume, bgmLibrary, bgmCurrentSong, bgmActiveDeck, safePlayBgm, generateShuffledQueue]);
+
+  // Crossfade to the next shuffled track using the inactive audio deck. The
+  // current song/index only advance after the volume ramp has completed.
+  const startBgmCrossfade = useCallback(() => {
+    if (!isHost || !bgmTransitionTrack || bgmTransitioningRef.current || isKaraokeActive || !bgmSettings.enabled) return;
+    const outgoing = bgmActiveDeck === 'primary' ? bgmAudioRef.current : bgmSecondaryAudioRef.current;
+    const incoming = bgmActiveDeck === 'primary' ? bgmSecondaryAudioRef.current : bgmAudioRef.current;
+    if (!outgoing || !incoming || incoming.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return;
+
+    bgmTransitioningRef.current = true;
+    const targetVolume = Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100));
+    const durationMs = Math.max(2, Math.min(12, bgmSettings.crossfadeDuration || 5)) * 1000;
+    const startTime = performance.now();
+    incoming.volume = 0;
+    safePlayBgm(incoming);
+
+    const ramp = (now: number) => {
+      if (!bgmTransitioningRef.current || isKaraokeActive || !bgmSettings.enabled) return;
+      const progress = Math.min(1, Math.max(0, (now - startTime) / durationMs));
+      outgoing.volume = targetVolume * (1 - progress);
+      incoming.volume = targetVolume * progress;
+      if (progress < 1) {
+        bgmTransitionRafRef.current = requestAnimationFrame(ramp);
+        return;
+      }
+
+      try { outgoing.pause(); } catch {}
+      outgoing.volume = 0;
+      incoming.volume = targetVolume;
+      bgmSavedPosRef.current = { songId: bgmTransitionTrack.id, time: 0 };
+      bgmCurrentIndexRef.current = bgmTransitionNextIndexRef.current ?? bgmCurrentIndexRef.current;
+      setBgmCurrentSong(bgmTransitionTrack);
+      setBgmActiveDeck(deck => deck === 'primary' ? 'secondary' : 'primary');
+      setBgmTransitionTrack(null);
+      bgmTransitionNextIndexRef.current = null;
+      bgmTransitioningRef.current = false;
+      bgmTransitionRafRef.current = null;
+    };
+    bgmTransitionRafRef.current = requestAnimationFrame(ramp);
+  }, [isHost, bgmTransitionTrack, bgmActiveDeck, isKaraokeActive, bgmSettings.enabled, bgmSettings.volume, bgmSettings.crossfadeDuration, safePlayBgm]);
+
+  const handleBgmTimeUpdate = useCallback(() => {
+    if (!isHost || !bgmSettings.enabled || isKaraokeActive || !bgmSettings.crossfadeEnabled || bgmLibrary.length < 2 || bgmTransitioningRef.current || bgmTransitionTrack) return;
+    const active = bgmActiveDeck === 'primary' ? bgmAudioRef.current : bgmSecondaryAudioRef.current;
+    if (!active || !Number.isFinite(active.duration) || active.duration <= 0) return;
+    const fadeSeconds = Math.max(2, Math.min(12, bgmSettings.crossfadeDuration || 5));
+    if (active.duration - active.currentTime > fadeSeconds) return;
+
+    let nextIndex = bgmCurrentIndexRef.current + 1;
+    let nextQueue = bgmShuffleQueueRef.current;
+    if (nextIndex >= nextQueue.length) {
+      nextQueue = generateShuffledQueue(bgmLibrary, bgmCurrentSong?.id ?? null);
+      bgmShuffleQueueRef.current = nextQueue;
+      nextIndex = 0;
+    }
+    const nextTrack = bgmLibrary.find(track => track.id === nextQueue[nextIndex]);
+    if (!nextTrack || nextTrack.id === bgmCurrentSong?.id) return;
+    bgmTransitionNextIndexRef.current = nextIndex;
+    setBgmTransitionTrack(nextTrack);
+  }, [isHost, bgmSettings.enabled, bgmSettings.crossfadeEnabled, bgmSettings.crossfadeDuration, isKaraokeActive, bgmLibrary, bgmTransitionTrack, bgmActiveDeck, bgmCurrentSong?.id, generateShuffledQueue]);
 
   // Handler when a background music track finishes naturally: advance continuous shuffle
   const handleBgmEnded = useCallback(() => {
-    if (!isHost || bgmLibrary.length === 0) return;
+    if (!isHost || bgmLibrary.length === 0 || bgmTransitioningRef.current) return;
 
     let nextIdx = bgmCurrentIndexRef.current + 1;
     if (nextIdx >= bgmShuffleQueueRef.current.length) {
@@ -1830,12 +1892,9 @@ export default function RoomSession() {
   }, [isHost, bgmLibrary.length, handleBgmEnded]);
 
   const handleEnableAudio = () => {
-    if (audioRef.current) {
-      safePlay(audioRef.current);
-    }
-    if (bgmAudioRef.current && isHost && !isKaraokeActive && bgmSettings.enabled) {
-      safePlayBgm(bgmAudioRef.current);
-    }
+    if (audioRef.current) safePlay(audioRef.current);
+    const activeBgm = bgmActiveDeck === 'primary' ? bgmAudioRef.current : bgmSecondaryAudioRef.current;
+    if (activeBgm && isHost && !isKaraokeActive && bgmSettings.enabled) safePlayBgm(activeBgm);
   };
 
   // High-frequency smooth animation loop for lyric sweep and position
@@ -2687,23 +2746,40 @@ export default function RoomSession() {
             />
           )}
 
-          {/* Background Music Audio Player for Host (Empty Queue) */}
+          {/* Dual background-music decks allow a real overlap during crossfade. */}
           {isHost && (
-            <audio
-              ref={bgmAudioRef}
-              src={bgmCurrentSong ? `/api/songs/${bgmCurrentSong.id}/audio?type=${bgmSettings.audioMode}` : undefined}
-              preload="auto"
-              playsInline
-              onCanPlay={() => {
-                const bgmAudio = bgmAudioRef.current;
-                if (bgmAudio && !isKaraokeActive && bgmSettings.enabled && bgmAudio.paused) {
-                  safePlayBgm(bgmAudio);
-                }
-              }}
-              onEnded={handleBgmEnded}
-              onError={handleBgmError}
-              className="hidden"
-            />
+            <>
+              <audio
+                ref={bgmAudioRef}
+                src={(bgmActiveDeck === 'primary' ? bgmCurrentSong : bgmTransitionTrack) ? `/api/songs/${(bgmActiveDeck === 'primary' ? bgmCurrentSong : bgmTransitionTrack)!.id}/audio?type=${bgmSettings.audioMode}` : undefined}
+                preload="auto"
+                playsInline
+                volume={bgmActiveDeck === 'primary' ? Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100)) : 0}
+                onCanPlay={() => {
+                  if (bgmActiveDeck === 'primary' && !isKaraokeActive && bgmSettings.enabled && bgmAudioRef.current?.paused && !bgmTransitionTrack) safePlayBgm(bgmAudioRef.current);
+                  if (bgmActiveDeck === 'secondary' && bgmTransitionTrack) startBgmCrossfade();
+                }}
+                onTimeUpdate={bgmActiveDeck === 'primary' ? handleBgmTimeUpdate : undefined}
+                onEnded={handleBgmEnded}
+                onError={handleBgmError}
+                className="hidden"
+              />
+              <audio
+                ref={bgmSecondaryAudioRef}
+                src={(bgmActiveDeck === 'secondary' ? bgmCurrentSong : bgmTransitionTrack) ? `/api/songs/${(bgmActiveDeck === 'secondary' ? bgmCurrentSong : bgmTransitionTrack)!.id}/audio?type=${bgmSettings.audioMode}` : undefined}
+                preload="auto"
+                playsInline
+                volume={bgmActiveDeck === 'secondary' ? Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100)) : 0}
+                onCanPlay={() => {
+                  if (bgmActiveDeck === 'secondary' && !isKaraokeActive && bgmSettings.enabled && bgmSecondaryAudioRef.current?.paused && !bgmTransitionTrack) safePlayBgm(bgmSecondaryAudioRef.current);
+                  if (bgmActiveDeck === 'primary' && bgmTransitionTrack) startBgmCrossfade();
+                }}
+                onTimeUpdate={bgmActiveDeck === 'secondary' ? handleBgmTimeUpdate : undefined}
+                onEnded={handleBgmEnded}
+                onError={handleBgmError}
+                className="hidden"
+              />
+            </>
           )}
         </main>
 
