@@ -188,6 +188,8 @@ export function updateRoomHostId(sessionId: string, newHostId: number) {
   const room = activeRooms.get(sessionId);
   if (room) {
     room.hostId = newHostId;
+    // Reassignment resets the grace period; do not inherit the former host's stale heartbeat.
+    room.lastHostHeartbeat = Date.now();
   }
 }
 
