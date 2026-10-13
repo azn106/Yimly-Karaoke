@@ -30,7 +30,8 @@ export const isPublicRoute = (req: Request): boolean => {
 
   // Public Karaoke session joining and guest queue submission.
   // The queue route validates controllerId against the active session before accepting a request.
-  if (method === 'POST' && (url === '/api/karaoke/sessions/join' || /^\/api\/karaoke\/sessions\/[^\/]+\/queue$/.test(url))) {
+  if ((method === 'POST' && (url === '/api/karaoke/sessions/join' || /^\/api\/karaoke\/sessions\/[^\/]+\/queue$/.test(url))) ||
+      (method === 'DELETE' && /^\/api\/karaoke\/sessions\/[^\/]+\/queue\/\d+$/.test(url))) {
     return true;
   }
 
