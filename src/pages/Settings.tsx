@@ -1774,21 +1774,6 @@ export default function Settings() {
                 </button>
               </div>
 
-              <select
-                id="default-audio-mode-select"
-                aria-label="Default Audio Mode"
-                value={karaokeDefaults.audioMode}
-                onChange={(e) => {
-                  const val = e.target.value as AudioMode;
-                  const updated = { ...karaokeDefaults, audioMode: val };
-                  setKaraokeDefaults(updated);
-                  saveKaraokeDefaults(updated);
-                }}
-                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3] cursor-pointer"
-              >
-                <option value="instrumental">Instrumental</option>
-                <option value="original">Original</option>
-              </select>
             </div>
 
             {/* Default Lyrics Mode */}
@@ -1847,21 +1832,6 @@ export default function Settings() {
                 </button>
               </div>
 
-              <select
-                id="default-lyrics-mode-select"
-                aria-label="Default Lyrics Mode"
-                value={karaokeDefaults.lyricsMode}
-                onChange={(e) => {
-                  const val = e.target.value as LyricsMode;
-                  const updated = { ...karaokeDefaults, lyricsMode: val };
-                  setKaraokeDefaults(updated);
-                  saveKaraokeDefaults(updated);
-                }}
-                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3] cursor-pointer"
-              >
-                <option value="elrc">eLRC</option>
-                <option value="lrc">LRC</option>
-              </select>
             </div>
           </div>
 
