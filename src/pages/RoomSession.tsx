@@ -88,6 +88,8 @@ export default function RoomSession() {
   const [queue, setQueue] = useState<any[]>([]);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [playing, setPlaying] = useState(false);
+  // True only after the host's HTMLAudioElement confirms actual playback.
+  const [karaokeAudioActuallyPlaying, setKaraokeAudioActuallyPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -1706,8 +1708,15 @@ export default function RoomSession() {
     };
   }, [isHost, bgmSettings.playlistId, bgmSettings.audioMode, generateShuffledQueue]);
 
-  // Determine if Room is in a genuine idle, empty-queue state
-  const isKaraokeActive = playing || (currentSong && currentSong.status === 'playing');
+  // Coordinate BGM against real audio playback, not the optimistic WebSocket play state.
+  // Keep the flag during a track transition while the room remains logically playing.
+  const isKaraokeActive = karaokeAudioActuallyPlaying;
+
+  useEffect(() => {
+    if (!isHost || !playing || !currentSong) {
+      setKaraokeAudioActuallyPlaying(false);
+    }
+  }, [isHost, playing, currentSong?.songId]);
 
   // Background Music Playback Coordinator Effect
   useEffect(() => {
@@ -2605,6 +2614,12 @@ export default function RoomSession() {
               src={currentSong && currentSong.songId ? `/api/songs/${currentSong.songId}/audio?type=${variant}` : undefined}
               preload="auto"
               playsInline
+              onPlay={() => setKaraokeAudioActuallyPlaying(true)}
+              onPlaying={() => setKaraokeAudioActuallyPlaying(true)}
+              onPause={() => {
+                // A pause between consecutive tracks should not briefly restart BGM.
+                if (!playing || !currentSong) setKaraokeAudioActuallyPlaying(false);
+              }}
               onTimeUpdate={() => {
                 if (audioRef.current) {
                   setCurrentTime(audioRef.current.currentTime);
@@ -2635,6 +2650,7 @@ export default function RoomSession() {
                   setVariant('original');
                   return;
                 }
+                setKaraokeAudioActuallyPlaying(false);
                 setPlaying(false);
                 setAudioAutoplayBlocked(false);
                 setAudioError('Audio track could not be loaded or is unavailable on disk. Tap Skip to continue.');
