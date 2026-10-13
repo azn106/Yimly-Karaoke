@@ -57,10 +57,6 @@ if not errorlevel 1 (
     echo [ERROR] JWT_SECRET uses the former insecure Docker default.
     goto FAILED
 )
-if not errorlevel 1 (
-    echo [ERROR] JWT_SECRET is still the example placeholder in .env.
-    goto FAILED
-)
 findstr /r /b /c:"JWT_SECRET=." ".env" >nul
 if errorlevel 1 (
     echo [ERROR] JWT_SECRET is missing or empty in .env.
