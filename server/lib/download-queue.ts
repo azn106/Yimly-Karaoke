@@ -930,6 +930,29 @@ export class DownloadQueueManager {
               duration: track.duration || undefined,
             });
 
+            // Cancellation can arrive while the serialized Demucs/FFmpeg/indexing
+            // pipeline is running. Do not overwrite the cancelled job's failed-track
+            // state with completed when that in-flight pipeline eventually settles.
+            if (isCancelledJob(job)) {
+              track.status = 'failed';
+              track.progress = 0;
+              track.error = 'Job cancelled by user';
+              await db.update(downloadTrackJobs).set({
+                status: 'failed',
+                progress: 0,
+                error: 'Job cancelled by user',
+                updatedAt: new Date(),
+              }).where(eq(downloadTrackJobs.id, track.id));
+              await db.update(queueItems).set({ downloadStatus: 'failed' })
+                .where(eq(queueItems.downloadTrackId, track.id));
+              const cancelledQueues = await db.select().from(queueItems)
+                .where(eq(queueItems.downloadTrackId, track.id));
+              const sessionIds = Array.from(new Set(cancelledQueues.map(q => q.sessionId)));
+              const { notifyQueueUpdate } = await import('../ws/index.js');
+              for (const sessionId of sessionIds) notifyQueueUpdate(sessionId);
+              return;
+            }
+
             await db.update(downloadTrackJobs).set({
               status: 'completed',
               progress: 100,
