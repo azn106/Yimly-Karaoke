@@ -533,9 +533,11 @@ export class DownloadQueueManager {
 
         this.activeWorkers++;
         // Start processing this track asynchronously
-        this.processTrack(nextJob, nextTrack).finally(() => {
+        this.processTrack(nextJob, nextTrack).finally(async () => {
           this.activeWorkers--;
-          this.checkJobCompletion(nextJob!);
+          // Job-level finalization, including the library scan, must finish before
+          // another global pipeline is allowed to start.
+          await this.checkJobCompletion(nextJob!);
           this.pumpQueue();
         });
       }
@@ -567,9 +569,7 @@ export class DownloadQueueManager {
           const allLibs = await db.select().from(libraries);
           const matchedLib = allLibs.find(l => l.path === job.libraryPath) || allLibs[0];
           if (matchedLib) {
-            scanLibrary(matchedLib.id, job.libraryPath).catch(err => {
-              console.error('[Downloader] Auto-scan error:', err);
-            });
+            await scanLibrary(matchedLib.id, job.libraryPath);
           }
         } catch (scanErr) {
           console.error('[Downloader] Auto-scan trigger failed:', scanErr);
@@ -887,8 +887,25 @@ export class DownloadQueueManager {
               duration: track.duration || undefined,
             });
           }
-        } catch (err) {
-          console.error('[Downloader] Failed to initiate song processing:', err);
+        } catch (err: any) {
+          console.error('[Downloader] Song processing failed:', err);
+          track.status = 'failed';
+          track.progress = 0;
+          track.error = sanitizeErrorMessage(`Audio processing failed: ${err?.message || err}`);
+          track.updatedAt = new Date();
+          await db.update(downloadTrackJobs).set({
+            status: 'failed',
+            progress: 0,
+            error: track.error,
+            updatedAt: track.updatedAt,
+          }).where(eq(downloadTrackJobs.id, track.id));
+          await db.update(queueItems).set({ downloadStatus: 'failed' })
+            .where(eq(queueItems.downloadTrackId, track.id));
+          const failedQueues = await db.select().from(queueItems)
+            .where(eq(queueItems.downloadTrackId, track.id));
+          const sessionIds = Array.from(new Set(failedQueues.map(q => q.sessionId)));
+          const { notifyQueueUpdate } = await import('../ws/index.js');
+          for (const sessionId of sessionIds) notifyQueueUpdate(sessionId);
         }
       } else if (track.status === 'failed') {
         try {
