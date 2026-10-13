@@ -87,6 +87,15 @@ if not exist ".env" (
 )
 :: Refuse to deploy with the public example JWT secret or a missing/empty secret.
 findstr /x /c:"JWT_SECRET=change_this_to_a_long_random_secret_in_production" ".env" >nul
+if not errorlevel 1 (
+    echo [ERROR] JWT_SECRET is still the example placeholder in .env.
+    goto FAILED
+)
+findstr /x /c:"JWT_SECRET=yimly_production_secure_secret_change_me" ".env" >nul
+if not errorlevel 1 (
+    echo [ERROR] JWT_SECRET uses the former insecure Docker default.
+    goto FAILED
+)
 if %ERRORLEVEL%==0 (
     echo [ERROR] JWT_SECRET is still the example placeholder in .env.
     echo Set a unique random secret before deploying. Suggested: openssl rand -base64 32
