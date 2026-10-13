@@ -20,6 +20,7 @@ export interface LyricsAppearanceSettings {
   visibleLines: number; // 1 | 3 | 5
   highlightCurrentLine: boolean; // on / off
   animationDuration: number; // in seconds, e.g. 0.25
+  elrcDisplayLeadInMs?: number; // Optional line-display lead-in for eLRC lyrics, in milliseconds.
   elrcTransition?: ElrcTransition;
   elrcHighlightMode?: ElrcTransition | 'progressive_sweeping'; // 'smooth_sweep' | 'karaoke' | 'current_only' | 'instant'
   wordHighlightAnimation?: 'smooth' | 'instant' | 'fade' | 'off'; // 'smooth' | 'instant' | 'fade' | 'off'
