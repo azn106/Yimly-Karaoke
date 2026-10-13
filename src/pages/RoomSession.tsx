@@ -1129,21 +1129,47 @@ export default function RoomSession() {
     try {
       const trackId = `dl_${track.title}_${track.artist}`;
       setAddingSongId(trackId as any);
+
+      // Send the signed-in user's token when available. Guest requests still use
+      // their room-scoped controllerId, while authenticated hosts must not be
+      // accidentally treated as unauthenticated guests.
+      const token = getAuthToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
       const res = await fetch(`/api/karaoke/sessions/${sessionId}/queue`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        credentials: 'same-origin',
+        headers,
+        body: JSON.stringify({
           track,
           controllerId: controllerId || undefined
         })
       });
+
+      let responseData: any = {};
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        try {
+          responseData = await res.json();
+        } catch {
+          // Keep the HTTP status as a useful fallback below.
+        }
+      }
 
       if (res.ok) {
         setAddedSongId(trackId as any);
         setTimeout(() => setAddedSongId(null), 2000);
         fetchState();
       } else {
-        alert('Failed to add song to queue');
+        const message = responseData.error || `Request failed (HTTP ${res.status})`;
+        console.error('[QUEUE] Failed to add track:', {
+          status: res.status,
+          message,
+          sessionId,
+          authenticatedTokenPresent: Boolean(token),
+          controllerIdPresent: Boolean(controllerId)
+        });
+        alert(`Failed to add song to queue: ${message}`);
       }
     } catch (e) {
       console.error(e);
