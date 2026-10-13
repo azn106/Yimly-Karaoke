@@ -3758,6 +3758,30 @@ test('session expiry host detection follows reassigned host, not stale host sock
   assert.equal(hasActiveHostConnection(room, userBId), false, 'A closed new-host socket must not count as active');
 });
 
+test('host reassignment resets the previous host heartbeat grace period', async () => {
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ roomName: 'Host heartbeat reassignment regression' })
+  });
+  assert.equal(createRes.status, 200);
+  const roomData = await createRes.json();
+
+  const { getOrCreateRoom, updateRoomHostId } = await import('../ws/index.js');
+  const room = await getOrCreateRoom(roomData.id);
+  room.lastHostHeartbeat = Date.now() - 120_000;
+  const before = room.lastHostHeartbeat;
+
+  updateRoomHostId(roomData.id, userBId);
+  assert.equal(room.hostId, userBId);
+  assert.ok(room.lastHostHeartbeat > before, 'Reassignment should start a fresh host grace period');
+
+  await fetch(`${baseUrl}/api/karaoke/sessions/${roomData.id}/end`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenA}` }
+  });
+});
+
 test('expired session cleanup closes the room and clears queue/controller state', async () => {
   const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
     method: 'POST',
