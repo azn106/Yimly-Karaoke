@@ -1814,7 +1814,12 @@ export default function RoomSession() {
 
     bgmTransitioningRef.current = true;
     const targetVolume = Math.max(0, Math.min(1, (bgmSettings.volume ?? 25) / 100));
-    const durationMs = Math.max(2, Math.min(12, bgmSettings.crossfadeDuration || 5)) * 1000;
+    const configuredFadeSeconds = Math.max(2, Math.min(12, bgmSettings.crossfadeDuration || 5));
+    const remainingSeconds = Number.isFinite(outgoing.duration) && outgoing.duration > 0
+      ? Math.max(0.25, outgoing.duration - outgoing.currentTime)
+      : configuredFadeSeconds;
+    // If buffering delayed the transition, finish before the outgoing track ends.
+    const durationMs = Math.min(configuredFadeSeconds, remainingSeconds) * 1000;
     const startTime = performance.now();
     incoming.volume = 0;
     safePlayBgm(incoming);
