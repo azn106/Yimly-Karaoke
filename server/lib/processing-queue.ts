@@ -1,6 +1,10 @@
 import { ProcessSongRequest, processDownloadedSong } from './song-processor.js';
 
 export class ProcessingQueueManager {
+  constructor(
+    private readonly processSong: (request: ProcessSongRequest) => Promise<void> = processDownloadedSong
+  ) {}
+
   private queue: ProcessSongRequest[] = [];
   private isProcessing: boolean = false;
 
@@ -23,7 +27,7 @@ export class ProcessingQueueManager {
 
     try {
       console.log(`[ProcessingQueue] Starting processing for "${request.title}"`);
-      await processDownloadedSong(request);
+      await this.processSong(request);
       console.log(`[ProcessingQueue] Finished processing for "${request.title}"`);
       promise?.resolve();
     } catch (err) {
