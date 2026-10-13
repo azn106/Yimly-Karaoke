@@ -63,10 +63,6 @@ export const isPublicRoute = (req: Request): boolean => {
     return true;
   }
 
-  if ((method === 'PUT' || method === 'POST' || method === 'PATCH') && /^\/api\/songs\/\d+\/lyrics\/offset$/.test(url)) {
-    return true;
-  }
-
   if (method === 'GET' && /^\/api\/(artists|albums)\/\d+\/artwork$/.test(url)) {
     return true;
   }
