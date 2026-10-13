@@ -1820,17 +1820,15 @@ export default function RoomSession() {
       : configuredFadeSeconds;
     // If buffering delayed the transition, finish before the outgoing track ends.
     const durationMs = Math.min(configuredFadeSeconds, remainingSeconds) * 1000;
-    const startTime = performance.now();
     incoming.volume = 0;
-    safePlayBgm(incoming);
 
-    const ramp = (now: number) => {
+    const ramp = (now: number, startTime: number) => {
       if (!bgmTransitioningRef.current || isKaraokeActive || !bgmSettings.enabled) return;
       const progress = Math.min(1, Math.max(0, (now - startTime) / durationMs));
       outgoing.volume = targetVolume * (1 - progress);
       incoming.volume = targetVolume * progress;
       if (progress < 1) {
-        bgmTransitionRafRef.current = requestAnimationFrame(ramp);
+        bgmTransitionRafRef.current = requestAnimationFrame(nextNow => ramp(nextNow, startTime));
         return;
       }
 
@@ -1846,7 +1844,38 @@ export default function RoomSession() {
       bgmTransitioningRef.current = false;
       bgmTransitionRafRef.current = null;
     };
-    bgmTransitionRafRef.current = requestAnimationFrame(ramp);
+
+    // Do not fade out the current song unless the incoming deck actually starts.
+    // Autoplay rejection must leave the outgoing track audible.
+    try {
+      const playResult = incoming.play();
+      if (playResult && typeof playResult.then === 'function') {
+        playResult.then(() => {
+          if (!bgmTransitioningRef.current || isKaraokeActive || !bgmSettings.enabled) return;
+          const startTime = performance.now();
+          bgmTransitionRafRef.current = requestAnimationFrame(now => ramp(now, startTime));
+        }).catch(error => {
+          console.warn('[BGM] Incoming track could not start; keeping current track audible:', error);
+          bgmTransitioningRef.current = false;
+          bgmTransitionNextIndexRef.current = null;
+          incoming.volume = 0;
+          try { incoming.pause(); } catch {}
+          outgoing.volume = targetVolume;
+          setBgmTransitionTrack(null);
+        });
+      } else {
+        const startTime = performance.now();
+        bgmTransitionRafRef.current = requestAnimationFrame(now => ramp(now, startTime));
+      }
+    } catch (error) {
+      console.warn('[BGM] Incoming track could not start; keeping current track audible:', error);
+      bgmTransitioningRef.current = false;
+      bgmTransitionNextIndexRef.current = null;
+      incoming.volume = 0;
+      try { incoming.pause(); } catch {}
+      outgoing.volume = targetVolume;
+      setBgmTransitionTrack(null);
+    }
   }, [isHost, bgmTransitionTrack, bgmActiveDeck, isKaraokeActive, bgmSettings.enabled, bgmSettings.volume, bgmSettings.crossfadeDuration, safePlayBgm]);
 
   const handleBgmTransitionError = useCallback(() => {
