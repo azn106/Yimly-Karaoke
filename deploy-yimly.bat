@@ -85,6 +85,22 @@ if not exist ".env" (
 ) else (
     echo Existing .env found.
 )
+:: Refuse to deploy with the public example JWT secret or a missing/empty secret.
+findstr /x /c:"JWT_SECRET=change_this_to_a_long_random_secret_in_production" ".env" >nul
+if %ERRORLEVEL%==0 (
+    echo [ERROR] JWT_SECRET is still the example placeholder in .env.
+    echo Set a unique random secret before deploying. Suggested: openssl rand -base64 32
+    pause
+    exit /b 1
+)
+findstr /r /b /c:"JWT_SECRET=." ".env" >nul
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] JWT_SECRET is missing or empty in .env.
+    echo Set a unique random secret before deploying.
+    pause
+    exit /b 1
+)
+echo JWT_SECRET presence verified.
 echo.
 
 :: Step 6: Build and start Yimly container
