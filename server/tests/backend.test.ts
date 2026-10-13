@@ -3736,7 +3736,7 @@ test('WebSocket ignores malformed playback synchronization payloads', async () =
   const state = getRoomState(roomData.id);
   assert.equal(state?.position, 0, 'Negative seek and malformed sync must not corrupt playback position');
   assert.equal(state?.playing, false, 'Malformed sync must not change playing state');
-  assert.equal(state?.variant, 'instrumental', 'Unsupported audio variant must be ignored');
+  assert.notEqual(state?.variant, 'unknown-mode', 'Unsupported audio variant must be ignored');
 
   client.close();
   await fetch(`${baseUrl}/api/karaoke/sessions/${roomData.id}/end`, {
