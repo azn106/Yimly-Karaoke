@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 import fsSync from 'fs';
 import path from 'path';
 import { db, setupDatabase } from '../db/index.js';
-import { users, libraries, artists, albums, songs, favorites, playlists, playlistSongs, lyrics, queueItems, settings, controllers, queueItems, sessions } from '../db/schema.js';
+import { users, libraries, artists, albums, songs, favorites, playlists, playlistSongs, lyrics, settings, controllers, queueItems, sessions } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 import playlistsRoutes from '../routes/playlists.js';
