@@ -25,9 +25,13 @@ foreach ($item in @(
   $source = $config[$item.Key]
   if ([string]::IsNullOrWhiteSpace($source)) { $source = $item.Default }
   if (-not [System.IO.Path]::IsPathRooted($source)) { $source = Join-Path $root $source }
-  if (Test-Path -LiteralPath $source) {
-    Copy-Item -LiteralPath $source -Destination (Join-Path $stage $item.Name) -Recurse -Force
+  if (Test-Path -LiteralPath $source -PathType Container) {
+    $destination = Join-Path $stage $item.Name
+    New-Item -ItemType Directory -Force -Path $destination | Out-Null
+    Get-ChildItem -Force -LiteralPath $source | Copy-Item -Destination $destination -Recurse -Force
     $copied++
+  } elseif (Test-Path -LiteralPath $source) {
+    throw "Configured path is not a directory: $source"
   }
 }
 
