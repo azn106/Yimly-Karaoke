@@ -3703,6 +3703,48 @@ test('WebSocket cannot grant host privileges from isHost query parameter alone',
   });
 });
 
+test('WebSocket ignores malformed playback synchronization payloads', async () => {
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ roomName: 'WebSocket payload validation regression' })
+  });
+  assert.equal(createRes.status, 200);
+  const roomData = await createRes.json();
+
+  const { WebSocket } = await import('ws');
+  const { getRoomState } = await import('../ws/index.js');
+  const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/karaoke?sessionId=${roomData.id}&isHost=true&token=${tokenA}`;
+  const client = new WebSocket(wsUrl);
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('WebSocket connection timed out')), 3000);
+    client.once('open', () => {
+      clearTimeout(timeout);
+      client.send(JSON.stringify({ type: 'SEEK', payload: { position: -10 } }));
+      client.send(JSON.stringify({ type: 'SYNC', payload: { position: 20, playing: 'yes' } }));
+      client.send(JSON.stringify({ type: 'VARIANT_CHANGED', payload: { variant: 'unknown-mode' } }));
+      resolve();
+    });
+    client.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const state = getRoomState(roomData.id);
+  assert.equal(state?.position, 0, 'Negative seek and malformed sync must not corrupt playback position');
+  assert.equal(state?.playing, false, 'Malformed sync must not change playing state');
+  assert.equal(state?.variant, 'instrumental', 'Unsupported audio variant must be ignored');
+
+  client.close();
+  await fetch(`${baseUrl}/api/karaoke/sessions/${roomData.id}/end`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenA}` }
+  });
+});
+
 test('Close server', async () => {
   const { libraryWatcher } = await import('../lib/watcher.js');
   libraryWatcher.stopAll();
