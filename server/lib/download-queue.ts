@@ -259,6 +259,9 @@ export class DownloadQueueManager {
       console.log(`[Downloader Queue] Initialized with concurrency ${this.maxConcurrency}. Recovered ${pendingJobs.length} active jobs.`);
       this.pumpQueue();
     } catch (err) {
+      // Allow a later addJob/init call to retry recovery after a transient DB
+      // failure instead of leaving the manager permanently marked initialized.
+      this.initialized = false;
       console.error('[Downloader Queue] Initialization error:', err);
     }
   }
