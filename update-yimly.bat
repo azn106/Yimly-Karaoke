@@ -43,6 +43,21 @@ if errorlevel 1 (
     goto FAILED
 )
 
+if not exist ".env" (
+    echo [ERROR] .env is missing. Configure JWT_SECRET before updating.
+    goto FAILED
+)
+findstr /x /c:"JWT_SECRET=change_this_to_a_long_random_secret_in_production" ".env" >nul
+if not errorlevel 1 (
+    echo [ERROR] JWT_SECRET is still the example placeholder in .env.
+    goto FAILED
+)
+findstr /r /b /c:"JWT_SECRET=." ".env" >nul
+if errorlevel 1 (
+    echo [ERROR] JWT_SECRET is missing or empty in .env.
+    goto FAILED
+)
+
 echo [3/6] Checking Git branch...
 
 for /f "delims=" %%B in ('git branch --show-current') do set "CURRENT_BRANCH=%%B"
