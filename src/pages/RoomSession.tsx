@@ -1868,6 +1868,20 @@ export default function RoomSession() {
   const handleBgmEnded = useCallback(() => {
     if (!isHost || bgmLibrary.length === 0 || bgmTransitioningRef.current) return;
 
+    // If the outgoing track ends before the incoming deck becomes ready, promote
+    // the queued track without a fade rather than getting stuck on an ended source.
+    if (bgmTransitionTrack && bgmTransitionNextIndexRef.current !== null) {
+      const oldDeck = bgmActiveDeck === 'primary' ? bgmAudioRef.current : bgmSecondaryAudioRef.current;
+      if (oldDeck) { try { oldDeck.pause(); } catch {} }
+      bgmCurrentIndexRef.current = bgmTransitionNextIndexRef.current;
+      bgmTransitionNextIndexRef.current = null;
+      bgmSavedPosRef.current = { songId: bgmTransitionTrack.id, time: 0 };
+      setBgmCurrentSong(bgmTransitionTrack);
+      setBgmActiveDeck(deck => deck === 'primary' ? 'secondary' : 'primary');
+      setBgmTransitionTrack(null);
+      return;
+    }
+
     let nextIdx = bgmCurrentIndexRef.current + 1;
     if (nextIdx >= bgmShuffleQueueRef.current.length) {
       // Re-shuffle avoiding repeating the last track
@@ -1882,7 +1896,7 @@ export default function RoomSession() {
     // Reset saved position for new track
     bgmSavedPosRef.current = { songId: nextTrack.id, time: 0 };
     setBgmCurrentSong(nextTrack);
-  }, [isHost, bgmLibrary, bgmCurrentSong?.id, generateShuffledQueue]);
+  }, [isHost, bgmLibrary, bgmCurrentSong?.id, bgmTransitionTrack, bgmActiveDeck, generateShuffledQueue]);
 
   // Handler for BGM audio errors (e.g. file missing on disk)
   const handleBgmError = useCallback(() => {
