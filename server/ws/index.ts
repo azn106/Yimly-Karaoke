@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { db } from '../db/index.js';
 import { sessions, queueItems, songs, artists, settings, users, controllers } from '../db/schema.js';
 import { eq, asc, and } from 'drizzle-orm';
+import { withSessionLock } from '../lib/session-lock.js';
 import { LyricsAppearanceSettings, DEFAULT_LYRICS_SETTINGS, resolveLyricsSettings } from '../lib/lyrics-settings.js';
 import jwt from 'jsonwebtoken';
 
