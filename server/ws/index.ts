@@ -666,13 +666,7 @@ export function setupWebSockets(wss: WebSocketServer) {
         // If host is not currently connected AND no valid host heartbeat received for > 90 seconds
         if (!hasActiveHost && timeSinceHeartbeat > EXPIRY_THRESHOLD_MS) {
           console.log(`[SESSION EXPIRED] Session ${sess.id} (code ${sess.roomCode}) timed out after ${Math.round(timeSinceHeartbeat / 1000)}s without host heartbeat.`);
-          // Expiry must leave the same durable state as an explicit session end.
-          await db.update(sessions).set({ status: 'closed' }).where(eq(sessions.id, sess.id));
-          await db.delete(queueItems).where(eq(queueItems.sessionId, sess.id));
-          await db.update(controllers)
-            .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
-            .where(eq(controllers.sessionId, sess.id));
-          closeSessionWS(sess.id);
+          await cleanupExpiredSession(sess.id);
         }
       }
     } catch (err) {
@@ -694,6 +688,16 @@ export async function handleHostHeartbeat(sessionId: string) {
   } catch (e) {
     console.error('[HEARTBEAT] Error updating session timestamp:', e);
   }
+}
+
+export async function cleanupExpiredSession(sessionId: string): Promise<void> {
+  // Expiry must leave the same durable state as an explicit session end.
+  await db.update(sessions).set({ status: 'closed' }).where(eq(sessions.id, sessionId));
+  await db.delete(queueItems).where(eq(queueItems.sessionId, sessionId));
+  await db.update(controllers)
+    .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
+    .where(eq(controllers.sessionId, sessionId));
+  closeSessionWS(sessionId);
 }
 
 export function closeSessionWS(sessionId: string) {
