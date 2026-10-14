@@ -19,13 +19,12 @@ const execFilePromise = promisify(execFile);
 
 const router = Router();
 router.use(requireAuth);
-router.use(requireAdmin);
 
 // -------------------------------------------------------------------
 // SETTINGS ENDPOINTS
 // -------------------------------------------------------------------
 
-router.get('/settings', async (req, res) => {
+router.get('/settings', requireAdmin, async (req, res) => {
   try {
     const allSettings = await db.select().from(settings);
     const settingsMap = new Map(allSettings.map((s) => [s.key, s.value]));
@@ -76,7 +75,7 @@ router.get('/settings', async (req, res) => {
   }
 });
 
-router.post('/settings', async (req, res) => {
+router.post('/settings', requireAdmin, async (req, res) => {
   try {
     const {
       libraryId,
@@ -274,6 +273,8 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   }
 
   // 3. Multi-Query Text Search with intelligent expansion & provider fallbacks
+  console.log(`[Search Flow] Incoming query: "${trimmed}"`);
+
   const searchQueries: string[] = [trimmed];
 
   const unquoted = trimmed.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
@@ -282,15 +283,16 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   }
 
   const queryIntent = detectTrackIntent(unquoted || trimmed, '');
+  console.log(`[Search Flow] Parsed Intent: coreTitle="${queryIntent.coreTitle}", mainArtist="${queryIntent.mainArtist}", featured=${JSON.stringify(queryIntent.featuredArtists)}`);
 
-  // Try title + main artist: "Superhuman Chris Brown", "Chris Brown Superhuman"
+  // Try title + main artist variations: "Superhuman Chris Brown", "Chris Brown Superhuman"
   if (queryIntent.coreTitle && queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') {
-    searchQueries.push(`${queryIntent.coreTitle} ${queryIntent.mainArtist}`);
     searchQueries.push(`${queryIntent.mainArtist} ${queryIntent.coreTitle}`);
+    searchQueries.push(`${queryIntent.coreTitle} ${queryIntent.mainArtist}`);
     if (queryIntent.featuredArtists.length > 0) {
-      searchQueries.push(`${queryIntent.coreTitle} ${queryIntent.mainArtist} ${queryIntent.featuredArtists[0]}`);
-      searchQueries.push(`${queryIntent.mainArtist} ${queryIntent.coreTitle} ${queryIntent.featuredArtists[0]}`);
+      searchQueries.push(`${queryIntent.mainArtist} ${queryIntent.featuredArtists[0]} ${queryIntent.coreTitle}`);
       searchQueries.push(`${queryIntent.coreTitle} ${queryIntent.featuredArtists[0]}`);
+      searchQueries.push(`${queryIntent.mainArtist} ${queryIntent.coreTitle} ${queryIntent.featuredArtists[0]}`);
     }
   }
 
@@ -312,8 +314,12 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   }
 
   const uniqueQueries = Array.from(new Set(searchQueries.map(q => q.trim()).filter(Boolean)));
+  console.log(`[Search Flow] Provider queries to execute:`, uniqueQueries);
+
   const seenTrackKeys = new Set<string>();
   const collectedTracks: any[] = [];
+  const cleanCore = cleanString(queryIntent.coreTitle || trimmed);
+  const cleanArtist = (queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') ? cleanString(queryIntent.mainArtist) : '';
 
   // Stage A: Apple iTunes Search with query expansion & strict artist/version relevance validation
   for (const q of uniqueQueries) {
@@ -323,9 +329,6 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
       if (itunesRes.ok) {
         const itunesData = await itunesRes.json();
         if (Array.isArray(itunesData.results) && itunesData.results.length > 0) {
-          const cleanCore = cleanString(queryIntent.coreTitle || trimmed);
-          const cleanArtist = queryIntent.mainArtist !== 'Unknown Artist' ? cleanString(queryIntent.mainArtist) : '';
-
           for (const item of itunesData.results) {
             const trackTitle = item.trackName || '';
             const trackArtist = item.artistName || '';
@@ -336,19 +339,27 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
             const itemIntent = detectTrackIntent(trackTitle, trackArtist);
             if (!queryIntent.isKaraoke && !queryIntent.isCover && !queryIntent.isInstrumental) {
               if (itemIntent.isKaraoke || itemIntent.isCover || itemIntent.isInstrumental) {
+                console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": classified as karaoke/cover/instrumental`);
                 continue;
               }
               const unwantedPhrases = ['in the style of', 'made famous by', 'originally performed by', 'karaoke version'];
               if (unwantedPhrases.some(phrase => cleanTTitle.includes(phrase) || cleanTArtist.includes(phrase))) {
+                console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": contains unwanted cover/karaoke phrase`);
                 continue;
               }
             }
 
-            // 2. Verify title relevance
-            const titleMatches = cleanTTitle.includes(cleanCore) || cleanCore.includes(cleanTTitle) ||
-              cleanCore.split(' ').filter(w => w.length > 2).some(w => cleanTTitle.includes(w));
+            // 2. Strip feature credits before checking title to avoid false matching on feature names
+            const titleBase = cleanString(
+              trackTitle
+                .replace(/[\(\[\{]\s*(?:feat\.?|ft\.?|featuring|with)\s+[^\]\)\}]+[\)\]\}]/gi, '')
+                .replace(/\s+(?:feat\.?|ft\.?|featuring)\s+.*/gi, '')
+                .trim()
+            ) || cleanTTitle;
 
-            if (!titleMatches && cleanCore.length > 3) {
+            const titleMatches = titleBase.includes(cleanCore) || cleanCore.includes(titleBase);
+            if (!titleMatches && cleanCore.length > 2) {
+              console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": title "${titleBase}" does not match core "${cleanCore}"`);
               continue;
             }
 
@@ -357,7 +368,8 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
               const artistMatches = cleanTArtist.includes(cleanArtist) || cleanArtist.includes(cleanTArtist) ||
                 cleanArtist.split(' ').filter(w => w.length > 2).every(w => cleanTArtist.includes(w) || cleanTTitle.includes(w));
               if (!artistMatches) {
-                continue; // Reject tracks by different artists
+                console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": artist does not match "${cleanArtist}"`);
+                continue;
               }
             }
 
@@ -365,6 +377,7 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
             if (seenTrackKeys.has(dedupKey)) continue;
             seenTrackKeys.add(dedupKey);
 
+            console.log(`[Search Flow Stage A] Accepted iTunes track: "${trackTitle}" by "${trackArtist}"`);
             collectedTracks.push({
               title: trackTitle || 'Unknown Title',
               artist: trackArtist || 'Unknown Artist',
@@ -377,7 +390,7 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
             });
           }
 
-          if (collectedTracks.length >= 3) {
+          if (collectedTracks.length >= 10) {
             break;
           }
         }
@@ -387,71 +400,74 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
     }
   }
 
-  // If iTunes yielded relevant matches, return them!
+  // Stage B: Fallback to YouTube Music & InnerTube if no exact target artist match found or results sparse
+  const hasExactArtistMatch = cleanArtist ? collectedTracks.some(t => cleanString(t.artist).includes(cleanArtist)) : false;
+
+  if (!hasExactArtistMatch || collectedTracks.length < 5) {
+    console.log(`[Search Flow Stage B] Fallback triggered: searching YouTube Music & InnerTube (hasExactArtistMatch=${hasExactArtistMatch}, count=${collectedTracks.length})...`);
+    try {
+      const candidatePool: YouTubeCandidate[] = [];
+      const poolSeenIds = new Set<string>();
+
+      for (const q of uniqueQueries.slice(0, 3)) {
+        const ytCandidates = await searchYouTubeCandidates(q);
+        console.log(`[Search Flow Stage B] Query "${q}" returned ${ytCandidates.length} raw candidates`);
+        for (const c of ytCandidates) {
+          if (!poolSeenIds.has(c.id)) {
+            poolSeenIds.add(c.id);
+            candidatePool.push(c);
+          }
+        }
+        if (candidatePool.length >= 20) break;
+      }
+
+      // Score and rank candidates against the target query intent
+      const targetMeta = {
+        title: queryIntent.coreTitle || trimmed,
+        artist: (queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') ? queryIntent.mainArtist : (queryIntent.coreTitle || trimmed),
+      };
+
+      const scoredCandidates = candidatePool
+        .filter(c => c.duration <= 1200) // Disqualify long compilations
+        .map(c => scoreCandidate(targetMeta, c))
+        .filter(s => s.score >= 40) // Exclude negative and very poor matches (covers, karaoke)
+        .sort((a, b) => b.score - a.score);
+
+      console.log(`[Search Flow Stage B] Scored ${scoredCandidates.length} viable candidates (threshold >= 40)`);
+      if (scoredCandidates.length > 0) {
+        console.log(`[Search Flow Stage B] Top candidate: "${scoredCandidates[0].candidate.title}" by "${scoredCandidates[0].candidate.artist}" (Score: ${scoredCandidates[0].score}, URL: ${scoredCandidates[0].candidate.url})`);
+      }
+
+      for (const s of scoredCandidates) {
+        const c = s.candidate;
+        const cleanCTitle = cleanString(c.title);
+        const cleanCArtist = cleanString(c.artist);
+        const dedupKey = `${cleanCTitle}|${cleanCArtist}`;
+        if (seenTrackKeys.has(dedupKey)) continue;
+        seenTrackKeys.add(dedupKey);
+
+        collectedTracks.push({
+          title: c.title || 'Unknown Title',
+          artist: c.artist || 'Unknown Artist',
+          album: c.album || 'YouTube',
+          trackNumber: collectedTracks.length + 1,
+          sourceUrl: c.url,
+          artworkUrl: c.thumbnailUrl || '',
+          duration: c.duration,
+        });
+      }
+    } catch (ytErr) {
+      console.warn('[Downloader] YouTube search fallback notice:', ytErr);
+    }
+  }
+
   if (collectedTracks.length > 0) {
+    console.log(`[Search Flow] Returning ${collectedTracks.length} tracks to frontend (Top: "${collectedTracks[0].title}" by "${collectedTracks[0].artist}")`);
     return {
       type: 'search',
       query: trimmed,
       tracks: collectedTracks.slice(0, 20),
     };
-  }
-
-  // Stage B: Fallback to YouTube Music & InnerTube search (e.g. for songs missing in iTunes)
-  try {
-    const candidatePool: YouTubeCandidate[] = [];
-    const poolSeenIds = new Set<string>();
-
-    for (const q of uniqueQueries.slice(0, 4)) {
-      const ytCandidates = await searchYouTubeCandidates(q);
-      for (const c of ytCandidates) {
-        if (!poolSeenIds.has(c.id)) {
-          poolSeenIds.add(c.id);
-          candidatePool.push(c);
-        }
-      }
-      if (candidatePool.length >= 10) break;
-    }
-
-    // Score and rank candidates against the target query intent
-    const targetMeta = {
-      title: queryIntent.coreTitle || trimmed,
-      artist: queryIntent.mainArtist !== 'Unknown Artist' ? queryIntent.mainArtist : trimmed,
-    };
-
-    const scoredCandidates = candidatePool
-      .filter(c => c.duration <= 1200) // Disqualify long compilations
-      .map(c => scoreCandidate(targetMeta, c))
-      .filter(s => s.score >= 40) // Exclude negative and very poor matches (covers, karaoke)
-      .sort((a, b) => b.score - a.score);
-
-    for (const s of scoredCandidates) {
-      const c = s.candidate;
-      const cleanCTitle = cleanString(c.title);
-      const cleanCArtist = cleanString(c.artist);
-      const dedupKey = `${cleanCTitle}|${cleanCArtist}`;
-      if (seenTrackKeys.has(dedupKey)) continue;
-      seenTrackKeys.add(dedupKey);
-
-      collectedTracks.push({
-        title: c.title || 'Unknown Title',
-        artist: c.artist || 'Unknown Artist',
-        album: c.album || 'YouTube',
-        trackNumber: collectedTracks.length + 1,
-        sourceUrl: c.url,
-        artworkUrl: c.thumbnailUrl || '',
-        duration: c.duration,
-      });
-    }
-
-    if (collectedTracks.length > 0) {
-      return {
-        type: 'search',
-        query: trimmed,
-        tracks: collectedTracks.slice(0, 20),
-      };
-    }
-  } catch (ytErr) {
-    console.warn('[Downloader] YouTube search fallback notice:', ytErr);
   }
 
   // Stage C: Final fallback to yt-dlp search
@@ -519,6 +535,13 @@ router.post('/start', async (req, res) => {
       folderStructure = '{artist}/{artist} - {title}',
       playlistFolder = true,
       playlistName,
+      playlistCoverUrl,
+      artworkUrl,
+      coverUrl,
+      spotifyPlaylistId,
+      sourceType,
+      sourceId,
+      spotifyId,
       downloadLyrics,
       download_lyrics,
       lyricsProviders,
@@ -579,11 +602,19 @@ router.post('/start', async (req, res) => {
       duration: t.duration,
       artworkUrl: t.artworkUrl,
       sourceUrl: t.sourceUrl,
+      spotifyId: t.spotifyId,
     }));
+
+    const resolvedCover = playlistCoverUrl || artworkUrl || coverUrl;
+    const resolvedSourceId = spotifyPlaylistId || sourceId || spotifyId;
 
     // Add to persistent queue
     const activeJob = await downloadQueue.addJob({
+      userId: (req as any).user?.id,
       playlistName,
+      playlistCoverUrl: resolvedCover,
+      spotifyPlaylistId: resolvedSourceId,
+      sourceType: sourceType || (resolvedSourceId ? 'spotify' : undefined),
       libraryId: targetLib.id,
       libraryPath: targetLib.path,
       format,

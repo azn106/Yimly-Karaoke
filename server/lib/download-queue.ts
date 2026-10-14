@@ -4,7 +4,7 @@ import { promisify } from 'util';
 import { execFile, exec, ChildProcess } from 'child_process';
 import NodeID3 from 'node-id3';
 import { db } from '../db/index.js';
-import { downloadJobs, downloadTrackJobs, libraries, queueItems } from '../db/schema.js';
+import { downloadJobs, downloadTrackJobs, libraries, queueItems, playlists, playlistSongs, songs } from '../db/schema.js';
 import { eq, and, asc, inArray, sql } from 'drizzle-orm';
 import { scanLibrary } from './scanner.js';
 import { fetchLyrics, saveLrcSidecar, stripLrcTimestamps } from './lyrics.js';
@@ -28,7 +28,12 @@ export interface TrackMetadata {
 
 export interface CreateJobParams {
   id?: string;
+  userId?: number;
   playlistName?: string;
+  playlistCoverUrl?: string;
+  spotifyPlaylistId?: string;
+  sourceType?: string;
+  sourceId?: string;
   type?: 'playlist' | 'album' | 'track' | 'search';
   libraryId?: number;
   libraryPath: string;
@@ -66,6 +71,7 @@ export interface ActiveTrackJob {
 export interface ActiveDownloadJob {
   id: string;
   playlistName?: string | null;
+  playlistId?: number | null;
   type: string;
   status: 'queued' | 'downloading' | 'completed' | 'failed' | 'cancelled';
   libraryId?: number | null;
@@ -297,9 +303,60 @@ export class DownloadQueueManager {
       position: idx,
     }));
 
+    let playlistId: number | null = null;
+    if (params.userId && (params.spotifyPlaylistId || params.sourceId || params.playlistName)) {
+      const sourceTypeVal = params.sourceType || (params.spotifyPlaylistId || params.sourceId ? 'spotify' : 'playlist');
+      const sourceIdVal = params.spotifyPlaylistId || params.sourceId || null;
+
+      try {
+        let existing = [];
+        if (sourceIdVal) {
+          existing = await db.select().from(playlists).where(
+            and(eq(playlists.userId, params.userId), eq(playlists.sourceId, sourceIdVal))
+          ).limit(1);
+        } else if (params.playlistName) {
+          existing = await db.select().from(playlists).where(
+            and(eq(playlists.userId, params.userId), eq(playlists.name, params.playlistName.trim()))
+          ).limit(1);
+        }
+
+        if (existing.length > 0) {
+          playlistId = existing[0].id;
+          let coverPathVal = existing[0].coverPath;
+          if (params.playlistCoverUrl && !coverPathVal) {
+            coverPathVal = await this.downloadAndSavePlaylistCover(params.playlistCoverUrl);
+          }
+          await db.update(playlists).set({
+            name: params.playlistName?.trim() || existing[0].name,
+            coverPath: coverPathVal,
+            updatedAt: now,
+          }).where(eq(playlists.id, playlistId));
+        } else {
+          let coverPathVal: string | null = null;
+          if (params.playlistCoverUrl) {
+            coverPathVal = await this.downloadAndSavePlaylistCover(params.playlistCoverUrl);
+          }
+
+          const newPl = await db.insert(playlists).values({
+            userId: params.userId,
+            name: params.playlistName?.trim() || 'Imported Playlist',
+            coverPath: coverPathVal,
+            sourceType: sourceTypeVal,
+            sourceId: sourceIdVal,
+            createdAt: now,
+            updatedAt: now,
+          }).returning();
+          playlistId = newPl[0].id;
+        }
+      } catch (plErr) {
+        console.warn('[Downloader Queue] Failed to create or reuse playlist:', plErr);
+      }
+    }
+
     const activeJob: ActiveDownloadJob = {
       id: jobId,
       playlistName: params.playlistName || null,
+      playlistId,
       type: params.type || 'playlist',
       status: 'downloading',
       libraryId: params.libraryId || null,
@@ -324,6 +381,7 @@ export class DownloadQueueManager {
     await db.insert(downloadJobs).values({
       id: activeJob.id,
       playlistName: activeJob.playlistName,
+      playlistId: playlistId,
       type: activeJob.type,
       status: 'downloading',
       libraryId: activeJob.libraryId,
@@ -977,6 +1035,8 @@ export class DownloadQueueManager {
               error: null,
               updatedAt: new Date(),
             }).where(eq(downloadTrackJobs.id, track.id));
+
+            await this.linkTrackToPlaylistIfNeeded(track.jobId, track);
           }
         } catch (err: any) {
           console.error('[Downloader] Song processing failed:', err);
@@ -1018,6 +1078,57 @@ export class DownloadQueueManager {
       }
     } catch (e) {
       console.error('[Downloader] Failed to persist track update to DB:', e);
+    }
+  }
+
+  private async downloadAndSavePlaylistCover(coverUrl: string): Promise<string | null> {
+    try {
+      const res = await fetch(coverUrl);
+      if (res.ok) {
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const ext = coverUrl.includes('.png') ? '.png' : '.jpg';
+        const filename = `playlist_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`;
+        const playlistCoversDir = path.join(process.cwd(), 'data', 'playlist_covers');
+        if (!fs.existsSync(playlistCoversDir)) {
+          fs.mkdirSync(playlistCoversDir, { recursive: true });
+        }
+        fs.writeFileSync(path.join(playlistCoversDir, filename), buffer);
+        return filename;
+      }
+    } catch (err) {
+      console.warn('[Downloader Queue] Failed to download playlist cover:', err);
+    }
+    return null;
+  }
+
+  private async linkTrackToPlaylistIfNeeded(jobId: string, track: ActiveTrackJob) {
+    try {
+      const jobRec = await db.select().from(downloadJobs).where(eq(downloadJobs.id, jobId)).limit(1);
+      if (jobRec.length === 0 || !jobRec[0].playlistId) return;
+      const playlistId = jobRec[0].playlistId;
+
+      const matchingSongs = await db.select().from(songs).where(
+        sql`LOWER(title) = LOWER(${track.title})`
+      );
+
+      const matchedSong = matchingSongs.find(s => s.title.toLowerCase() === track.title.toLowerCase()) || matchingSongs[0];
+      if (matchedSong) {
+        const existingAssoc = await db.select().from(playlistSongs).where(
+          and(eq(playlistSongs.playlistId, playlistId), eq(playlistSongs.songId, matchedSong.id))
+        ).limit(1);
+
+        if (existingAssoc.length === 0) {
+          await db.insert(playlistSongs).values({
+            playlistId,
+            songId: matchedSong.id,
+            position: track.position,
+            addedAt: new Date(),
+          });
+          console.log(`[Downloader Queue] Linked song ID ${matchedSong.id} ("${track.title}") to playlist ID ${playlistId} at position ${track.position}`);
+        }
+      }
+    } catch (linkErr) {
+      console.warn('[Downloader Queue] Failed to link track to playlist:', linkErr);
     }
   }
 }

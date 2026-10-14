@@ -478,12 +478,19 @@ export async function setupDatabase(migrationsFolderOverride?: string) {
     console.error('Failed to create download jobs tables:', e);
   }
 
-  // Ensure cover_path column exists in playlists table (backward compatibility safety)
+  // Ensure cover_path, source_type, source_id columns exist in playlists table and playlist_id in download_jobs
   try {
     await sqlite.execute('ALTER TABLE playlists ADD COLUMN cover_path text;');
-  } catch (e) {
-    // Column already exists, safe to ignore
-  }
+  } catch (e) {}
+  try {
+    await sqlite.execute('ALTER TABLE playlists ADD COLUMN source_type text;');
+  } catch (e) {}
+  try {
+    await sqlite.execute('ALTER TABLE playlists ADD COLUMN source_id text;');
+  } catch (e) {}
+  try {
+    await sqlite.execute('ALTER TABLE download_jobs ADD COLUMN playlist_id integer;');
+  } catch (e) {}
 
   // Normalize multi-artist metadata, backfill song_artists, and cleanup orphaned records
   try {

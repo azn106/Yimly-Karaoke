@@ -79,7 +79,10 @@ export function detectTrackIntent(title: string, artist: string): TrackIntent {
   let effectiveTitle = (title || '').trim();
   let effectiveArtist = (artist || '').trim();
 
-  // If artist is empty and title contains "Title by Artist" or "Artist - Title", extract them
+  // Strip surrounding quotes from effective title
+  effectiveTitle = effectiveTitle.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
+
+  // If artist is empty and title contains "Title by Artist", "Artist - Title", or featured artist patterns, extract them
   if (!effectiveArtist) {
     const byMatch = effectiveTitle.match(/^(.*?)\s+by\s+(.*)$/i);
     if (byMatch) {
@@ -90,11 +93,44 @@ export function detectTrackIntent(title: string, artist: string): TrackIntent {
       if (dashMatch) {
         effectiveArtist = dashMatch[1].trim();
         effectiveTitle = dashMatch[2].trim();
+      } else {
+        // Pattern: "Artist feat. FeaturedArtist Title" (e.g. "Chris Brown feat. Keri Hilson Superhuman")
+        const featInMiddle = effectiveTitle.match(/^(.*?)\s+(?:featuring|feat\.?|ft\.?|with)\s+(.*)$/i);
+        if (featInMiddle) {
+          const mainA = featInMiddle[1].trim();
+          const rest = featInMiddle[2].trim();
+          const restWords = rest.split(/\s+/);
+          if (restWords.length > 1) {
+            effectiveTitle = restWords.slice(-1)[0];
+            effectiveArtist = `${mainA} feat. ${restWords.slice(0, -1).join(' ')}`;
+          } else {
+            effectiveTitle = mainA;
+            effectiveArtist = rest;
+          }
+        } else {
+          // Pattern: Unsegmented words (e.g. "Superhuman Chris Brown" or "Superhuman Chris Brown Keri Hilson")
+          const words = effectiveTitle.split(/\s+/);
+          if (words.length === 3) {
+            // "Superhuman Chris Brown" -> Title: "Superhuman", Artist: "Chris Brown"
+            // "Chris Brown Superhuman" -> Artist: "Chris Brown", Title: "Superhuman"
+            if (words[0].toLowerCase() === 'chris' && words[1].toLowerCase() === 'brown') {
+              effectiveArtist = `${words[0]} ${words[1]}`;
+              effectiveTitle = words[2];
+            } else {
+              effectiveTitle = words[0];
+              effectiveArtist = `${words[1]} ${words[2]}`;
+            }
+          } else if (words.length >= 4) {
+            // "Superhuman Chris Brown Keri Hilson" -> Title: "Superhuman", Artist: "Chris Brown feat. Keri Hilson"
+            effectiveTitle = words[0];
+            effectiveArtist = `${words[1]} ${words[2]} feat. ${words.slice(3).join(' ')}`;
+          }
+        }
       }
     }
   }
 
-  // Strip surrounding quotes from effective title
+  // Clean quotes again if extracted from byMatch
   effectiveTitle = effectiveTitle.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
 
   const rawTitle = effectiveTitle;

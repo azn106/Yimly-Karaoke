@@ -116,6 +116,8 @@ export const playlists = sqliteTable('playlists', {
   description: text('description'),
   isPublic: integer('is_public').notNull().default(0), // 0 = private (default), 1 = public
   coverPath: text('cover_path'),
+  sourceType: text('source_type'),
+  sourceId: text('source_id'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
@@ -155,6 +157,7 @@ export const settings = sqliteTable('settings', {
 export const downloadJobs = sqliteTable('download_jobs', {
   id: text('id').primaryKey(),
   playlistName: text('playlist_name'),
+  playlistId: integer('playlist_id').references(() => playlists.id, { onDelete: 'set null' }),
   type: text('type').notNull().default('playlist'),
   status: text('status', { enum: ['queued', 'downloading', 'completed', 'failed', 'cancelled'] }).notNull().default('queued'),
   libraryId: integer('library_id').references(() => libraries.id, { onDelete: 'cascade' }),
