@@ -219,6 +219,8 @@ test('Interrupted migration recovery: orphaned table rebuild staging tables reco
   await rawSqlite.execute("INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('h4', 1787395719808);");
   await rawSqlite.execute("INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('h5', 1787400000000);");
   await rawSqlite.execute("INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('h6', 1787410000000);");
+  await rawSqlite.execute("INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('h7', 1791664950816);");
+  await rawSqlite.execute("INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('h8', 1791910000000);");
 
   // Create base 0006 schema tables needed for 0007 rebuilds
   await rawSqlite.execute('CREATE TABLE libraries (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, name text NOT NULL, path text NOT NULL, last_scan integer);');

@@ -152,8 +152,21 @@ exit /b 0
 
 :FAILED
 echo.
+echo ========================================================================
+echo                         UPDATE FAILED
+echo ========================================================================
 echo Update did not complete. Review the error above.
-echo Your persistent data/media folders were not intentionally deleted.
+echo Your persistent data and media folders were not intentionally deleted.
+echo.
+echo ROLLBACK OPTIONS:
+echo 1. To restore your database and media from the automatic backup:
+echo    powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\restore-yimly.ps1"
+echo 2. To rollback to a previous Git commit if needed:
+echo    git checkout ^<previous_commit_hash^>
+echo    docker compose -f compose.yaml up -d --build
+echo 3. To view detailed container logs:
+echo    docker compose -f compose.yaml logs --tail=100 yimly
+echo ========================================================================
 echo.
 pause
 exit /b 1

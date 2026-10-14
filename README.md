@@ -101,10 +101,16 @@ Or double-click `update-yimly.bat` in File Explorer.
 If an update causes issues, you can restore your previous deployment:
 
 1. **Restore Data:**
-   * Stop the container: `docker compose stop yimly`
-   * Navigate to the `./backups/` directory.
-   * Extract the last known-good backup (`tar -xzf yimly_backup_YYYYMMDD_HHMMSS.tar.gz`) into the root directory, overwriting the current `./data` and `./media` folders.
-   * Start the container: `docker compose start yimly`
+   * **Automated (Windows):** Run PowerShell restore script:
+     ```cmd
+     powershell -ExecutionPolicy Bypass -File ".\scripts\restore-yimly.ps1"
+     ```
+     This automatically stops Yimly, verifies archive integrity, creates a safety backup, extracts the latest backup into `DATA_PATH` and `MEDIA_PATH`, and restarts the container.
+   * **Manual:**
+     * Stop the container: `docker compose stop yimly`
+     * Navigate to the `./backups/` directory.
+     * Extract the last known-good backup (`tar -xzf yimly_backup_YYYYMMDD_HHMMSS.tar.gz`) into the root directory.
+     * Start the container: `docker compose start yimly`
 
 2. **Rollback Image (if required):**
    * If the application code is the cause, revert the repository to the previous commit: `git checkout <previous_commit_hash>`
