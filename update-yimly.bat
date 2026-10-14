@@ -9,7 +9,7 @@ echo           YIMLY UPDATE
 echo ========================================
 echo.
 
-echo [1/6] Checking Git...
+echo [1/5] Checking Git...
 where git >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Git is not installed or not in PATH.
@@ -17,7 +17,7 @@ if errorlevel 1 (
     goto FAILED
 )
 
-echo [2/6] Checking Docker and Compose...
+echo [2/5] Checking Docker and Compose...
 where docker >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Docker is not installed or not in PATH.
@@ -63,7 +63,7 @@ if errorlevel 1 (
     goto FAILED
 )
 
-echo [3/6] Checking Git branch...
+echo [3/5] Checking Git branch...
 
 for /f "delims=" %%B in ('git branch --show-current') do set "CURRENT_BRANCH=%%B"
 if not "%CURRENT_BRANCH%"=="main" (
@@ -73,28 +73,7 @@ if not "%CURRENT_BRANCH%"=="main" (
 )
 
 echo.
-echo [4/6] Backing up persistent data and media...
-echo Stopping Yimly briefly so SQLite data is consistent...
-docker compose -f compose.yaml stop yimly
-if errorlevel 1 (
-    echo [ERROR] Could not stop Yimly safely; no backup was attempted.
-    goto FAILED
-)
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\backup-yimly.ps1"
-if errorlevel 1 (
-    echo [ERROR] Backup failed. Restarting the existing Yimly container.
-    docker compose -f compose.yaml start yimly
-    goto FAILED
-)
-docker compose -f compose.yaml start yimly
-if errorlevel 1 (
-    echo [ERROR] Backup succeeded but Yimly could not be restarted before update.
-    docker compose -f compose.yaml logs --tail=100 yimly
-    goto FAILED
-)
-
-echo.
-echo [5/6] Pulling latest main...
+echo [4/5] Pulling latest main...
 git pull --ff-only origin main
 if errorlevel 1 (
     echo [ERROR] Could not update from origin/main. Existing application remains in place.
@@ -103,7 +82,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [6/6] Building the latest Yimly image...
+echo [5/5] Building the latest Yimly image...
 docker compose -f compose.yaml build --pull
 if errorlevel 1 (
     echo [ERROR] Docker build failed. The existing container has not been replaced.
@@ -159,7 +138,7 @@ echo Update did not complete. Review the error above.
 echo Your persistent data and media folders were not intentionally deleted.
 echo.
 echo ROLLBACK OPTIONS:
-echo 1. To restore your database and media from the automatic backup:
+echo 1. To restore your database and media from a backup (if available):
 echo    powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\restore-yimly.ps1"
 echo 2. To rollback to a previous Git commit if needed:
 echo    git checkout ^<previous_commit_hash^>

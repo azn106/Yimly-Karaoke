@@ -92,7 +92,7 @@ Or double-click `update-yimly.bat` in File Explorer.
 4. Cleans up obsolete build artifacts safely (`docker image prune -f`)
 5. Verifies container health
 
-> **Note on Data Safety:** The update script **never** deletes or resets your SQLite database (`./data/yimly.db`) or media library (`./media`). It now automatically backs up these files to `./backups/` before any update.
+> **Note on Data Safety:** The update script **never** deletes or resets your SQLite database (`./data/yimly.db`) or media library (`./media`). If you wish to create a manual backup before updating, run `powershell -ExecutionPolicy Bypass -File ".\scripts\backup-yimly.ps1"`.
 
 ---
 
