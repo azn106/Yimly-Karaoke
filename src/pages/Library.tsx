@@ -853,6 +853,7 @@ export default function Library() {
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -1033,8 +1034,8 @@ export default function Library() {
   // MAIN VIEW: Library Catalogs & Search
   // -----------------------------------------------------------------
   const sortedSongs = [...songs].sort((a, b) => {
-    const left = String(songSort === 'artist' ? a.artist : songSort === 'album' ? a.album : songSort === 'duration' ? a.duration : a.title || '').toLocaleLowerCase();
-    const right = String(songSort === 'artist' ? b.artist : songSort === 'album' ? b.album : songSort === 'duration' ? b.duration : b.title || '').toLocaleLowerCase();
+    const left = String((songSort === 'artist' ? a.artist : songSort === 'album' ? a.album : songSort === 'duration' ? a.duration : a.title) ?? '').toLocaleLowerCase();
+    const right = String((songSort === 'artist' ? b.artist : songSort === 'album' ? b.album : songSort === 'duration' ? b.duration : b.title) ?? '').toLocaleLowerCase();
     if (songSort === 'duration') return (Number(a.duration) || 0) - (Number(b.duration) || 0);
     return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
   });
@@ -1140,6 +1141,7 @@ export default function Library() {
                             }
                             alt={item.title || item.name}
                             className="w-full h-full object-cover"
+                            loading="lazy"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = 'none';
                             }}
@@ -1153,6 +1155,11 @@ export default function Library() {
                         )}
                       </div>
                       <span className="truncate">{item.title || item.name}</span>
+                      {item.type === 'song' && String(item.variant || '').toLowerCase().includes('instrumental') && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" title="Instrumental version">
+                          Instrumental
+                        </span>
+                      )}
                       {item.type === 'song' && (
                         <LyricBadges
                           hasLrc={item.hasLrc}
@@ -1240,6 +1247,7 @@ export default function Library() {
                         src={`/api/artists/${artist.id}/artwork`}
                         alt={artist.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
