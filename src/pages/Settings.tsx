@@ -155,6 +155,8 @@ export default function Settings() {
       setTimeout(() => setBgmSavedMessage(''), 3000);
     } catch (e) {
       console.error('Failed to save background music settings:', e);
+      // The helper keeps the user's choice locally, but the server copy may be stale.
+      setBgmSavedMessage('Saved on this device only — server sync failed. Retry to sync.');
     } finally {
       setSavingBgmSettings(false);
     }
@@ -1713,8 +1715,8 @@ export default function Settings() {
 
             <div className="flex items-center justify-between pt-2">
               {bgmSavedMessage && (
-                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                  <Check className="w-4 h-4" />
+                <span className={`text-xs font-bold flex items-center gap-1.5 ${bgmSavedMessage.startsWith('Saved on this device only') ? 'text-amber-300' : 'text-emerald-400'}`}>
+                  {!bgmSavedMessage.startsWith('Saved on this device only') && <Check className="w-4 h-4" />}
                   <span>{bgmSavedMessage}</span>
                 </span>
               )}

@@ -77,7 +77,7 @@ if not exist ".env" (
         echo Created .env from .env.example with default values.
         echo [NOTE] Remember to customize JWT_SECRET in .env for production.
     ) else (
-        echo JWT_SECRET=yimly_production_secret_change_me > .env
+        echo JWT_SECRET=change_this_to_a_long_random_secret_in_production > .env
         echo DATA_PATH=./data >> .env
         echo MEDIA_PATH=./media >> .env
         echo Created default .env file.
@@ -85,6 +85,27 @@ if not exist ".env" (
 ) else (
     echo Existing .env found.
 )
+:: Refuse to deploy with an example, legacy, or missing/empty JWT secret.
+findstr /x /c:"JWT_SECRET=change_this_to_a_long_random_secret_in_production" ".env" >nul
+if not errorlevel 1 (
+    echo [ERROR] JWT_SECRET is still the example placeholder in .env.
+    echo Set a unique random secret before deploying. Suggested: openssl rand -base64 32
+    pause
+    exit /b 1
+)
+findstr /x /c:"JWT_SECRET=yimly_production_secure_secret_change_me" ".env" >nul
+if not errorlevel 1 (
+    echo [ERROR] JWT_SECRET uses the former insecure Docker default.
+    pause
+    exit /b 1
+)
+findstr /r /b /c:"JWT_SECRET=." ".env" >nul
+if errorlevel 1 (
+    echo [ERROR] JWT_SECRET is missing or empty in .env.
+    pause
+    exit /b 1
+)
+echo JWT_SECRET presence verified.
 echo.
 
 :: Step 6: Build and start Yimly container

@@ -8,8 +8,8 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # Copy source code and build production bundle
 COPY . .
@@ -49,8 +49,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 # Install only production dependencies
-COPY package.json package-lock.json* ./
-RUN npm install --omit=dev --ignore-scripts
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
 
 # Copy compiled backend and frontend from builder
 COPY --from=builder /app/dist ./dist

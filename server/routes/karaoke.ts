@@ -842,9 +842,23 @@ router.post('/sessions/:sessionId/leave', async (req: AuthenticatedRequest, res)
     const user = req.user;
 
     if (controllerId) {
+      // An authenticated account may only mark its own controller disconnected
+      // (or an administrator may manage room participants). Guest clients use
+      // their unguessable controller ID as a bearer credential.
+      const controller = await db.select().from(controllers).where(
+        and(eq(controllers.id, String(controllerId)), eq(controllers.sessionId, sessionId))
+      ).limit(1);
+
+      if (controller.length === 0) {
+        return res.status(404).json({ error: 'Controller not found in this session' });
+      }
+      if (user?.id && user.role !== 'administrator' && controller[0].userId !== user.id) {
+        return res.status(403).json({ error: 'Forbidden. You can only disconnect your own controller.' });
+      }
+
       await db.update(controllers)
         .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
-        .where(and(eq(controllers.id, controllerId), eq(controllers.sessionId, sessionId)));
+        .where(and(eq(controllers.id, String(controllerId)), eq(controllers.sessionId, sessionId)));
     } else if (user?.id) {
       await db.update(controllers)
         .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
@@ -1160,6 +1174,7 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
     return await withSessionLock(sessionId, async () => {
       let userId: number | null = null;
       let guestName: string | null = null;
+      let ownerControllerId: string | null = null;
 
       if (user?.id) {
         const isHostOrAdmin = Boolean(user.role === 'administrator' || user.id === session[0].hostId);
@@ -1193,6 +1208,8 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
         }
         userId = ctrl[0].userId || null;
         guestName = ctrl[0].guestName || (req.body?.guestName ? String(req.body.guestName).trim() : 'Guest');
+        // Keep the guest's controller identity on the queue item; display names are not unique credentials.
+        if (!userId) ownerControllerId = ctrl[0].id;
       }
 
       let finalSongId: number | null = null;
@@ -1328,6 +1345,7 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
         songId: finalSongId,
         userId,
         guestName,
+        controllerId: ownerControllerId,
         addedAt: new Date(),
         position: nextPosition,
         tempTitle,
@@ -1378,7 +1396,7 @@ router.delete('/sessions/:sessionId/queue/:queueItemId', async (req: Authenticat
         const ctrl = await db.select().from(controllers).where(
           and(eq(controllers.id, controllerId), eq(controllers.sessionId, sessionId))
         ).limit(1);
-        if (ctrl.length > 0 && ctrl[0].guestName && ctrl[0].guestName === qItem[0].guestName) {
+        if (ctrl.length > 0 && qItem[0].controllerId && ctrl[0].id === qItem[0].controllerId) {
           isOwner = true;
         }
       }

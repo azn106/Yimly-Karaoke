@@ -134,14 +134,22 @@ export async function saveBackgroundMusicSettings(settings: BackgroundMusicSetti
       headers,
       body: JSON.stringify({ settings: canonical }),
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.settings) {
-        return resolveBackgroundMusicSettings(data.settings);
-      }
+    if (!res.ok) {
+      throw new Error(`Server rejected background music settings (${res.status})`);
     }
+    const data = await res.json();
+    if (!data || !data.settings) {
+      throw new Error('Server returned an invalid background music settings response');
+    }
+    const saved = resolveBackgroundMusicSettings(data.settings);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(BACKGROUND_MUSIC_STORAGE_KEY, JSON.stringify(saved));
+      }
+    } catch (e) {}
+    return saved;
   } catch (err) {
-    console.warn('[BackgroundMusic] Failed to save server background music settings:', err);
+    console.warn('[BackgroundMusic] Failed to save server background music settings; local settings were retained:', err);
+    throw err;
   }
-  return canonical;
 }

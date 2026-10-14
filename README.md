@@ -47,12 +47,13 @@ http://yimly:3000
    ```bash
    copy .env.example .env
    ```
-   Edit `.env` and set a strong `JWT_SECRET`:
+   Edit `.env` and replace the example `JWT_SECRET` with a unique, randomly generated secret before deploying:
    ```env
-   JWT_SECRET=your_long_random_secret_here
+   JWT_SECRET=your_unique_random_secret_here
    DATA_PATH=./data
    MEDIA_PATH=./media
    ```
+   Generate a secret with `openssl rand -base64 32`. Deployment stops if the example placeholder or an empty secret is used.
 
 3. **Deploy Yimly:**
    Double-click `deploy-yimly.bat` or run:

@@ -188,11 +188,21 @@ export function updateRoomHostId(sessionId: string, newHostId: number) {
   const room = activeRooms.get(sessionId);
   if (room) {
     room.hostId = newHostId;
+    // Reassignment resets the grace period; do not inherit the former host's stale heartbeat.
+    room.lastHostHeartbeat = Date.now();
   }
 }
 
 export function getRoomState(sessionId: string): RoomState | undefined {
   return activeRooms.get(sessionId);
+}
+
+export function hasActiveHostConnection(room: RoomState | undefined, sessionHostId: number | null | undefined): boolean {
+  if (!room) return false;
+  return [...room.clients].some((client: any) =>
+    client.readyState === WebSocket.OPEN &&
+    (client.isAdmin || (client.userId && client.userId === sessionHostId))
+  );
 }
 
 export function setupWebSockets(wss: WebSocketServer) {
@@ -344,7 +354,11 @@ export function setupWebSockets(wss: WebSocketServer) {
               console.warn(`[WS] Unauthorized non-host attempted SEEK on session ${sessionId}`);
               break;
             }
-            room.position = data.payload.position;
+            {
+              const position = Number(data.payload?.position);
+              if (!Number.isFinite(position) || position < 0) break;
+              room.position = position;
+            }
             broadcastToRoom(sessionId, { type: 'SEEKED', payload: { position: room.position } });
             break;
 
@@ -353,8 +367,12 @@ export function setupWebSockets(wss: WebSocketServer) {
               console.warn(`[WS] Unauthorized non-host attempted SYNC on session ${sessionId}`);
               break;
             }
-            room.position = data.payload.position;
-            room.playing = data.payload.playing;
+            {
+              const position = Number(data.payload?.position);
+              if (!Number.isFinite(position) || position < 0 || typeof data.payload?.playing !== 'boolean') break;
+              room.position = position;
+              room.playing = data.payload.playing;
+            }
             broadcastToRoom(sessionId, { type: 'SYNC', payload: { position: room.position, playing: room.playing } });
             break;
 
@@ -381,8 +399,14 @@ export function setupWebSockets(wss: WebSocketServer) {
               console.warn(`[WS] Unauthorized non-host attempted VARIANT_CHANGED on session ${sessionId}`);
               break;
             }
+            if (data.payload?.variant !== 'original' && data.payload?.variant !== 'instrumental') break;
+            if (data.payload.position !== undefined) {
+              const position = Number(data.payload.position);
+              if (!Number.isFinite(position) || position < 0) break;
+              room.position = position;
+            }
+            if (data.payload.playing !== undefined && typeof data.payload.playing !== 'boolean') break;
             room.variant = data.payload.variant;
-            if (data.payload.position !== undefined) room.position = data.payload.position;
             if (data.payload.playing !== undefined) room.playing = data.payload.playing;
             broadcastToRoom(sessionId, { 
               type: 'VARIANT_CHANGED', 
@@ -633,7 +657,9 @@ export function setupWebSockets(wss: WebSocketServer) {
 
       for (const sess of activeSessions) {
         const room = activeRooms.get(sess.id);
-        const hasActiveHost = room?.hostClient && room.hostClient.readyState === WebSocket.OPEN;
+        // Host ownership can change while the former host socket remains open.
+        // Determine presence from the current session host ID, not the stale hostClient pointer.
+        const hasActiveHost = hasActiveHostConnection(room, sess.hostId);
         const lastHeartbeat = room?.lastHostHeartbeat || (sess.updatedAt ? new Date(sess.updatedAt).getTime() : 0);
         const createdAt = sess.createdAt ? new Date(sess.createdAt).getTime() : 0;
         
@@ -642,8 +668,7 @@ export function setupWebSockets(wss: WebSocketServer) {
         // If host is not currently connected AND no valid host heartbeat received for > 90 seconds
         if (!hasActiveHost && timeSinceHeartbeat > EXPIRY_THRESHOLD_MS) {
           console.log(`[SESSION EXPIRED] Session ${sess.id} (code ${sess.roomCode}) timed out after ${Math.round(timeSinceHeartbeat / 1000)}s without host heartbeat.`);
-          await db.update(sessions).set({ status: 'closed' }).where(eq(sessions.id, sess.id));
-          closeSessionWS(sess.id);
+          await cleanupExpiredSession(sess.id);
         }
       }
     } catch (err) {
@@ -665,6 +690,16 @@ export async function handleHostHeartbeat(sessionId: string) {
   } catch (e) {
     console.error('[HEARTBEAT] Error updating session timestamp:', e);
   }
+}
+
+export async function cleanupExpiredSession(sessionId: string): Promise<void> {
+  // Expiry must leave the same durable state as an explicit session end.
+  await db.update(sessions).set({ status: 'closed' }).where(eq(sessions.id, sessionId));
+  await db.delete(queueItems).where(eq(queueItems.sessionId, sessionId));
+  await db.update(controllers)
+    .set({ connectionState: 'disconnected', lastSeenTime: new Date() })
+    .where(eq(controllers.sessionId, sessionId));
+  closeSessionWS(sessionId);
 }
 
 export function closeSessionWS(sessionId: string) {

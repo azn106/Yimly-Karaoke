@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 import fsSync from 'fs';
 import path from 'path';
 import { db, setupDatabase } from '../db/index.js';
-import { users, libraries, artists, albums, songs, favorites, playlists, playlistSongs, lyrics, queueItems, settings } from '../db/schema.js';
+import { users, libraries, artists, albums, songs, favorites, playlists, playlistSongs, lyrics, settings, controllers, queueItems, sessions } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 import playlistsRoutes from '../routes/playlists.js';
@@ -2846,7 +2846,38 @@ test('Production Step #2: Karaoke Security, Server-Side Permissions & Room Isola
   });
   assert.strictEqual(validGuestQueueRes.status, 200, 'Valid controller in Room A can queue song in Room A');
 
-  // 3e. Authenticated User A queues in Room A -> 200
+  // 3e. Two guests with the same display name must still have distinct queue ownership.
+  const sameNameJoinRes = await fetch(`${baseUrl}/api/karaoke/sessions/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roomCode: roomA.roomCode, displayName: 'Guest In Room A' })
+  });
+  assert.strictEqual(sameNameJoinRes.status, 200);
+  const sameNameGuest = await sameNameJoinRes.json();
+
+  const sameNameQueueRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/queue`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ songId, controllerId: sameNameGuest.controllerId })
+  });
+  assert.strictEqual(sameNameQueueRes.status, 200);
+  const sameNameQueueItem = await sameNameQueueRes.json();
+
+  const removeOtherGuestItemRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/queue/${sameNameQueueItem.id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ controllerId: guestA.controllerId })
+  });
+  assert.strictEqual(removeOtherGuestItemRes.status, 403, 'Guest with a matching display name must not remove another guest\'s queue item');
+
+  const removeOwnGuestItemRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/queue/${sameNameQueueItem.id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ controllerId: sameNameGuest.controllerId })
+  });
+  assert.strictEqual(removeOwnGuestItemRes.status, 200, 'Guest must be able to remove their own queue item with their controller credential');
+
+  // 3f. Authenticated User A queues in Room A -> 200
   const validUserQueueRes = await fetch(`${baseUrl}/api/karaoke/sessions/${roomA.id}/queue`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
@@ -3596,6 +3627,203 @@ test('Production Step #10: Security Regression Tests', async () => {
     headers: { 'Content-Type': 'application/json' }
   });
   assert.strictEqual(skipRes.status, 401, 'Skip request without authorization must return 401');
+});
+
+test('session leave endpoint cannot disconnect another authenticated user controller', async () => {
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ roomName: 'Leave ownership regression' })
+  });
+  assert.equal(createRes.status, 200);
+  const room = await createRes.json();
+
+  const controllerId = `leave-owner-regression-${Date.now()}`;
+  await db.insert(controllers).values({
+    id: controllerId,
+    sessionId: room.id,
+    userId: userBId,
+    guestName: null,
+    device: 'regression-test',
+    connectionState: 'connected',
+    lastSeenTime: new Date(),
+  });
+
+  const leaveRes = await fetch(`${baseUrl}/api/karaoke/sessions/${room.id}/leave`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ controllerId })
+  });
+  assert.equal(leaveRes.status, 403, 'A different authenticated user must not disconnect this controller');
+
+  const [controllerAfter] = await db.select().from(controllers).where(eq(controllers.id, controllerId)).limit(1);
+  assert.equal(controllerAfter.connectionState, 'connected', 'Rejected leave request must not change controller state');
+
+  await db.delete(controllers).where(eq(controllers.id, controllerId));
+  await fetch(`${baseUrl}/api/karaoke/sessions/${room.id}/end`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenA}` }
+  });
+});
+
+test('WebSocket cannot grant host privileges from isHost query parameter alone', async () => {
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ roomName: 'WebSocket host spoof regression' })
+  });
+  assert.equal(createRes.status, 200);
+  const roomData = await createRes.json();
+
+  const { WebSocket } = await import('ws');
+  const { getRoomState } = await import('../ws/index.js');
+  const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/karaoke?sessionId=${roomData.id}&isHost=true&token=${tokenB}`;
+  const client = new WebSocket(wsUrl);
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('WebSocket connection timed out')), 3000);
+    client.once('open', () => {
+      clearTimeout(timeout);
+      client.send(JSON.stringify({ type: 'PLAY' }));
+      resolve();
+    });
+    client.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(getRoomState(roomData.id)?.playing, false, 'A non-host must not control playback by setting isHost=true');
+
+  client.close();
+  await fetch(`${baseUrl}/api/karaoke/sessions/${roomData.id}/end`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenA}` }
+  });
+});
+
+test('WebSocket ignores malformed playback synchronization payloads', async () => {
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ roomName: 'WebSocket payload validation regression' })
+  });
+  assert.equal(createRes.status, 200);
+  const roomData = await createRes.json();
+
+  const { WebSocket } = await import('ws');
+  const { getRoomState } = await import('../ws/index.js');
+  const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/karaoke?sessionId=${roomData.id}&isHost=true&token=${tokenA}`;
+  const client = new WebSocket(wsUrl);
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('WebSocket connection timed out')), 3000);
+    client.once('open', () => {
+      clearTimeout(timeout);
+      client.send(JSON.stringify({ type: 'SEEK', payload: { position: -10 } }));
+      client.send(JSON.stringify({ type: 'SYNC', payload: { position: 20, playing: 'yes' } }));
+      client.send(JSON.stringify({ type: 'VARIANT_CHANGED', payload: { variant: 'unknown-mode' } }));
+      resolve();
+    });
+    client.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const state = getRoomState(roomData.id);
+  assert.equal(state?.position, 0, 'Negative seek and malformed sync must not corrupt playback position');
+  assert.equal(state?.playing, false, 'Malformed sync must not change playing state');
+  assert.notEqual(state?.variant, 'unknown-mode', 'Unsupported audio variant must be ignored');
+
+  client.close();
+  await fetch(`${baseUrl}/api/karaoke/sessions/${roomData.id}/end`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenA}` }
+  });
+});
+
+test('session expiry host detection follows reassigned host, not stale host socket', async () => {
+  const { hasActiveHostConnection } = await import('../ws/index.js');
+  const formerHostSocket = { readyState: 1, userId: userAId, isAdmin: false };
+  const newHostSocket = { readyState: 1, userId: userBId, isAdmin: false };
+  const room = { clients: new Set([formerHostSocket, newHostSocket]) } as any;
+
+  assert.equal(hasActiveHostConnection(room, userBId), true, 'The reassigned host socket should keep the room active');
+  assert.equal(hasActiveHostConnection(room, 999999), false, 'An old host socket alone must not keep the room active');
+
+  newHostSocket.readyState = 3;
+  assert.equal(hasActiveHostConnection(room, userBId), false, 'A closed new-host socket must not count as active');
+});
+
+test('host reassignment resets the previous host heartbeat grace period', async () => {
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ roomName: 'Host heartbeat reassignment regression' })
+  });
+  assert.equal(createRes.status, 200);
+  const roomData = await createRes.json();
+
+  const { getOrCreateRoom, updateRoomHostId } = await import('../ws/index.js');
+  const room = await getOrCreateRoom(roomData.id);
+  room.lastHostHeartbeat = Date.now() - 120_000;
+  const before = room.lastHostHeartbeat;
+
+  updateRoomHostId(roomData.id, userBId);
+  assert.equal(room.hostId, userBId);
+  assert.ok(room.lastHostHeartbeat > before, 'Reassignment should start a fresh host grace period');
+
+  await fetch(`${baseUrl}/api/karaoke/sessions/${roomData.id}/end`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenA}` }
+  });
+});
+
+test('expired session cleanup closes the room and clears queue/controller state', async () => {
+  const createRes = await fetch(`${baseUrl}/api/karaoke/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ roomName: 'Expiry cleanup regression' })
+  });
+  assert.equal(createRes.status, 200);
+  const roomData = await createRes.json();
+  const controllerId = `expiry-cleanup-regression-${Date.now()}`;
+
+  await db.insert(controllers).values({
+    id: controllerId,
+    sessionId: roomData.id,
+    userId: userAId,
+    guestName: null,
+    device: 'regression-test',
+    connectionState: 'connected',
+    lastSeenTime: new Date(),
+  });
+  await db.insert(queueItems).values({
+    sessionId: roomData.id,
+    songId: null,
+    userId: userAId,
+    guestName: null,
+    controllerId,
+    addedAt: new Date(),
+    position: 1,
+    status: 'pending',
+    tempTitle: 'Expiry cleanup test',
+    tempArtist: 'Test',
+  });
+
+  const { cleanupExpiredSession } = await import('../ws/index.js');
+  await cleanupExpiredSession(roomData.id);
+
+  const [sessionAfter] = await db.select().from(sessions).where(eq(sessions.id, roomData.id)).limit(1);
+  const queueAfter = await db.select().from(queueItems).where(eq(queueItems.sessionId, roomData.id));
+  const [controllerAfter] = await db.select().from(controllers).where(eq(controllers.id, controllerId)).limit(1);
+  assert.equal(sessionAfter.status, 'closed');
+  assert.equal(queueAfter.length, 0, 'Expired room queue should be cleared');
+  assert.equal(controllerAfter.connectionState, 'disconnected', 'Expired room controllers should be disconnected');
+  await db.delete(controllers).where(eq(controllers.id, controllerId));
 });
 
 test('Close server', async () => {

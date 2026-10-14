@@ -97,6 +97,7 @@ export const queueItems = sqliteTable('queue_items', {
   songId: integer('song_id').references(() => songs.id, { onDelete: 'cascade' }),
   userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }), // null if queued by karaoke guest
   guestName: text('guest_name'),
+  controllerId: text('controller_id').references(() => controllers.id, { onDelete: 'set null' }), // exact guest requester for queue-item ownership
   addedAt: integer('added_at', { mode: 'timestamp' }).notNull(),
   position: integer('position').notNull(),
   status: text('status', { enum: ['pending', 'playing', 'finished'] }).notNull().default('pending'),

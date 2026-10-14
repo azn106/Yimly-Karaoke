@@ -25,7 +25,7 @@ const isProd = process.env.NODE_ENV === 'production';
 
 // Production configuration and secrets verification
 const JWT_SECRET = process.env.JWT_SECRET;
-if (isProd && (!JWT_SECRET || JWT_SECRET === 'fallback_secret_for_dev' || JWT_SECRET === 'change_this_to_a_long_random_secret_in_production')) {
+if (isProd && (!JWT_SECRET || JWT_SECRET === 'fallback_secret_for_dev' || JWT_SECRET === 'change_this_to_a_long_random_secret_in_production' || JWT_SECRET === 'yimly_production_secure_secret_change_me')) {
   console.error('🚨 CRITICAL CONFIGURATION ERROR: A secure JWT_SECRET environment variable must be specified in production mode.');
   process.exit(1);
 }

@@ -86,6 +86,11 @@ export interface ActiveDownloadJob {
   updatedAt: Date;
 }
 
+// Keep cancellation checks visible to TypeScript after awaits, where mutable job state may change.
+function isCancelledJob(job: ActiveDownloadJob): boolean {
+  return job.status === 'cancelled';
+}
+
 export function sanitizeFilename(str: string): string {
   if (!str) return 'Unknown';
   const cleaned = str.replace(/[/\\?%*:|"<>]/g, '').trim().replace(/^\.+|\.+$/g, '');
@@ -259,6 +264,9 @@ export class DownloadQueueManager {
       console.log(`[Downloader Queue] Initialized with concurrency ${this.maxConcurrency}. Recovered ${pendingJobs.length} active jobs.`);
       this.pumpQueue();
     } catch (err) {
+      // Allow a later addJob/init call to retry recovery after a transient DB
+      // failure instead of leaving the manager permanently marked initialized.
+      this.initialized = false;
       console.error('[Downloader Queue] Initialization error:', err);
     }
   }
@@ -534,14 +542,15 @@ export class DownloadQueueManager {
         this.activeWorkers++;
         // Start processing this track asynchronously
         this.processTrack(nextJob, nextTrack).finally(async () => {
-          this.activeWorkers--;
           try {
-            // Job-level finalization, including the library scan, must finish before
-            // another global pipeline is allowed to start.
+            // Keep the worker slot occupied through job finalization. Releasing it
+            // before the awaited DB/library work finishes lets another concurrent
+            // pumpQueue() call start a second global pipeline too early.
             await this.checkJobCompletion(nextJob!);
           } catch (err) {
             console.error('[Downloader] Job finalization failed:', err);
           } finally {
+            this.activeWorkers--;
             this.pumpQueue();
           }
         });
@@ -584,7 +593,7 @@ export class DownloadQueueManager {
   }
 
   private async processTrack(job: ActiveDownloadJob, track: ActiveTrackJob) {
-    if (job.status === 'cancelled') {
+    if (isCancelledJob(job)) {
       track.status = 'failed';
       track.error = 'Job cancelled by user';
       await this.persistTrackUpdate(track);
@@ -619,6 +628,14 @@ export class DownloadQueueManager {
                 saveLrcSidecar(finalDestFile, lyricsResult.synced);
               }
             } catch {}
+          }
+
+          if (isCancelledJob(job)) {
+            track.status = 'failed';
+            track.progress = 0;
+            track.error = 'Job cancelled by user';
+            await this.persistTrackUpdate(track);
+            return;
           }
 
           track.status = 'completed';
@@ -807,12 +824,28 @@ export class DownloadQueueManager {
           }
         }
 
+        // Cancellation may happen while lyrics or artwork are being fetched. Do not
+        // publish a file or start downstream song processing after cancellation.
+        if (isCancelledJob(job)) {
+          track.status = 'failed';
+          track.progress = 0;
+          track.error = 'Job cancelled by user';
+          try {
+            if (fs.existsSync(tmpJobDir)) {
+              fs.rmSync(tmpJobDir, { recursive: true, force: true });
+            }
+          } catch {}
+          await this.persistTrackUpdate(track);
+          return;
+        }
+
         // Ensure destination artist directory exists
         if (!fs.existsSync(artistDir)) {
           fs.mkdirSync(artistDir, { recursive: true });
         }
 
-        // Move to final library destination
+        // Move to final library destination. Keep this synchronous section free of
+        // awaits so cancelJob cannot interleave between the final check and publish.
         fs.copyFileSync(downloadedAudioPath, finalDestFile);
 
         // Save LRC sidecar if lyrics available
@@ -897,6 +930,29 @@ export class DownloadQueueManager {
               album: track.album || undefined,
               duration: track.duration || undefined,
             });
+
+            // Cancellation can arrive while the serialized Demucs/FFmpeg/indexing
+            // pipeline is running. Do not overwrite the cancelled job's failed-track
+            // state with completed when that in-flight pipeline eventually settles.
+            if (this.memoryJobs.get(track.jobId)?.status === 'cancelled') {
+              track.status = 'failed';
+              track.progress = 0;
+              track.error = 'Job cancelled by user';
+              await db.update(downloadTrackJobs).set({
+                status: 'failed',
+                progress: 0,
+                error: 'Job cancelled by user',
+                updatedAt: new Date(),
+              }).where(eq(downloadTrackJobs.id, track.id));
+              await db.update(queueItems).set({ downloadStatus: 'failed' })
+                .where(eq(queueItems.downloadTrackId, track.id));
+              const cancelledQueues = await db.select().from(queueItems)
+                .where(eq(queueItems.downloadTrackId, track.id));
+              const sessionIds = Array.from(new Set(cancelledQueues.map(q => q.sessionId)));
+              const { notifyQueueUpdate } = await import('../ws/index.js');
+              for (const sessionId of sessionIds) notifyQueueUpdate(sessionId);
+              return;
+            }
 
             await db.update(downloadTrackJobs).set({
               status: 'completed',
