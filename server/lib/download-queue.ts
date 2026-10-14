@@ -690,7 +690,7 @@ export class DownloadQueueManager {
               releaseYear: track.releaseYear,
             });
 
-            if (ytMatch && ytMatch.candidate?.url) {
+            if (ytMatch && ytMatch.candidate?.url && ytMatch.score >= 40) {
               targetDownloadUrl = ytMatch.candidate.url;
               track.sourceUrl = targetDownloadUrl;
               // Persist resolved YouTube URL to database
@@ -700,7 +700,7 @@ export class DownloadQueueManager {
 
               console.log(`[Downloader Queue] Matched "${track.title}" -> ${targetDownloadUrl} (Spotify: ${track.duration || '?'}s, YT: ${ytMatch.candidate.duration}s, Diff: ${ytMatch.durationDiff}s, Score: ${ytMatch.score})`);
             } else {
-              console.warn(`[Downloader Queue] No YouTube Music match found for "${track.title}" by "${track.artist}"`);
+              console.warn(`[Downloader Queue] No credible YouTube Music match found for "${track.title}" by "${track.artist}" (score too low or rejected)`);
             }
           } catch (matchErr: any) {
             console.warn(`[Downloader Queue] Matching error for "${track.title}":`, matchErr?.message || matchErr);
@@ -710,7 +710,7 @@ export class DownloadQueueManager {
         // If matching failed completely and no target URL available, fail this individual track cleanly
         if (!targetDownloadUrl || targetDownloadUrl.includes('spotify.com/')) {
           track.status = 'failed';
-          track.error = 'No matching YouTube Music audio stream found for track';
+          track.error = 'No credible matching official audio stream found for track';
           track.progress = 0;
           await this.persistTrackUpdate(track);
           await this.checkJobCompletion(job);
@@ -808,17 +808,30 @@ export class DownloadQueueManager {
                 const imgRes = await fetch(track.artworkUrl);
                 if (imgRes.ok) {
                   const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+                  let mimeType = 'image/jpeg';
+                  const headerType = (imgRes.headers.get('content-type') || '').toLowerCase();
+                  if (headerType.includes('png') || (imgBuf.length >= 4 && imgBuf[0] === 0x89 && imgBuf[1] === 0x50 && imgBuf[2] === 0x4E && imgBuf[3] === 0x47)) {
+                    mimeType = 'image/png';
+                  } else if (headerType.includes('webp') || (imgBuf.length >= 12 && imgBuf.slice(0, 4).toString() === 'RIFF' && imgBuf.slice(8, 12).toString() === 'WEBP')) {
+                    mimeType = 'image/webp';
+                  }
+
                   tags.image = {
-                    mime: 'image/jpeg',
+                    mime: mimeType,
                     type: { id: 3, name: 'front cover' },
                     description: 'Cover',
                     imageBuffer: imgBuf,
                   };
                 }
-              } catch {}
+              } catch (artErr) {
+                console.warn('[Downloader] Artwork fetch notice:', artErr);
+              }
             }
 
-            NodeID3.write(tags, downloadedAudioPath);
+            const writeOk = NodeID3.write(tags, downloadedAudioPath);
+            if (!writeOk) {
+              console.warn('[Downloader] NodeID3.write reported failure for:', downloadedAudioPath);
+            }
           } catch (tagErr) {
             console.warn('[Downloader] ID3 Tag embedding warning:', tagErr);
           }
@@ -929,6 +942,10 @@ export class DownloadQueueManager {
               artist: track.artist,
               album: track.album || undefined,
               duration: track.duration || undefined,
+              trackNumber: track.trackNumber || undefined,
+              discNumber: track.discNumber || undefined,
+              releaseYear: track.releaseYear || undefined,
+              artworkUrl: track.artworkUrl || undefined,
             });
 
             // Cancellation can arrive while the serialized Demucs/FFmpeg/indexing

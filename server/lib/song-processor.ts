@@ -17,6 +17,10 @@ export interface ProcessSongRequest {
   artist: string;
   album?: string;
   duration?: number;
+  trackNumber?: number;
+  discNumber?: number;
+  releaseYear?: number;
+  artworkUrl?: string;
 }
 
 function atomicWriteFile(targetPath: string, content: string) {
@@ -124,12 +128,22 @@ export async function processDownloadedSong(req: ProcessSongRequest): Promise<vo
       console.warn(`[SongProcessor] Cloud lyrics fetch failed (non-fatal):`, lyricErr);
     }
 
-    // 4. Library Registration: Scan and index the finalized files
+    // 4. Library Registration: Scan and index the finalized files with canonical metadata
     console.log(`[SongProcessor] Registering completed audio files in library ${libraryId}...`);
+    const canonicalMeta = {
+      title,
+      artist,
+      album,
+      duration,
+      trackNumber: req.trackNumber,
+      discNumber: req.discNumber,
+      year: req.releaseYear,
+      artworkUrl: req.artworkUrl,
+    };
     // Import both main and instrumental files
-    const imported = await importSingleAudioFile(libraryId, originalAudioPath);
+    const imported = await importSingleAudioFile(libraryId, originalAudioPath, canonicalMeta);
     if (fs.existsSync(targetInstrumentalPath)) {
-      await importSingleAudioFile(libraryId, targetInstrumentalPath);
+      await importSingleAudioFile(libraryId, targetInstrumentalPath, canonicalMeta);
     }
 
     if (!imported || imported.length === 0 || !imported[0]?.id) {

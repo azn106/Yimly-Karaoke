@@ -136,6 +136,9 @@ router.post('/settings', async (req, res) => {
   }
 });
 
+import { searchYouTubeCandidates, scoreCandidate, YouTubeCandidate } from '../lib/youtube-matcher.js';
+import { cleanString, detectTrackIntent, normalizeCanonicalMetadata } from '../lib/canonical-metadata.js';
+
 // -------------------------------------------------------------------
 // RESOLVE & METADATA ENDPOINT (Supports full playlist extraction)
 // -------------------------------------------------------------------
@@ -167,10 +170,14 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
       const tracks = lines.map((line, idx) => {
         try {
           const parsed = JSON.parse(line);
+          const rawTitle = parsed.title || 'Unknown Title';
+          const rawArtist = parsed.uploader || parsed.artist || 'Unknown Artist';
+          const intent = detectTrackIntent(rawTitle, rawArtist);
+
           return {
-            title: parsed.title || 'Unknown Title',
-            artist: parsed.uploader || parsed.artist || 'Unknown Artist',
-            album: 'YouTube Playlist',
+            title: intent.coreTitle,
+            artist: intent.mainArtist,
+            album: 'Single',
             trackNumber: idx + 1,
             sourceUrl: parsed.url || (parsed.id ? `https://www.youtube.com/watch?v=${parsed.id}` : undefined),
             artworkUrl: parsed.thumbnails?.[0]?.url || '',
@@ -195,13 +202,64 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
       ]);
 
       const parsed = JSON.parse(stdout);
+      const rawTitle = parsed.track || parsed.title || 'Unknown Title';
+      const rawArtist = parsed.artist || parsed.uploader || 'Unknown Artist';
+      const intent = detectTrackIntent(rawTitle, rawArtist);
+
+      let canonicalTitle = intent.coreTitle;
+      let canonicalArtist = intent.mainArtist;
+      let canonicalAlbum = parsed.album || 'Single';
+      let canonicalArtwork = parsed.thumbnail || (parsed.thumbnails?.[0]?.url || '');
+      let duration = Math.round(parsed.duration || 0);
+      let releaseYear: number | undefined = undefined;
+
+      // Attempt catalogue enrichment to find square album artwork and canonical album name
+      // without changing the audio source URL (which remains the user's supplied YouTube URL)
+      try {
+        const queryTerm = `${canonicalArtist} ${canonicalTitle}`;
+        const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&entity=song&limit=5`);
+        if (itunesRes.ok) {
+          const itunesData = await itunesRes.json();
+          const cleanTargetTitle = cleanString(canonicalTitle);
+          const cleanTargetArtist = cleanString(canonicalArtist);
+
+          const match = itunesData.results?.find((r: any) => {
+            const rTitle = cleanString(r.trackName);
+            const rArtist = cleanString(r.artistName);
+            const titleMatches = rTitle.includes(cleanTargetTitle) || cleanTargetTitle.includes(rTitle);
+            const artistMatches = rArtist.includes(cleanTargetArtist) || cleanTargetArtist.includes(rArtist);
+            const itunesDur = Math.round((r.trackTimeMillis || 0) / 1000);
+            const durationMatches = duration > 0 ? Math.abs(itunesDur - duration) <= 25 : true;
+            return titleMatches && artistMatches && durationMatches;
+          });
+
+          if (match) {
+            canonicalTitle = match.trackName || canonicalTitle;
+            canonicalArtist = match.artistName || canonicalArtist;
+            canonicalAlbum = match.collectionName || canonicalAlbum;
+            if (match.artworkUrl100) {
+              canonicalArtwork = match.artworkUrl100.replace('100x100bb', '600x600bb');
+            }
+            if (match.releaseDate) {
+              releaseYear = new Date(match.releaseDate).getFullYear();
+            }
+            if (!duration && match.trackTimeMillis) {
+              duration = Math.round(match.trackTimeMillis / 1000);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Downloader] YouTube catalogue resolution notice:', err);
+      }
+
       const track = {
-        title: parsed.track || parsed.title || 'Unknown Title',
-        artist: parsed.artist || parsed.uploader || 'Unknown Artist',
-        album: parsed.album || 'Single',
-        duration: Math.round(parsed.duration || 0),
-        artworkUrl: parsed.thumbnail || (parsed.thumbnails?.[0]?.url || ''),
-        sourceUrl: trimmed,
+        title: canonicalTitle,
+        artist: canonicalArtist,
+        album: canonicalAlbum,
+        duration,
+        artworkUrl: canonicalArtwork,
+        releaseYear,
+        sourceUrl: trimmed, // Preserve user's supplied YouTube URL as audio source!
       };
 
       return {
@@ -215,35 +273,191 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
     }
   }
 
-  // 3. Text Search Query (via iTunes Search API + fallback)
-  const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(trimmed)}&entity=song&limit=15`;
-  const itunesRes = await fetch(itunesUrl);
-  if (itunesRes.ok) {
-    const itunesData = await itunesRes.json();
-    if (itunesData.results && itunesData.results.length > 0) {
-      const tracks = itunesData.results.map((item: any, idx: number) => ({
-        title: item.trackName || 'Unknown Title',
-        artist: item.artistName || 'Unknown Artist',
-        album: item.collectionName || 'Single',
-        trackNumber: item.trackNumber || idx + 1,
-        discNumber: item.discNumber || 1,
-        releaseYear: item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined,
-        artworkUrl: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : '',
-        duration: Math.round((item.trackTimeMillis || 0) / 1000),
-      }));
+  // 3. Multi-Query Text Search with intelligent expansion & provider fallbacks
+  const searchQueries: string[] = [trimmed];
 
-      return {
-        type: 'search',
-        query: trimmed,
-        tracks,
-      };
+  const unquoted = trimmed.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
+  if (unquoted && unquoted !== trimmed) {
+    searchQueries.push(unquoted);
+  }
+
+  const queryIntent = detectTrackIntent(unquoted || trimmed, '');
+
+  // Try title + main artist: "Superhuman Chris Brown", "Chris Brown Superhuman"
+  if (queryIntent.coreTitle && queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') {
+    searchQueries.push(`${queryIntent.coreTitle} ${queryIntent.mainArtist}`);
+    searchQueries.push(`${queryIntent.mainArtist} ${queryIntent.coreTitle}`);
+    if (queryIntent.featuredArtists.length > 0) {
+      searchQueries.push(`${queryIntent.coreTitle} ${queryIntent.mainArtist} ${queryIntent.featuredArtists[0]}`);
+      searchQueries.push(`${queryIntent.mainArtist} ${queryIntent.coreTitle} ${queryIntent.featuredArtists[0]}`);
+      searchQueries.push(`${queryIntent.coreTitle} ${queryIntent.featuredArtists[0]}`);
     }
   }
 
-  // Fallback search via yt-dlp search
+  // Check for pattern: "{Artist} (featuring|feat|ft) {Featured} {Title}"
+  const featInMiddleMatch = (unquoted || trimmed).match(/^(.*?)\s+(?:featuring|feat\.?|ft\.?)\s+(.*?)\s+([A-Za-z0-9' ]+)$/i);
+  if (featInMiddleMatch) {
+    const pArtist = featInMiddleMatch[1].trim();
+    const pFeat = featInMiddleMatch[2].trim();
+    const pTitle = featInMiddleMatch[3].trim();
+    searchQueries.push(`${pTitle} ${pArtist}`);
+    searchQueries.push(`${pArtist} ${pTitle}`);
+    searchQueries.push(`${pTitle} ${pFeat}`);
+    searchQueries.push(`${pArtist} ${pFeat} ${pTitle}`);
+  }
+
+  // Try cleaned core title if different
+  if (queryIntent.coreTitle && queryIntent.coreTitle !== trimmed && queryIntent.coreTitle.length > 2) {
+    searchQueries.push(queryIntent.coreTitle);
+  }
+
+  const uniqueQueries = Array.from(new Set(searchQueries.map(q => q.trim()).filter(Boolean)));
+  const seenTrackKeys = new Set<string>();
+  const collectedTracks: any[] = [];
+
+  // Stage A: Apple iTunes Search with query expansion & strict artist/version relevance validation
+  for (const q of uniqueQueries) {
+    try {
+      const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=15`;
+      const itunesRes = await fetch(itunesUrl);
+      if (itunesRes.ok) {
+        const itunesData = await itunesRes.json();
+        if (Array.isArray(itunesData.results) && itunesData.results.length > 0) {
+          const cleanCore = cleanString(queryIntent.coreTitle || trimmed);
+          const cleanArtist = queryIntent.mainArtist !== 'Unknown Artist' ? cleanString(queryIntent.mainArtist) : '';
+
+          for (const item of itunesData.results) {
+            const trackTitle = item.trackName || '';
+            const trackArtist = item.artistName || '';
+            const cleanTTitle = cleanString(trackTitle);
+            const cleanTArtist = cleanString(trackArtist);
+
+            // 1. Exclude unwanted karaoke, covers, tributes, in the style of unless user requested it
+            const itemIntent = detectTrackIntent(trackTitle, trackArtist);
+            if (!queryIntent.isKaraoke && !queryIntent.isCover && !queryIntent.isInstrumental) {
+              if (itemIntent.isKaraoke || itemIntent.isCover || itemIntent.isInstrumental) {
+                continue;
+              }
+              const unwantedPhrases = ['in the style of', 'made famous by', 'originally performed by', 'karaoke version'];
+              if (unwantedPhrases.some(phrase => cleanTTitle.includes(phrase) || cleanTArtist.includes(phrase))) {
+                continue;
+              }
+            }
+
+            // 2. Verify title relevance
+            const titleMatches = cleanTTitle.includes(cleanCore) || cleanCore.includes(cleanTTitle) ||
+              cleanCore.split(' ').filter(w => w.length > 2).some(w => cleanTTitle.includes(w));
+
+            if (!titleMatches && cleanCore.length > 3) {
+              continue;
+            }
+
+            // 3. Verify artist relevance if target artist is known
+            if (cleanArtist) {
+              const artistMatches = cleanTArtist.includes(cleanArtist) || cleanArtist.includes(cleanTArtist) ||
+                cleanArtist.split(' ').filter(w => w.length > 2).every(w => cleanTArtist.includes(w) || cleanTTitle.includes(w));
+              if (!artistMatches) {
+                continue; // Reject tracks by different artists
+              }
+            }
+
+            const dedupKey = `${cleanTTitle}|${cleanTArtist}`;
+            if (seenTrackKeys.has(dedupKey)) continue;
+            seenTrackKeys.add(dedupKey);
+
+            collectedTracks.push({
+              title: trackTitle || 'Unknown Title',
+              artist: trackArtist || 'Unknown Artist',
+              album: item.collectionName || 'Single',
+              trackNumber: item.trackNumber || collectedTracks.length + 1,
+              discNumber: item.discNumber || 1,
+              releaseYear: item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined,
+              artworkUrl: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : '',
+              duration: Math.round((item.trackTimeMillis || 0) / 1000),
+            });
+          }
+
+          if (collectedTracks.length >= 3) {
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[Downloader] iTunes query "${q}" notice:`, e);
+    }
+  }
+
+  // If iTunes yielded relevant matches, return them!
+  if (collectedTracks.length > 0) {
+    return {
+      type: 'search',
+      query: trimmed,
+      tracks: collectedTracks.slice(0, 20),
+    };
+  }
+
+  // Stage B: Fallback to YouTube Music & InnerTube search (e.g. for songs missing in iTunes)
+  try {
+    const candidatePool: YouTubeCandidate[] = [];
+    const poolSeenIds = new Set<string>();
+
+    for (const q of uniqueQueries.slice(0, 4)) {
+      const ytCandidates = await searchYouTubeCandidates(q);
+      for (const c of ytCandidates) {
+        if (!poolSeenIds.has(c.id)) {
+          poolSeenIds.add(c.id);
+          candidatePool.push(c);
+        }
+      }
+      if (candidatePool.length >= 10) break;
+    }
+
+    // Score and rank candidates against the target query intent
+    const targetMeta = {
+      title: queryIntent.coreTitle || trimmed,
+      artist: queryIntent.mainArtist !== 'Unknown Artist' ? queryIntent.mainArtist : trimmed,
+    };
+
+    const scoredCandidates = candidatePool
+      .filter(c => c.duration <= 1200) // Disqualify long compilations
+      .map(c => scoreCandidate(targetMeta, c))
+      .filter(s => s.score >= 40) // Exclude negative and very poor matches (covers, karaoke)
+      .sort((a, b) => b.score - a.score);
+
+    for (const s of scoredCandidates) {
+      const c = s.candidate;
+      const cleanCTitle = cleanString(c.title);
+      const cleanCArtist = cleanString(c.artist);
+      const dedupKey = `${cleanCTitle}|${cleanCArtist}`;
+      if (seenTrackKeys.has(dedupKey)) continue;
+      seenTrackKeys.add(dedupKey);
+
+      collectedTracks.push({
+        title: c.title || 'Unknown Title',
+        artist: c.artist || 'Unknown Artist',
+        album: c.album || 'YouTube',
+        trackNumber: collectedTracks.length + 1,
+        sourceUrl: c.url,
+        artworkUrl: c.thumbnailUrl || '',
+        duration: c.duration,
+      });
+    }
+
+    if (collectedTracks.length > 0) {
+      return {
+        type: 'search',
+        query: trimmed,
+        tracks: collectedTracks.slice(0, 20),
+      };
+    }
+  } catch (ytErr) {
+    console.warn('[Downloader] YouTube search fallback notice:', ytErr);
+  }
+
+  // Stage C: Final fallback to yt-dlp search
   const ytDlpPath = await getYtDlpPath();
   const { stdout } = await execFilePromise(ytDlpPath, [
-    `ytsearch5:${trimmed}`,
+    `ytsearch10:${trimmed}`,
     '--dump-json',
     '--flat-playlist',
     '--js-runtimes',

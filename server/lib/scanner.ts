@@ -39,43 +39,53 @@ export function selectFrontCover(pictures?: mm.IPicture[]): mm.IPicture | null {
 }
 
 /**
- * Saves embedded picture buffer to cached artwork directory using content-based SHA-256 hash.
+ * Saves picture buffer to cached artwork directory using content-based SHA-256 hash.
  * Returns the cached filename (e.g. hash.jpg or hash.png).
  */
-export async function saveEmbeddedArtwork(picture: mm.IPicture): Promise<string> {
+export async function saveArtworkBuffer(data: Buffer | Uint8Array, format?: string): Promise<string> {
   if (!fsSync.existsSync(artworkDir)) {
     await fs.mkdir(artworkDir, { recursive: true });
   }
 
-  // Determine file extension
   let ext = 'jpg';
-  const format = (picture.format || '').toLowerCase();
-  if (format.includes('png')) {
+  const fmt = (format || '').toLowerCase();
+  if (fmt.includes('png')) {
     ext = 'png';
-  } else if (format.includes('webp')) {
+  } else if (fmt.includes('webp')) {
     ext = 'webp';
-  } else if (format.includes('gif')) {
+  } else if (fmt.includes('gif')) {
     ext = 'gif';
-  } else if (format.includes('jpeg') || format.includes('jpg')) {
-    ext = 'jpg';
-  } else if (picture.data && picture.data.length >= 4) {
-    if (picture.data[0] === 0x89 && picture.data[1] === 0x50 && picture.data[2] === 0x4E && picture.data[3] === 0x47) {
+  } else if (data && data.length >= 4) {
+    if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
       ext = 'png';
-    } else if (picture.data[0] === 0xFF && picture.data[1] === 0xD8 && picture.data[2] === 0xFF) {
+    } else if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) {
       ext = 'jpg';
+    } else if (
+      data.length >= 12 &&
+      data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 &&
+      data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50
+    ) {
+      ext = 'webp';
     }
   }
 
-  const hash = crypto.createHash('sha256').update(picture.data).digest('hex');
+  const hash = crypto.createHash('sha256').update(data).digest('hex');
   const filename = `${hash}.${ext}`;
   const filePath = path.join(artworkDir, filename);
 
-  // If already cached, reuse existing file without re-writing
   if (!fsSync.existsSync(filePath)) {
-    await fs.writeFile(filePath, Buffer.from(picture.data));
+    await fs.writeFile(filePath, Buffer.from(data));
   }
 
   return filename;
+}
+
+/**
+ * Saves embedded picture buffer to cached artwork directory using content-based SHA-256 hash.
+ * Returns the cached filename (e.g. hash.jpg or hash.png).
+ */
+export async function saveEmbeddedArtwork(picture: mm.IPicture): Promise<string> {
+  return await saveArtworkBuffer(picture.data, picture.format);
 }
 
 export interface ScannedMediaMetadata {
@@ -735,15 +745,71 @@ export async function reconcileDuplicateSongs(libraryId: number, filterTitle?: s
   return mergedCount;
 }
 
+export interface CanonicalImportMetadata {
+  title?: string;
+  artist?: string;
+  album?: string;
+  duration?: number;
+  trackNumber?: number;
+  discNumber?: number;
+  year?: number;
+  artworkUrl?: string;
+}
+
 /**
  * Incrementally imports or updates a single audio file into the database.
  */
-export async function importSingleAudioFile(libraryId: number, audioFullPath: string): Promise<any> {
+export async function importSingleAudioFile(
+  libraryId: number,
+  audioFullPath: string,
+  canonicalMeta?: CanonicalImportMetadata
+): Promise<any> {
   if (!fsSync.existsSync(audioFullPath)) {
     return null;
   }
 
   const metadata = await extractSongMetadata(audioFullPath);
+
+  // If canonical metadata is supplied from the authoritative download pipeline,
+  // apply it so file-tag omissions or filename-guessing never degrade metadata.
+  if (canonicalMeta) {
+    if (canonicalMeta.title) {
+      metadata.title = cleanSongTitle(canonicalMeta.title);
+    }
+    if (canonicalMeta.artist) {
+      metadata.artists = parseArtists(canonicalMeta.artist);
+    }
+    if (canonicalMeta.album && !['spotify playlist', 'youtube playlist', 'unknown album', 'single'].includes(canonicalMeta.album.toLowerCase())) {
+      metadata.album = canonicalMeta.album;
+    }
+    if (canonicalMeta.duration && canonicalMeta.duration > 0 && (!metadata.duration || metadata.duration <= 0)) {
+      metadata.duration = canonicalMeta.duration;
+    }
+    if (canonicalMeta.trackNumber && !metadata.trackNumber) {
+      metadata.trackNumber = canonicalMeta.trackNumber;
+    }
+    if (canonicalMeta.discNumber && !metadata.discNumber) {
+      metadata.discNumber = canonicalMeta.discNumber;
+    }
+    if (canonicalMeta.year && !metadata.year) {
+      metadata.year = canonicalMeta.year;
+    }
+
+    // If artwork is not yet extracted from audio file, download and cache canonical artwork
+    if (!metadata.artworkPath && canonicalMeta.artworkUrl) {
+      try {
+        const artRes = await fetch(canonicalMeta.artworkUrl);
+        if (artRes.ok) {
+          const artBuf = Buffer.from(await artRes.arrayBuffer());
+          const fmt = artRes.headers.get('content-type') || 'image/jpeg';
+          metadata.artworkPath = await saveArtworkBuffer(artBuf, fmt);
+        }
+      } catch (artErr) {
+        console.warn('[Scanner] Failed downloading canonical artwork notice:', artErr);
+      }
+    }
+  }
+
   const matchedLyrics = await findLyricsForAudio(audioFullPath, metadata.title);
   const normTitle = normalizeSongTitle(metadata.title);
 

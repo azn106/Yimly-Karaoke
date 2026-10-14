@@ -2,7 +2,14 @@
  * Spotify Metadata Resolver for Yimly
  * Extracts track lists, album info, and track metadata from Spotify URLs
  * without depending on yt-dlp (which fails on Spotify due to DRM checks).
+ * 
+ * Enforces canonical metadata principles:
+ * - Playlist title is NEVER assigned as the album title of tracks.
+ * - Playlist thumbnail is NEVER assigned as track-specific album artwork.
+ * - Each track resolves its own album, artwork, artists, and duration.
  */
+
+import { cleanString, normalizeCanonicalMetadata } from './canonical-metadata.js';
 
 export interface SpotifyResolvedTrack {
   title: string;
@@ -45,6 +52,11 @@ function parseSpotifyUrl(input: string): { type: 'track' | 'album' | 'playlist' 
 }
 
 /**
+ * Cache for individual track resolutions to accelerate playlist imports
+ */
+const trackResolutionCache = new Map<string, SpotifyResolvedTrack>();
+
+/**
  * Resolve Spotify Track, Album, or Playlist to metadata
  */
 export async function resolveSpotifyEntity(urlOrUri: string): Promise<SpotifyResolvedEntity> {
@@ -69,7 +81,19 @@ export async function resolveSpotifyEntity(urlOrUri: string): Promise<SpotifyRes
 /**
  * Extract Spotify Track
  */
-async function resolveSpotifyTrack(id: string): Promise<SpotifyResolvedEntity> {
+export async function resolveSpotifyTrack(id: string): Promise<SpotifyResolvedEntity> {
+  if (trackResolutionCache.has(id)) {
+    const cached = trackResolutionCache.get(id)!;
+    return {
+      type: 'track',
+      title: cached.title,
+      artist: cached.artist,
+      artworkUrl: cached.artworkUrl,
+      totalTracks: 1,
+      tracks: [{ ...cached }],
+    };
+  }
+
   const embedUrl = `https://open.spotify.com/embed/track/${id}`;
   const res = await fetch(embedUrl, {
     headers: {
@@ -113,16 +137,21 @@ async function resolveSpotifyTrack(id: string): Promise<SpotifyResolvedEntity> {
     }
   }
 
-  // Enrich with iTunes Search API if album or year missing
+  // Enrich with iTunes Search API if album or artwork missing
   if (album === 'Single' || !artworkUrl || !releaseYear) {
     try {
       const itunesRes = await fetch(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=song&limit=1`
+        `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=song&limit=3`
       );
       if (itunesRes.ok) {
         const itunesData = await itunesRes.json();
-        if (itunesData.results?.[0]) {
-          const match = itunesData.results[0];
+        const cleanTitle = cleanString(title);
+        const match = itunesData.results?.find((r: any) => {
+          const rTitle = cleanString(r.trackName);
+          return rTitle.includes(cleanTitle) || cleanTitle.includes(rTitle);
+        }) || itunesData.results?.[0];
+
+        if (match) {
           title = title === 'Unknown Title' ? match.trackName : title;
           artist = artist === 'Unknown Artist' ? match.artistName : artist;
           album = album === 'Single' && match.collectionName ? match.collectionName : album;
@@ -151,6 +180,8 @@ async function resolveSpotifyTrack(id: string): Promise<SpotifyResolvedEntity> {
     discNumber: 1,
     spotifyId: id,
   };
+
+  trackResolutionCache.set(id, track);
 
   return {
     type: 'track',
@@ -203,6 +234,9 @@ async function resolveSpotifyAlbum(id: string): Promise<SpotifyResolvedEntity> {
           if (entity.coverArt?.sources?.[0]?.url) {
             artworkUrl = entity.coverArt.sources[0].url;
           }
+          if (entity.releaseDate) {
+            releaseYear = new Date(entity.releaseDate).getFullYear();
+          }
           if (Array.isArray(entity.trackList) && entity.trackList.length > 0) {
             entity.trackList.forEach((t: any, idx: number) => {
               tracks.push({
@@ -212,6 +246,7 @@ async function resolveSpotifyAlbum(id: string): Promise<SpotifyResolvedEntity> {
                 trackNumber: t.trackNumber || idx + 1,
                 duration: t.duration ? Math.round(t.duration / 1000) : undefined,
                 artworkUrl,
+                releaseYear,
                 spotifyId: t.uri ? t.uri.replace('spotify:track:', '') : undefined,
               });
             });
@@ -243,7 +278,7 @@ async function resolveSpotifyAlbum(id: string): Promise<SpotifyResolvedEntity> {
               album: item.collectionName || albumTitle,
               trackNumber: item.trackNumber || idx + 1,
               discNumber: item.discNumber || 1,
-              releaseYear: item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined,
+              releaseYear: item.releaseDate ? new Date(item.releaseDate).getFullYear() : releaseYear,
               duration: Math.round((item.trackTimeMillis || 0) / 1000),
               artworkUrl: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : artworkUrl,
             });
@@ -268,7 +303,7 @@ async function resolveSpotifyAlbum(id: string): Promise<SpotifyResolvedEntity> {
 }
 
 /**
- * Extract Spotify Playlist (Supports playlists of all sizes)
+ * Extract Spotify Playlist (Supports playlists of all sizes, resolves each track independently)
  */
 async function resolveSpotifyPlaylist(id: string): Promise<SpotifyResolvedEntity> {
   const embedUrl = `https://open.spotify.com/embed/playlist/${id}`;
@@ -279,8 +314,8 @@ async function resolveSpotifyPlaylist(id: string): Promise<SpotifyResolvedEntity
   });
 
   let playlistTitle = 'Spotify Playlist';
-  let artworkUrl = '';
-  const tracks: SpotifyResolvedTrack[] = [];
+  let playlistArtworkUrl = '';
+  const rawTracks: SpotifyResolvedTrack[] = [];
 
   // 1. Fetch oEmbed for playlist title and thumbnail
   try {
@@ -288,7 +323,7 @@ async function resolveSpotifyPlaylist(id: string): Promise<SpotifyResolvedEntity
     if (oembedRes.ok) {
       const oembedData = await oembedRes.json();
       playlistTitle = oembedData.title || playlistTitle;
-      artworkUrl = oembedData.thumbnail_url || artworkUrl;
+      playlistArtworkUrl = oembedData.thumbnail_url || playlistArtworkUrl;
     }
   } catch {}
 
@@ -303,18 +338,20 @@ async function resolveSpotifyPlaylist(id: string): Promise<SpotifyResolvedEntity
         if (entity) {
           playlistTitle = entity.name || entity.title || playlistTitle;
           if (entity.coverArt?.sources?.[0]?.url) {
-            artworkUrl = entity.coverArt.sources[0].url;
+            playlistArtworkUrl = entity.coverArt.sources[0].url;
           }
 
           if (Array.isArray(entity.trackList)) {
             entity.trackList.forEach((t: any, idx: number) => {
-              tracks.push({
+              // Critical: DO NOT assign playlistTitle as track album!
+              // DO NOT assign playlistArtworkUrl as track artwork!
+              rawTracks.push({
                 title: t.title || t.name || `Track ${idx + 1}`,
                 artist: t.subtitle || 'Unknown Artist',
-                album: playlistTitle,
+                album: '', // Will be resolved per-track, never the playlist name
                 trackNumber: idx + 1,
                 duration: t.duration ? Math.round(t.duration / 1000) : undefined,
-                artworkUrl,
+                artworkUrl: undefined, // Will be resolved per-track
                 spotifyId: t.uri ? t.uri.replace('spotify:track:', '') : undefined,
               });
             });
@@ -326,13 +363,77 @@ async function resolveSpotifyPlaylist(id: string): Promise<SpotifyResolvedEntity
     }
   }
 
-  console.log(`[Spotify] Playlist resolved: "${playlistTitle}" (${tracks.length} tracks)`);
+  // 3. Enrich tracks individually so each has its own album and album artwork
+  const enrichedTracks: SpotifyResolvedTrack[] = [...rawTracks];
+  const concurrency = 5;
+
+  for (let i = 0; i < rawTracks.length; i += concurrency) {
+    const batch = rawTracks.slice(i, i + concurrency);
+    await Promise.all(batch.map(async (t, batchIdx) => {
+      const targetIdx = i + batchIdx;
+
+      // Try Spotify track embed if spotifyId exists
+      if (t.spotifyId) {
+        try {
+          const trackRes = await resolveSpotifyTrack(t.spotifyId);
+          if (trackRes?.tracks?.[0]) {
+            const tr = trackRes.tracks[0];
+            enrichedTracks[targetIdx] = {
+              ...t,
+              title: tr.title || t.title,
+              artist: tr.artist || t.artist,
+              album: (tr.album && tr.album !== 'Single') ? tr.album : (t.album || 'Single'),
+              artworkUrl: tr.artworkUrl || t.artworkUrl,
+              releaseYear: tr.releaseYear || t.releaseYear,
+              duration: tr.duration || t.duration,
+            };
+            return;
+          }
+        } catch {}
+      }
+
+      // Fallback: iTunes search enrichment
+      try {
+        const itunesRes = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(`${t.artist} ${t.title}`)}&entity=song&limit=3`
+        );
+        if (itunesRes.ok) {
+          const itunesData = await itunesRes.json();
+          const cleanTTitle = cleanString(t.title);
+          const cleanTArtist = cleanString(t.artist);
+          const match = itunesData.results?.find((r: any) => {
+            const matchTitle = cleanString(r.trackName);
+            const matchArtist = cleanString(r.artistName);
+            return (matchTitle.includes(cleanTTitle) || cleanTTitle.includes(matchTitle)) &&
+                   (matchArtist.includes(cleanTArtist) || cleanTArtist.includes(matchArtist));
+          });
+
+          if (match) {
+            enrichedTracks[targetIdx] = {
+              ...t,
+              album: match.collectionName || t.album || 'Single',
+              artworkUrl: match.artworkUrl100 ? match.artworkUrl100.replace('100x100bb', '600x600bb') : t.artworkUrl,
+              releaseYear: match.releaseDate ? new Date(match.releaseDate).getFullYear() : t.releaseYear,
+              duration: t.duration || Math.round((match.trackTimeMillis || 0) / 1000),
+            };
+          }
+        }
+      } catch {}
+
+      // If no album was resolved, fallback to 'Single', never the playlist title
+      if (!enrichedTracks[targetIdx].album) {
+        enrichedTracks[targetIdx].album = 'Single';
+      }
+    }));
+  }
+
+  console.log(`[Spotify] Playlist resolved: "${playlistTitle}" with ${enrichedTracks.length} individual tracks enriched`);
 
   return {
     type: 'playlist',
     title: playlistTitle,
-    artworkUrl,
-    totalTracks: tracks.length,
-    tracks,
+    artworkUrl: playlistArtworkUrl,
+    totalTracks: enrichedTracks.length,
+    tracks: enrichedTracks,
   };
 }

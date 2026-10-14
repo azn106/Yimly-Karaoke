@@ -10,7 +10,7 @@
     "preview": "npm run start",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "DATA_DIR=data/test_db_runner tsx --test server/tests/backend.test.ts server/tests/download-queue-concurrency.test.ts server/tests/backup-restore-queue.test.ts"
+    "test": "DATA_DIR=data/test_db_runner tsx --test server/tests/backend.test.ts server/tests/download-queue-concurrency.test.ts server/tests/backup-restore-queue.test.ts server/tests/canonical-metadata-and-matching.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
