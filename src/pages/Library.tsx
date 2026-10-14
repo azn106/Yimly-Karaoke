@@ -22,6 +22,8 @@ export default function Library() {
   const [songs, setSongs] = useState<any[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [songSort, setSongSort] = useState<'title' | 'artist' | 'album' | 'duration'>('title');
 
   // Detailed view states
   const [selectedArtist, setSelectedArtist] = useState<any | null>(null);
@@ -293,19 +295,44 @@ export default function Library() {
   };
 
   useEffect(() => {
-    if (search.trim()) {
-      fetch(`/api/search?q=${encodeURIComponent(search)}`)
-        .then(async res => {
-          if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
-            return await res.json();
-          }
-          return [];
-        })
-        .then(data => setSearchResults(Array.isArray(data) ? data : []))
-        .catch(err => console.error('Search failed:', err));
-    } else {
+    const query = search.trim();
+    if (!query) {
       setSearchResults([]);
+      setSearchLoading(false);
+      return;
     }
+
+    // Debounce keystrokes and cancel stale requests so a slower response
+    // cannot overwrite results for a newer query.
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+          credentials: 'same-origin',
+        });
+        if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) {
+          throw new Error(`Search failed (${res.status})`);
+        }
+        const data = await res.json();
+        if (!controller.signal.aborted) {
+          setSearchResults(Array.isArray(data) ? data : []);
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('Search failed:', err);
+          if (!controller.signal.aborted) setSearchResults([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) setSearchLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [search]);
 
   const triggerScan = async () => {
@@ -1005,6 +1032,13 @@ export default function Library() {
   // -----------------------------------------------------------------
   // MAIN VIEW: Library Catalogs & Search
   // -----------------------------------------------------------------
+  const sortedSongs = [...songs].sort((a, b) => {
+    const left = String(songSort === 'artist' ? a.artist : songSort === 'album' ? a.album : songSort === 'duration' ? a.duration : a.title || '').toLocaleLowerCase();
+    const right = String(songSort === 'artist' ? b.artist : songSort === 'album' ? b.album : songSort === 'duration' ? b.duration : b.title || '').toLocaleLowerCase();
+    if (songSort === 'duration') return (Number(a.duration) || 0) - (Number(b.duration) || 0);
+    return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+  });
+
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
       {/* Header & Search */}
@@ -1020,7 +1054,8 @@ export default function Library() {
           <div className="relative flex-1 md:w-80">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <input 
-              type="text" 
+              type="search" 
+              aria-label="Search artists, albums, songs, and playlists"
               placeholder="Search artists, albums, or songs..."
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -1070,7 +1105,10 @@ export default function Library() {
       {/* Search results view if searching */}
       {search.trim() && !loading && (
         <div className="space-y-4">
-          <h2 className="text-lg font-bold text-white">Search Results for "{search}"</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-white">Search Results for "{search}"</h2>
+            {searchLoading && <span className="text-xs text-zinc-400 inline-flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Searching…</span>}
+          </div>
           <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
             <table className="w-full text-left text-sm">
               <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
@@ -1260,7 +1298,25 @@ export default function Library() {
 
           {/* Songs Table */}
           {tab === 'songs' && (
-            <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-xs text-zinc-400">{songs.length.toLocaleString()} songs · sorted by {songSort}</p>
+                <label className="flex items-center gap-2 text-xs text-zinc-400">
+                  <span>Sort by</span>
+                  <select
+                    aria-label="Sort songs"
+                    value={songSort}
+                    onChange={e => setSongSort(e.target.value as 'title' | 'artist' | 'album' | 'duration')}
+                    className="bg-[#141622] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#FF4FA3]"
+                  >
+                    <option value="title">Title (A–Z)</option>
+                    <option value="artist">Artist (A–Z)</option>
+                    <option value="album">Album (A–Z)</option>
+                    <option value="duration">Duration (shortest first)</option>
+                  </select>
+                </label>
+              </div>
+              <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
                   <tr>
@@ -1273,25 +1329,30 @@ export default function Library() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {songs.map((song) => {
+                  {sortedSongs.map((song) => {
                     return (
                       <tr key={song.id} className="hover:bg-[#1A1C2C]/60 transition-colors group">
                         <td className="px-5 py-3.5 font-medium text-white flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden">
-                            {song.hasArtwork ? (
+                          <div className="relative w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden">
+                            <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#FF4FA3] transition-colors" />
+                            {song.hasArtwork && (
                               <img
                                 src={`/api/songs/${song.id}/artwork`}
                                 alt={song.title}
-                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                className="absolute inset-0 w-full h-full object-cover"
                                 onError={(e) => {
                                   (e.target as HTMLElement).style.display = 'none';
                                 }}
                               />
-                            ) : (
-                              <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#FF4FA3] transition-colors" />
                             )}
                           </div>
                           <span className="truncate" title={song.title}>{song.title}</span>
+                          {String(song.variant || '').toLowerCase().includes('instrumental') && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" title="Instrumental version">
+                              Instrumental
+                            </span>
+                          )}
                           <LyricBadges
                             hasLrc={song.hasLrc}
                             hasElrc={song.hasElrc}
@@ -1326,6 +1387,7 @@ export default function Library() {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
