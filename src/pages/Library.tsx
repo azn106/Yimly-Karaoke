@@ -41,6 +41,53 @@ export default function Library() {
   const [error, setError] = useState<string | null>(null);
   const [queuedSongId, setQueuedSongId] = useState<number | null>(null);
   const [playingAll, setPlayingAll] = useState(false);
+  const [refreshingAll, setRefreshingAll] = useState(false);
+  const [refreshingArtistId, setRefreshingArtistId] = useState<number | null>(null);
+  const [refreshSummary, setRefreshSummary] = useState<any | null>(null);
+
+  const handleRefreshAllArtists = async () => {
+    if (refreshingAll) return;
+    setRefreshingAll(true);
+    try {
+      const res = await fetch('/api/artists/refresh-all', { method: 'POST' });
+      if (res.ok) {
+        const summary = await res.json();
+        setRefreshSummary(summary);
+        loadAllData();
+      } else {
+        alert('Failed to refresh artist images.');
+      }
+    } catch (err) {
+      console.error('Refresh all error:', err);
+      alert('Failed to refresh artist images.');
+    } finally {
+      setRefreshingAll(false);
+    }
+  };
+
+  const handleRefreshArtist = async (artistId: number) => {
+    if (refreshingArtistId === artistId) return;
+    setRefreshingArtistId(artistId);
+    try {
+      const res = await fetch(`/api/artists/${artistId}/refresh`, { method: 'POST' });
+      if (res.ok) {
+        const result = await res.json();
+        alert(`Artist refresh result: ${result.status}${result.error ? ` (${result.error})` : ''}`);
+        loadAllData();
+        if (selectedArtist && selectedArtist.id === artistId) {
+          openArtist(artistId);
+        }
+      } else {
+        alert('Failed to refresh artist image.');
+      }
+    } catch (err) {
+      console.error('Refresh artist error:', err);
+      alert('Failed to refresh artist image.');
+    } finally {
+      setRefreshingArtistId(null);
+    }
+  };
+
 
   useEffect(() => {
     loadAllData();
@@ -800,12 +847,20 @@ export default function Library() {
               <Mic className="w-12 h-12 text-[#FF4FA3]" />
             )}
           </div>
-          <div className="text-center sm:text-left">
+          <div className="text-center sm:text-left flex-1">
             <span className="text-xs uppercase tracking-widest text-[#FF4FA3] font-bold">Artist</span>
             <h1 className="text-3xl md:text-4xl font-extrabold text-white mt-1 mb-2">{selectedArtist.name}</h1>
-            <p className="text-sm text-zinc-400 font-medium">
+            <p className="text-sm text-zinc-400 font-medium mb-4">
               {selectedArtist.albums?.length || 0} Albums • {selectedArtist.songs?.length || 0} Songs
             </p>
+            <button
+              onClick={() => handleRefreshArtist(selectedArtist.id)}
+              disabled={refreshingArtistId === selectedArtist.id}
+              className="px-4 py-2 bg-[#FF4FA3]/15 hover:bg-[#FF4FA3]/25 border border-[#FF4FA3]/30 text-[#FF4FA3] text-xs font-bold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshingArtistId === selectedArtist.id ? 'animate-spin' : ''}`} />
+              <span>{refreshingArtistId === selectedArtist.id ? 'Refreshing Image...' : 'Refresh Artist Image'}</span>
+            </button>
           </div>
         </div>
 
@@ -1157,35 +1212,92 @@ export default function Library() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex border-b border-white/10 gap-8 overflow-x-auto">
-        <button 
-          onClick={() => setTab('artists')}
-          className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'artists' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
-        >
-          Artists ({stats.artists})
-        </button>
-        <button 
-          onClick={() => setTab('albums')}
-          className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'albums' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
-        >
-          Albums ({stats.albums})
-        </button>
-        <button 
-          onClick={() => setTab('songs')}
-          className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'songs' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
-        >
-          Songs ({stats.songs})
-        </button>
-        <button 
-          onClick={() => setTab('playlists')}
-          className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'playlists' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
-        >
-          Playlists ({stats.playlists || playlists.length})
-        </button>
+      {/* Tabs & Library Management Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 gap-4 pb-3">
+        <div className="flex gap-8 overflow-x-auto">
+          <button 
+            onClick={() => setTab('artists')}
+            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'artists' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Artists ({stats.artists})
+          </button>
+          <button 
+            onClick={() => setTab('albums')}
+            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'albums' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Albums ({stats.albums})
+          </button>
+          <button 
+            onClick={() => setTab('songs')}
+            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'songs' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Songs ({stats.songs})
+          </button>
+          <button 
+            onClick={() => setTab('playlists')}
+            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'playlists' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Playlists ({stats.playlists || playlists.length})
+          </button>
+        </div>
+        {tab === 'artists' && (
+          <button
+            onClick={handleRefreshAllArtists}
+            disabled={refreshingAll}
+            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 shrink-0"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshingAll ? 'animate-spin text-[#FF4FA3]' : ''}`} />
+            <span>{refreshingAll ? 'Refreshing All Artists...' : 'Refresh All Artist Images'}</span>
+          </button>
+        )}
       </div>
 
+      {/* Refresh Summary Modal */}
+      {refreshSummary && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#141622] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <h3 className="text-lg font-bold text-white">Artist Images Refresh Summary</h3>
+              <button 
+                onClick={() => setRefreshSummary(null)}
+                className="text-zinc-400 hover:text-white p-2 rounded-xl bg-white/5 hover:bg-white/10"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+              <div className="bg-[#1C1E2D] p-4 rounded-2xl border border-white/5">
+                <div className="text-2xl font-black text-emerald-400">{refreshSummary.updated}</div>
+                <div className="text-xs text-zinc-400 mt-1">Updated</div>
+              </div>
+              <div className="bg-[#1C1E2D] p-4 rounded-2xl border border-white/5">
+                <div className="text-2xl font-black text-blue-400">{refreshSummary.unchanged}</div>
+                <div className="text-xs text-zinc-400 mt-1">Unchanged</div>
+              </div>
+              <div className="bg-[#1C1E2D] p-4 rounded-2xl border border-white/5">
+                <div className="text-2xl font-black text-amber-400">{refreshSummary.unavailable}</div>
+                <div className="text-xs text-zinc-400 mt-1">Unavailable</div>
+              </div>
+              <div className="bg-[#1C1E2D] p-4 rounded-2xl border border-white/5">
+                <div className="text-2xl font-black text-red-400">{refreshSummary.failed}</div>
+                <div className="text-xs text-zinc-400 mt-1">Failed</div>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-400 text-center">
+              Total artists processed: {refreshSummary.total}
+            </p>
+            <button
+              onClick={() => setRefreshSummary(null)}
+              className="w-full py-3 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
       {!loading && !error && (
+
         <>
           {/* Artists Grid */}
           {tab === 'artists' && (

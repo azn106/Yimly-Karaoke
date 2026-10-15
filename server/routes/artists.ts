@@ -187,4 +187,41 @@ router.get('/:id/artwork', async (req, res) => {
   }
 });
 
+// Refresh individual artist profile image
+router.post('/:id/refresh', async (req, res) => {
+  try {
+    const artistId = parseInt(req.params.id);
+    if (isNaN(artistId)) return res.status(400).json({ error: 'Invalid artist ID' });
+
+    const { refreshArtistProfileImage } = await import('../lib/artist-image-refresher.js');
+    const result = await refreshArtistProfileImage(artistId);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to refresh artist image' });
+  }
+});
+
+// Refresh all artist profile images
+router.post('/refresh-all', async (req, res) => {
+  try {
+    const { refreshAllArtists } = await import('../lib/artist-image-refresher.js');
+    const summary = await refreshAllArtists();
+    res.json(summary);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to refresh all artist images' });
+  }
+});
+
+// Cancel bulk artist refresh
+router.post('/refresh-cancel', async (req, res) => {
+  try {
+    const { cancelBulkRefresh } = await import('../lib/artist-image-refresher.js');
+    cancelBulkRefresh();
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to cancel refresh' });
+  }
+});
+
 export default router;
+
