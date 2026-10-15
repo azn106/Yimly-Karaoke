@@ -634,18 +634,10 @@ export class DownloadQueueManager {
         updatedAt: new Date(),
       }).where(eq(downloadJobs.id, job.id));
 
-      // Trigger automatic background library scan on completion
+      // Completed audio files are already incrementally indexed with canonical metadata by importSingleAudioFile.
+      // Do not trigger a full disk-wide scanLibrary here, which locks SQLite and starves the server.
       if (anySucceeded && job.libraryPath) {
-        console.log(`[Downloader] Download job "${job.id}" complete. Triggering library auto-scan at: ${job.libraryPath}`);
-        try {
-          const allLibs = await db.select().from(libraries);
-          const matchedLib = allLibs.find(l => l.path === job.libraryPath) || allLibs[0];
-          if (matchedLib) {
-            await scanLibrary(matchedLib.id, job.libraryPath);
-          }
-        } catch (scanErr) {
-          console.error('[Downloader] Auto-scan trigger failed:', scanErr);
-        }
+        console.log(`[Downloader] Download job "${job.id}" complete for library at: ${job.libraryPath}`);
       }
     }
   }
@@ -886,7 +878,7 @@ export class DownloadQueueManager {
               }
             }
 
-            const writeOk = NodeID3.write(tags, downloadedAudioPath);
+            const writeOk = await NodeID3.Promise.write(tags, downloadedAudioPath);
             if (!writeOk) {
               console.warn('[Downloader] NodeID3.write reported failure for:', downloadedAudioPath);
             }
@@ -902,9 +894,7 @@ export class DownloadQueueManager {
           track.progress = 0;
           track.error = 'Job cancelled by user';
           try {
-            if (fs.existsSync(tmpJobDir)) {
-              fs.rmSync(tmpJobDir, { recursive: true, force: true });
-            }
+            await fs.promises.rm(tmpJobDir, { recursive: true, force: true });
           } catch {}
           await this.persistTrackUpdate(track);
           return;
@@ -912,23 +902,32 @@ export class DownloadQueueManager {
 
         // Ensure destination artist directory exists
         if (!fs.existsSync(artistDir)) {
-          fs.mkdirSync(artistDir, { recursive: true });
+          await fs.promises.mkdir(artistDir, { recursive: true });
         }
 
-        // Move to final library destination. Keep this synchronous section free of
-        // awaits so cancelJob cannot interleave between the final check and publish.
-        fs.copyFileSync(downloadedAudioPath, finalDestFile);
+        // Move to final library destination using asynchronous copy to prevent freezing the event loop
+        await fs.promises.copyFile(downloadedAudioPath, finalDestFile);
+
+        if (isCancelledJob(job)) {
+          try { await fs.promises.unlink(finalDestFile); } catch {}
+          track.status = 'failed';
+          track.progress = 0;
+          track.error = 'Job cancelled by user';
+          try {
+            await fs.promises.rm(tmpJobDir, { recursive: true, force: true });
+          } catch {}
+          await this.persistTrackUpdate(track);
+          return;
+        }
 
         // Save LRC sidecar if lyrics available
         if (lyricsResult?.synced) {
           saveLrcSidecar(finalDestFile, lyricsResult.synced);
         }
 
-        // Clean up temp directory
+        // Clean up temp directory asynchronously
         try {
-          if (fs.existsSync(tmpJobDir)) {
-            fs.rmSync(tmpJobDir, { recursive: true, force: true });
-          }
+          await fs.promises.rm(tmpJobDir, { recursive: true, force: true });
         } catch {}
 
         // Mark as completed!

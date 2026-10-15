@@ -40,6 +40,18 @@ os.environ.setdefault("HF_HOME", _models_dir)
 os.environ.setdefault("XDG_CACHE_HOME", _models_dir)
 os.environ.setdefault("TRANSFORMERS_CACHE", _models_dir)
 
+# Prevent PyTorch / OpenMP CPU worker threads from starving Node.js event loop
+os.environ.setdefault("OMP_NUM_THREADS", "2")
+os.environ.setdefault("MKL_NUM_THREADS", "2")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "2")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "2")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "2")
+if hasattr(os, 'nice'):
+    try:
+        os.nice(10)
+    except Exception:
+        pass
+
 
 def log(level, msg):
     sys.stderr.write(f"[{level}] {msg}\n")
@@ -73,6 +85,10 @@ def run_separation(req, status_path=None):
     try:
         import numpy
         import torch
+        try:
+            torch.set_num_threads(2)
+        except Exception:
+            pass
         import demucs.separate
     except ImportError as e:
         err_msg = f"missing dependency: {e}"
@@ -200,6 +216,10 @@ def worker_loop():
     try:
         import numpy
         import torch
+        try:
+            torch.set_num_threads(2)
+        except Exception:
+            pass
         import demucs.separate
     except ImportError as e:
         log("ERR ", f"Demucs worker missing dependency: {e}")

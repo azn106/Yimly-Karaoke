@@ -23,13 +23,13 @@ export interface ProcessSongRequest {
   artworkUrl?: string;
 }
 
-function atomicWriteFile(targetPath: string, content: string) {
+async function atomicWriteFile(targetPath: string, content: string) {
   const tempPath = `${targetPath}.tmp.${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   try {
-    fs.writeFileSync(tempPath, content, 'utf-8');
-    fs.renameSync(tempPath, targetPath);
+    await fs.promises.writeFile(tempPath, content, 'utf-8');
+    await fs.promises.rename(tempPath, targetPath);
   } catch (err) {
-    try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+    try { await fs.promises.unlink(tempPath); } catch {}
     throw err;
   }
 }
@@ -116,12 +116,12 @@ export async function processDownloadedSong(req: ProcessSongRequest): Promise<vo
       });
 
       if (dualResult.elrcResult?.elrc && !fs.existsSync(targetElrcPath)) {
-        atomicWriteFile(targetElrcPath, dualResult.elrcResult.elrc);
+        await atomicWriteFile(targetElrcPath, dualResult.elrcResult.elrc);
         console.log(`[SongProcessor] Saved word-synced eLRC from ${dualResult.elrcResult.source}`);
       }
 
       if (dualResult.lrcResult?.lrc && !fs.existsSync(targetLrcPath)) {
-        atomicWriteFile(targetLrcPath, dualResult.lrcResult.lrc);
+        await atomicWriteFile(targetLrcPath, dualResult.lrcResult.lrc);
         console.log(`[SongProcessor] Saved line-synced LRC from ${dualResult.lrcResult.source}`);
       }
     } catch (lyricErr) {

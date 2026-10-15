@@ -15,7 +15,12 @@ export interface SeparationResult {
  * Checks if NVIDIA GPU is present and CUDA is available in PyTorch.
  * Strictly verifies CUDA tensor operations.
  */
+let cachedCudaCheck: { available: boolean; deviceName?: string; error?: string } | null = null;
+
 export async function checkCudaAvailability(pythonBin?: string): Promise<{ available: boolean; deviceName?: string; error?: string }> {
+  if (cachedCudaCheck && cachedCudaCheck.available) {
+    return cachedCudaCheck;
+  }
   const py = pythonBin || getSettings().pythonPath;
   return new Promise((resolve) => {
     const pyScript = `import sys, json
@@ -49,6 +54,9 @@ except Exception as e:
       if (match && match[1]) {
         try {
           const parsed = JSON.parse(match[1]);
+          if (parsed.available) {
+            cachedCudaCheck = parsed;
+          }
           resolve(parsed);
           return;
         } catch {}
@@ -77,6 +85,7 @@ export async function createInstrumentalWithFFmpeg(
   return new Promise((resolve, reject) => {
     const args = [
       '-y',
+      '-threads', '2',
       '-i', isolatedStemPath,
       '-i', originalAudioPath,
       '-map', '0:a:0',
@@ -119,6 +128,7 @@ export async function createInstrumentalWithFFmpeg(
       // Fallback simple conversion without original tags if mux failed
       const fbArgs = [
         '-y',
+        '-threads', '2',
         '-i', isolatedStemPath,
         '-c:a', 'libmp3lame',
         '-b:a', '320k',
@@ -224,7 +234,7 @@ export async function separateAndCreateInstrumental(
   } finally {
     try {
       if (fs.existsSync(jobTempDir)) {
-        fs.rmSync(jobTempDir, { recursive: true, force: true });
+        await fs.promises.rm(jobTempDir, { recursive: true, force: true });
       }
     } catch {}
   }

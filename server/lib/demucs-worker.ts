@@ -77,6 +77,9 @@ export class DemucsWorkerManager {
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         PYTHONUNBUFFERED: '1',
+        OMP_NUM_THREADS: '2',
+        MKL_NUM_THREADS: '2',
+        OPENBLAS_NUM_THREADS: '2',
       };
       if (modelsDir) {
         env.TORCH_HOME = modelsDir;

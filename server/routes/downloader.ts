@@ -321,82 +321,89 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   const cleanCore = cleanString(queryIntent.coreTitle || trimmed);
   const cleanArtist = (queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') ? cleanString(queryIntent.mainArtist) : '';
 
-  // Stage A: Apple iTunes Search with query expansion & strict artist/version relevance validation
-  for (const q of uniqueQueries) {
-    try {
-      const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=15`;
-      const itunesRes = await fetch(itunesUrl);
-      if (itunesRes.ok) {
-        const itunesData = await itunesRes.json();
-        if (Array.isArray(itunesData.results) && itunesData.results.length > 0) {
-          for (const item of itunesData.results) {
-            const trackTitle = item.trackName || '';
-            const trackArtist = item.artistName || '';
-            const cleanTTitle = cleanString(trackTitle);
-            const cleanTArtist = cleanString(trackArtist);
+  // Stage A: Apple iTunes Search with query expansion & strict artist/version relevance validation (run in parallel)
+  const itunesResults = await Promise.all(
+    uniqueQueries.map(async (q) => {
+      try {
+        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=15`;
+        const itunesRes = await fetch(itunesUrl);
+        if (itunesRes.ok) {
+          const itunesData = await itunesRes.json();
+          return Array.isArray(itunesData.results) ? itunesData.results : [];
+        }
+      } catch (e) {
+        console.warn(`[Downloader] iTunes query "${q}" notice:`, e);
+      }
+      return [];
+    })
+  );
 
-            // 1. Exclude unwanted karaoke, covers, tributes, in the style of unless user requested it
-            const itemIntent = detectTrackIntent(trackTitle, trackArtist);
-            if (!queryIntent.isKaraoke && !queryIntent.isCover && !queryIntent.isInstrumental) {
-              if (itemIntent.isKaraoke || itemIntent.isCover || itemIntent.isInstrumental) {
-                console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": classified as karaoke/cover/instrumental`);
-                continue;
-              }
-              const unwantedPhrases = ['in the style of', 'made famous by', 'originally performed by', 'karaoke version'];
-              if (unwantedPhrases.some(phrase => cleanTTitle.includes(phrase) || cleanTArtist.includes(phrase))) {
-                console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": contains unwanted cover/karaoke phrase`);
-                continue;
-              }
-            }
+  for (const items of itunesResults) {
+    if (items.length > 0) {
+      for (const item of items) {
+        const trackTitle = item.trackName || '';
+        const trackArtist = item.artistName || '';
+        const cleanTTitle = cleanString(trackTitle);
+        const cleanTArtist = cleanString(trackArtist);
 
-            // 2. Strip feature credits before checking title to avoid false matching on feature names
-            const titleBase = cleanString(
-              trackTitle
-                .replace(/[\(\[\{]\s*(?:feat\.?|ft\.?|featuring|with)\s+[^\]\)\}]+[\)\]\}]/gi, '')
-                .replace(/\s+(?:feat\.?|ft\.?|featuring)\s+.*/gi, '')
-                .trim()
-            ) || cleanTTitle;
-
-            const titleMatches = titleBase.includes(cleanCore) || cleanCore.includes(titleBase);
-            if (!titleMatches && cleanCore.length > 2) {
-              console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": title "${titleBase}" does not match core "${cleanCore}"`);
-              continue;
-            }
-
-            // 3. Verify artist relevance if target artist is known
-            if (cleanArtist) {
-              const artistMatches = cleanTArtist.includes(cleanArtist) || cleanArtist.includes(cleanTArtist) ||
-                cleanArtist.split(' ').filter(w => w.length > 2).every(w => cleanTArtist.includes(w) || cleanTTitle.includes(w));
-              if (!artistMatches) {
-                console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": artist does not match "${cleanArtist}"`);
-                continue;
-              }
-            }
-
-            const dedupKey = `${cleanTTitle}|${cleanTArtist}`;
-            if (seenTrackKeys.has(dedupKey)) continue;
-            seenTrackKeys.add(dedupKey);
-
-            console.log(`[Search Flow Stage A] Accepted iTunes track: "${trackTitle}" by "${trackArtist}"`);
-            collectedTracks.push({
-              title: trackTitle || 'Unknown Title',
-              artist: trackArtist || 'Unknown Artist',
-              album: item.collectionName || 'Single',
-              trackNumber: item.trackNumber || collectedTracks.length + 1,
-              discNumber: item.discNumber || 1,
-              releaseYear: item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined,
-              artworkUrl: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : '',
-              duration: Math.round((item.trackTimeMillis || 0) / 1000),
-            });
+        // 1. Exclude unwanted karaoke, covers, tributes, in the style of unless user requested it
+        const itemIntent = detectTrackIntent(trackTitle, trackArtist);
+        if (!queryIntent.isKaraoke && !queryIntent.isCover && !queryIntent.isInstrumental) {
+          if (itemIntent.isKaraoke || itemIntent.isCover || itemIntent.isInstrumental) {
+            console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": classified as karaoke/cover/instrumental`);
+            continue;
           }
-
-          if (collectedTracks.length >= 10) {
-            break;
+          const unwantedPhrases = ['in the style of', 'made famous by', 'originally performed by', 'karaoke version'];
+          if (unwantedPhrases.some(phrase => cleanTTitle.includes(phrase) || cleanTArtist.includes(phrase))) {
+            console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": contains unwanted cover/karaoke phrase`);
+            continue;
           }
         }
+
+        // 2. Strip feature credits before checking title to avoid false matching on feature names
+        const titleBase = cleanString(
+          trackTitle
+            .replace(/[\(\[\{]\s*(?:feat\.?|ft\.?|featuring|with)\s+[^\]\)\}]+[\)\]\}]/gi, '')
+            .replace(/\s+(?:feat\.?|ft\.?|featuring)\s+.*/gi, '')
+            .trim()
+        ) || cleanTTitle;
+
+        const titleMatches = titleBase.includes(cleanCore) || cleanCore.includes(titleBase);
+        if (!titleMatches && cleanCore.length > 2) {
+          console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": title "${titleBase}" does not match core "${cleanCore}"`);
+          continue;
+        }
+
+        // 3. Verify artist relevance if target artist is known
+        if (cleanArtist) {
+          const artistMatches = cleanTArtist.includes(cleanArtist) || cleanArtist.includes(cleanTArtist) ||
+            cleanArtist.split(' ').filter(w => w.length > 2).every(w => cleanTArtist.includes(w) || cleanTTitle.includes(w));
+          if (!artistMatches) {
+            console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": artist does not match "${cleanArtist}"`);
+            continue;
+          }
+        }
+
+        const dedupKey = `${cleanTTitle}|${cleanTArtist}`;
+        if (seenTrackKeys.has(dedupKey)) continue;
+        seenTrackKeys.add(dedupKey);
+
+        console.log(`[Search Flow Stage A] Accepted iTunes track: "${trackTitle}" by "${trackArtist}"`);
+        collectedTracks.push({
+          title: trackTitle || 'Unknown Title',
+          artist: trackArtist || 'Unknown Artist',
+          album: item.collectionName || 'Single',
+          trackNumber: item.trackNumber || collectedTracks.length + 1,
+          discNumber: item.discNumber || 1,
+          releaseYear: item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined,
+          artworkUrl: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : '',
+          duration: Math.round((item.trackTimeMillis || 0) / 1000),
+        });
       }
-    } catch (e) {
-      console.warn(`[Downloader] iTunes query "${q}" notice:`, e);
+
+      if (collectedTracks.length >= 10) {
+        break;
+      }
     }
   }
 
@@ -408,9 +415,12 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
     try {
       const candidatePool: YouTubeCandidate[] = [];
       const poolSeenIds = new Set<string>();
+      const ytQueries = uniqueQueries.slice(0, 3);
+      const ytResults = await Promise.all(ytQueries.map(q => searchYouTubeCandidates(q)));
 
-      for (const q of uniqueQueries.slice(0, 3)) {
-        const ytCandidates = await searchYouTubeCandidates(q);
+      for (let idx = 0; idx < ytQueries.length; idx++) {
+        const q = ytQueries[idx];
+        const ytCandidates = ytResults[idx];
         console.log(`[Search Flow Stage B] Query "${q}" returned ${ytCandidates.length} raw candidates`);
         for (const c of ytCandidates) {
           if (!poolSeenIds.has(c.id)) {
@@ -418,7 +428,6 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
             candidatePool.push(c);
           }
         }
-        if (candidatePool.length >= 20) break;
       }
 
       // Score and rank candidates against the target query intent

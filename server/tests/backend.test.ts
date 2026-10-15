@@ -3266,6 +3266,8 @@ test('Production Step #5: Database Integrity, Initialization & Account Persisten
       description text,
       is_public integer DEFAULT 0 NOT NULL,
       cover_path text,
+      source_type text,
+      source_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
