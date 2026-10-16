@@ -938,8 +938,7 @@ export async function importSingleAudioFile(
       }
     }
 
-    // 7. Consolidate any duplicate records if they exist
-    return await db.select().from(songs).where(eq(songs.id, songId))
+    return await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
   });
 
   // Reconciliation also acquires per-song locks. Run it only after releasing
