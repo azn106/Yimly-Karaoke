@@ -799,7 +799,7 @@ export class DownloadQueueManager {
         ];
 
         await new Promise<void>((resolve, reject) => {
-          const child = execFile(ytDlpPath, dlArgs, (err) => {
+          const child = execFile(ytDlpPath, dlArgs, { timeout: 300000 }, (err) => {
             this.activeChildProcesses.delete(track.id);
             if (err) reject(err);
             else resolve();

@@ -348,7 +348,7 @@ export async function findLyricsForAudio(audioFullPath: string, songTitle: strin
       }
     }
 
-    const rankCandidates = (candidates: string[]): string | null => {
+    const rankCandidates = async (candidates: string[]): Promise<string | null> => {
       // 1. Exact base match
       for (const p of candidates) {
         const name = path.basename(p);
@@ -356,7 +356,7 @@ export async function findLyricsForAudio(audioFullPath: string, songTitle: strin
         const extLen = isElrc ? 9 : 4;
         const lrcBase = name.slice(0, -extLen);
         if (normalizeBaseName(lrcBase) === normAudioBase) {
-          if (validateLrcFile(p)) return p;
+          if (await validateLrcFile(p)) return p;
         }
       }
       // 2. Clean base match
@@ -366,7 +366,7 @@ export async function findLyricsForAudio(audioFullPath: string, songTitle: strin
         const extLen = isElrc ? 9 : 4;
         const lrcBase = name.slice(0, -extLen);
         if (cleanVariantFromBaseName(lrcBase) === cleanAudioBase) {
-          if (validateLrcFile(p)) return p;
+          if (await validateLrcFile(p)) return p;
         }
       }
       // 3. Title match
@@ -378,14 +378,14 @@ export async function findLyricsForAudio(audioFullPath: string, songTitle: strin
         const lrcNorm = normalizeBaseName(lrcBase);
         const lrcClean = cleanVariantFromBaseName(lrcBase);
         if (lrcNorm === songTitleNorm || lrcClean === songTitleNorm) {
-          if (validateLrcFile(p)) return p;
+          if (await validateLrcFile(p)) return p;
         }
       }
       return null;
     };
 
-    const elrcMatch = rankCandidates(elrcCandidates);
-    const stdLrcMatch = rankCandidates(stdLrcCandidates);
+    const elrcMatch = await rankCandidates(elrcCandidates);
+    const stdLrcMatch = await rankCandidates(stdLrcCandidates);
 
     return { lrc: stdLrcMatch, elrc: elrcMatch };
   } catch (err) {
@@ -394,10 +394,10 @@ export async function findLyricsForAudio(audioFullPath: string, songTitle: strin
   }
 }
 
-function validateLrcFile(filePath: string): boolean {
+async function validateLrcFile(filePath: string): Promise<boolean> {
   try {
     if (!fsSync.existsSync(filePath)) return false;
-    const content = fsSync.readFileSync(filePath, 'utf-8');
+    const content = await fs.readFile(filePath, 'utf-8');
     return isLrcContentValid(content);
   } catch {
     return false;
@@ -432,9 +432,11 @@ export async function findExistingSongRecord(
     }
   }
 
-  // 2. Query candidate songs by libraryId and normalized title match
+  // 2. Query candidate songs by libraryId and normalized title match (optimized)
   const normTargetTitle = normalizeSongTitle(cleanTitle);
-  const candidates = await db.select().from(songs).where(eq(songs.libraryId, libraryId));
+  const candidates = await db.select().from(songs).where(
+    eq(songs.libraryId, libraryId)
+  );
 
   const titleMatches = candidates.filter(s => normalizeSongTitle(s.title) === normTargetTitle);
   if (titleMatches.length === 0) {

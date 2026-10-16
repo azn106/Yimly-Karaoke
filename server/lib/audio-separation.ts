@@ -106,13 +106,20 @@ export async function createInstrumentalWithFFmpeg(
     ];
 
     const child = spawn(ffmpegPath, args);
+    const watchdog = setTimeout(() => {
+        child.kill('SIGKILL');
+        reject(new Error('FFmpeg instrumental encoding timed out'));
+    }, 300000); // 5 minutes
+
     let stderr = '';
     child.stderr.on('data', (d) => { stderr += d.toString(); });
     child.on('error', (err) => {
+      clearTimeout(watchdog);
       try { if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath); } catch {}
       reject(err);
     });
     child.on('close', (code) => {
+      clearTimeout(watchdog);
       if (code === 0 && fs.existsSync(tempOutputPath)) {
         try {
           const stats = fs.statSync(tempOutputPath);
@@ -137,7 +144,12 @@ export async function createInstrumentalWithFFmpeg(
         tempOutputPath,
       ];
       const fbChild = spawn(ffmpegPath, fbArgs);
+      const fbWatchdog = setTimeout(() => {
+          fbChild.kill('SIGKILL');
+          reject(new Error('FFmpeg instrumental fallback encoding timed out'));
+      }, 300000); // 5 minutes
       fbChild.on('close', (fbCode) => {
+        clearTimeout(fbWatchdog);
         if (fbCode === 0 && fs.existsSync(tempOutputPath)) {
           fs.renameSync(tempOutputPath, outputPath);
           resolve();
@@ -146,7 +158,10 @@ export async function createInstrumentalWithFFmpeg(
           reject(new Error(`FFmpeg instrumental encoding failed with code ${fbCode}: ${stderr}`));
         }
       });
-      fbChild.on('error', (e) => reject(e));
+      fbChild.on('error', (e) => {
+        clearTimeout(fbWatchdog);
+        reject(e);
+      });
     });
   });
 }
