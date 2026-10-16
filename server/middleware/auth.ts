@@ -4,7 +4,11 @@ import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set in environment variables');
+}
+
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -109,7 +113,13 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     if (isExempt) {
       return next();
     }
-    console.log(`[AUTH] authenticated-user failure: JWT verify failed - ${(error as Error).message}`);
+    console.log(`[AUTH] authenticated-user failure: JWT verify failed - ${(error as Error).message}. Token prefix: ${token?.substring(0, 10)}`);
+    res.clearCookie('yimly_token', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      partitioned: true
+    });
     return res.status(401).json({ error: 'Unauthorized' });
   }
 };

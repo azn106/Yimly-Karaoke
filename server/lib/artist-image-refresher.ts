@@ -43,6 +43,8 @@ export function normalizeArtistNameForMatching(name: string): string {
   if (!name) return '';
   return name
     .toLowerCase()
+    .replace(/º|°/g, ' degrees')
+    .replace(/98\s*degrees/g, '98 degrees')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // strip diacritics
     .replace(/^the\s+/i, '') // strip leading article
@@ -152,42 +154,46 @@ export async function resolveMusicBrainzId(artistName: string, timeoutMs = 8000)
     return null;
   }
 
-  try {
-    const searchUrl = `https://musicbrainz.org/ws/2/artist?query=artist:${encodeURIComponent(cleanName)}&fmt=json`;
-    const res = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'YimlyKaraoke/1.0 (contact: info@yimly.local)',
-        'Accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+  const variations = [normalizeArtistNameForMatching(cleanName), cleanName];
+  const targetNorm = normalizeArtistNameForMatching(cleanName);
 
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
-    if (!data || !Array.isArray(data.artists) || data.artists.length === 0) return null;
+  for (const name of variations) {
+    try {
+      const searchUrl = `https://musicbrainz.org/ws/2/artist?query=artist:${encodeURIComponent(name)}&fmt=json`;
+      const res = await fetch(searchUrl, {
+        headers: {
+          'User-Agent': 'YimlyKaraoke/1.0 (contact: info@yimly.local)',
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
 
-    const targetNorm = normalizeArtistNameForMatching(cleanName);
-    const exactMatches = data.artists.filter((a: any) => {
-      if (!a.id) return false;
-      const nameNorm = normalizeArtistNameForMatching(a.name || '');
-      if (nameNorm === targetNorm) return true;
-      if (a.sortName && normalizeArtistNameForMatching(a.sortName) === targetNorm) return true;
-      if (Array.isArray(a.aliases)) {
-        for (const alias of a.aliases) {
-          if (normalizeArtistNameForMatching(alias.name || '') === targetNorm) return true;
+      if (!res.ok) continue;
+      const data = await res.json().catch(() => null);
+      if (!data || !Array.isArray(data.artists) || data.artists.length === 0) continue;
+
+      const exactMatches = data.artists.filter((a: any) => {
+        if (!a.id) return false;
+        const nameNorm = normalizeArtistNameForMatching(a.name || '');
+        if (nameNorm === targetNorm) return true;
+        if (a.sortName && normalizeArtistNameForMatching(a.sortName) === targetNorm) return true;
+        if (Array.isArray(a.aliases)) {
+          for (const alias of a.aliases) {
+            if (normalizeArtistNameForMatching(alias.name || '') === targetNorm) return true;
+          }
         }
+        return false;
+      });
+
+      if (exactMatches.length === 1) {
+        return exactMatches[0].id;
       }
-      return false;
-    });
-
-    if (exactMatches.length === 1) {
-      return exactMatches[0].id;
+    } catch {
+      continue;
     }
-
-    return null;
-  } catch {
-    return null;
   }
+
+  return null;
 }
 
 /**
@@ -436,6 +442,12 @@ export async function refreshArtistProfileImage(artistId: number): Promise<Artis
     }
 
     // Preserve existing image if lookup fails
+    if (knownMbid && knownMbid !== artist.musicbrainzId) {
+        await db.update(artists)
+        .set({ musicbrainzId: knownMbid })
+        .where(eq(artists.id, artistId));
+    }
+
     if (artist.artworkPath) {
       return {
         artistId,

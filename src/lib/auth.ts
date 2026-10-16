@@ -124,7 +124,12 @@ export function initAuthFetchInterceptor(): void {
       }
     }
 
-    return originalFetch.call(this, input, init);
+    return originalFetch.call(this, input, init).then(response => {
+      if (response.status === 401) {
+        clearAuthToken();
+      }
+      return response;
+    });
   };
 
   let patched = false;

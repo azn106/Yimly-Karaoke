@@ -10,6 +10,8 @@ import AddSongsModal from '../components/playlist/AddSongsModal';
 import PlaylistsGrid from '../components/playlist/PlaylistsGrid';
 import PlaylistDetailView from '../components/playlist/PlaylistDetailView';
 import LyricBadges from '../components/LyricBadges';
+import { clearAuthToken } from '../lib/auth';
+
 
 export default function Library() {
   const { user } = useOutletContext<{ user: any }>() || {};
@@ -145,6 +147,7 @@ export default function Library() {
       const dataRes = await fetchWithRetry(endpoint, 2, 500);
       if (!dataRes.ok) {
         if (dataRes.status === 401) {
+          clearAuthToken();
           setError('Session expired or unauthorized. Please log in again.');
           setLoading(false);
           return;

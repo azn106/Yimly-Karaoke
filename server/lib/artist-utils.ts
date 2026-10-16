@@ -93,7 +93,6 @@ export async function getOrCreateArtist(artistName: string, initialArtistArtwork
   // Insert new artist (dedicated artist portrait remains null until verified from provider)
   const inserted = await db.insert(artists).values({
     name: trimmed,
-    artworkPath: initialArtistArtwork || null,
   }).returning();
 
   return inserted[0].id;
