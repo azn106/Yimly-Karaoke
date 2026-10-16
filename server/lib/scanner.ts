@@ -815,7 +815,7 @@ export async function importSingleAudioFile(
   const matchedLyrics = await findLyricsForAudio(audioFullPath, metadata.title);
   const normTitle = normalizeSongTitle(metadata.title);
 
-  return await withSongLock(libraryId, normTitle, async () => {
+  const imported = await withSongLock(libraryId, normTitle, async () => {
     // 1. Upsert all Artists
     const artistIds: number[] = [];
     for (const artistName of metadata.artists) {
@@ -938,11 +938,22 @@ export async function importSingleAudioFile(
       }
     }
 
-    // 7. Consolidate any duplicate records if they exist
-    await reconcileDuplicateSongs(libraryId, metadata.title);
-
     return await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
   });
+
+  // Reconciliation also acquires per-song locks. Run it only after releasing
+  // this import's lock; calling it from inside the lock can deadlock whenever
+  // duplicate rows for this title need to be merged.
+  await reconcileDuplicateSongs(libraryId, metadata.title);
+
+  // Reconciliation may consolidate duplicate rows and change the surviving ID.
+  // Resolve the imported song again by its audio path so callers receive the
+  // canonical row that now owns this file.
+  const canonical = await db.select().from(songs).where(
+    or(eq(songs.mainAudioPath, audioFullPath), eq(songs.instrumentalAudioPath, audioFullPath))
+  ).limit(1);
+
+  return canonical.length > 0 ? canonical : imported;
 }
 
 /**
