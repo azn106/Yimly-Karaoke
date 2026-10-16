@@ -45,6 +45,7 @@ export function normalizeArtistNameForMatching(name: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // strip diacritics
+    .replace(/[º°]/g, ' degrees ') // normalize ordinal degree symbols in names such as 98º / 98 Degrees
     .replace(/^the\s+/i, '') // strip leading article
     .replace(/[^\p{L}\p{N}\s]/gu, '') // strip punctuation/symbols
     .replace(/\s+/g, ' ')
@@ -153,22 +154,34 @@ export async function resolveMusicBrainzId(artistName: string, timeoutMs = 8000)
   }
 
   try {
-    const searchUrl = `https://musicbrainz.org/ws/2/artist?query=artist:${encodeURIComponent(cleanName)}&fmt=json`;
-    const res = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'YimlyKaraoke/1.0 (contact: info@yimly.local)',
-        'Accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    // Search the original spelling first, then common text equivalents for symbols
+    // that MusicBrainz may not index consistently (for example, "98º" / "98 Degrees").
+    const searchTerms = [cleanName];
+    if (/[º°]/u.test(cleanName)) {
+      searchTerms.push(cleanName.replace(/[º°]/g, ' degrees '));
+    }
 
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
-    if (!data || !Array.isArray(data.artists) || data.artists.length === 0) return null;
+    const candidates = new Map<string, any>();
+    for (const term of [...new Set(searchTerms)]) {
+      const searchUrl = `https://musicbrainz.org/ws/2/artist?query=artist:${encodeURIComponent(term)}&fmt=json`;
+      const res = await fetch(searchUrl, {
+        headers: {
+          'User-Agent': 'YimlyKaraoke/1.0 (contact: info@yimly.local)',
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
+      if (!res.ok) continue;
+      const data = await res.json().catch(() => null);
+      if (!data || !Array.isArray(data.artists)) continue;
+      for (const artist of data.artists) {
+        if (artist?.id) candidates.set(artist.id, artist);
+      }
+    }
 
     const targetNorm = normalizeArtistNameForMatching(cleanName);
-    const exactMatches = data.artists.filter((a: any) => {
-      if (!a.id) return false;
+    const exactMatches = [...candidates.values()].filter((a: any) => {
       const nameNorm = normalizeArtistNameForMatching(a.name || '');
       if (nameNorm === targetNorm) return true;
       if (a.sortName && normalizeArtistNameForMatching(a.sortName) === targetNorm) return true;
@@ -180,11 +193,8 @@ export async function resolveMusicBrainzId(artistName: string, timeoutMs = 8000)
       return false;
     });
 
-    if (exactMatches.length === 1) {
-      return exactMatches[0].id;
-    }
-
-    return null;
+    // Only persist a result when the normalized name/alias match is unique.
+    return exactMatches.length === 1 ? exactMatches[0].id : null;
   } catch {
     return null;
   }
@@ -419,6 +429,14 @@ export async function refreshArtistProfileImage(artistId: number): Promise<Artis
             provider: 'none',
             error: 'Fanart.tv API key not configured.',
         };
+    }
+
+    // Save a confidently resolved MusicBrainz ID even when Fanart.tv has no portrait.
+    // This avoids repeating name resolution on every future refresh and preserves existing artwork.
+    if (!artist.musicbrainzId && knownMbid) {
+      await db.update(artists)
+        .set({ musicbrainzId: knownMbid })
+        .where(eq(artists.id, artistId));
     }
 
     if (knownMbid) {
