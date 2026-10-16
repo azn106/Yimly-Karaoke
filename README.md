@@ -52,8 +52,10 @@ http://yimly:3000
    JWT_SECRET=your_unique_random_secret_here
    DATA_PATH=./data
    MEDIA_PATH=./media
+   # Optional: Fanart.tv API key for secondary artist portraits and fan art
+   FANART_TV_API_KEY=your_fanart_tv_api_key_here
    ```
-   Generate a secret with `openssl rand -base64 32`. Deployment stops if the example placeholder or an empty secret is used.
+   Generate a secret with `openssl rand -base64 32`. Deployment stops if the example placeholder or an empty secret is used. Note: `FANART_TV_API_KEY` is optional and used server-side to fetch official artist portraits. Never commit API keys.
 
 3. **Deploy Yimly:**
    Double-click `deploy-yimly.bat` or run:

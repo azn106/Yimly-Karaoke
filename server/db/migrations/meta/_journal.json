@@ -64,6 +64,13 @@
       "when": 1791910000000,
       "tag": "0008_guest_queue_controller_owner",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792000000000,
+      "tag": "0009_theaudiodb_artist_artwork",
+      "breakpoints": true
     }
   ]
 }

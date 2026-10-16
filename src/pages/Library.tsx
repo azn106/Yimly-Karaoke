@@ -50,16 +50,16 @@ export default function Library() {
     setRefreshingAll(true);
     try {
       const res = await fetch('/api/artists/refresh-all', { method: 'POST' });
-      if (res.ok) {
-        const summary = await res.json();
+      const summary = await res.json().catch(() => null);
+      if (res.ok && summary) {
         setRefreshSummary(summary);
         loadAllData();
       } else {
-        alert('Failed to refresh artist images.');
+        alert(summary?.error || 'Failed to refresh artist images.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Refresh all error:', err);
-      alert('Failed to refresh artist images.');
+      alert(err?.message || 'Failed to refresh artist images.');
     } finally {
       setRefreshingAll(false);
     }
@@ -70,19 +70,20 @@ export default function Library() {
     setRefreshingArtistId(artistId);
     try {
       const res = await fetch(`/api/artists/${artistId}/refresh`, { method: 'POST' });
-      if (res.ok) {
-        const result = await res.json();
-        alert(`Artist refresh result: ${result.status}${result.error ? ` (${result.error})` : ''}`);
+      const result = await res.json().catch(() => null);
+      if (res.ok && result) {
+        const msg = `Artist refresh: ${result.status}${result.error ? ` (${result.error})` : ''}`;
+        alert(msg);
         loadAllData();
         if (selectedArtist && selectedArtist.id === artistId) {
           openArtist(artistId);
         }
       } else {
-        alert('Failed to refresh artist image.');
+        alert(result?.error || 'Failed to refresh artist image.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Refresh artist error:', err);
-      alert('Failed to refresh artist image.');
+      alert(err?.message || 'Failed to refresh artist image.');
     } finally {
       setRefreshingArtistId(null);
     }
@@ -833,18 +834,17 @@ export default function Library() {
 
         {/* Artist Hero */}
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-[#141622] p-8 rounded-3xl border border-white/5 shadow-xl">
-          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#FF4FA3]/10 overflow-hidden">
-            {selectedArtist.hasArtwork ? (
+          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#FF4FA3]/10 overflow-hidden relative">
+            <Mic className="w-12 h-12 text-[#FF4FA3] absolute" />
+            {selectedArtist.hasArtwork && (
               <img
                 src={`/api/artists/${selectedArtist.id}/artwork`}
                 alt={selectedArtist.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover relative z-10"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                 }}
               />
-            ) : (
-              <Mic className="w-12 h-12 text-[#FF4FA3]" />
             )}
           </div>
           <div className="text-center sm:text-left flex-1">
@@ -1265,21 +1265,31 @@ export default function Library() {
                 ✕
               </button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-              <div className="bg-[#1C1E2D] p-4 rounded-2xl border border-white/5">
-                <div className="text-2xl font-black text-emerald-400">{refreshSummary.updated}</div>
+            {refreshSummary.error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-xs p-3 rounded-xl flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{refreshSummary.error}</span>
+              </div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
+                <div className="text-xl font-black text-emerald-400">{refreshSummary.updated || 0}</div>
                 <div className="text-xs text-zinc-400 mt-1">Updated</div>
               </div>
-              <div className="bg-[#1C1E2D] p-4 rounded-2xl border border-white/5">
-                <div className="text-2xl font-black text-blue-400">{refreshSummary.unchanged}</div>
+              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
+                <div className="text-xl font-black text-blue-400">{refreshSummary.unchanged || 0}</div>
                 <div className="text-xs text-zinc-400 mt-1">Unchanged</div>
               </div>
-              <div className="bg-[#1C1E2D] p-4 rounded-2xl border border-white/5">
-                <div className="text-2xl font-black text-amber-400">{refreshSummary.unavailable}</div>
+              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
+                <div className="text-xl font-black text-amber-400">{refreshSummary.unavailable || 0}</div>
                 <div className="text-xs text-zinc-400 mt-1">Unavailable</div>
               </div>
-              <div className="bg-[#1C1E2D] p-4 rounded-2xl border border-white/5">
-                <div className="text-2xl font-black text-red-400">{refreshSummary.failed}</div>
+              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
+                <div className="text-xl font-black text-purple-400">{refreshSummary.ambiguous || 0}</div>
+                <div className="text-xs text-zinc-400 mt-1">Ambiguous</div>
+              </div>
+              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
+                <div className="text-xl font-black text-red-400">{refreshSummary.failed || 0}</div>
                 <div className="text-xs text-zinc-400 mt-1">Failed</div>
               </div>
             </div>
@@ -1308,18 +1318,17 @@ export default function Library() {
                   onClick={() => openArtist(artist.id)}
                   className="bg-[#141622] hover:bg-[#1A1C2C] p-5 rounded-2xl border border-white/5 hover:border-[#FF4FA3]/30 cursor-pointer transition-all group flex flex-col items-center text-center shadow-lg"
                 >
-                  <div className="w-24 h-24 rounded-full bg-[#1C1E2D] flex items-center justify-center mb-4 border border-white/10 group-hover:border-[#FF4FA3]/40 transition-colors shadow-inner overflow-hidden">
-                    {artist.hasArtwork ? (
+                  <div className="w-24 h-24 rounded-full bg-[#1C1E2D] flex items-center justify-center mb-4 border border-white/10 group-hover:border-[#FF4FA3]/40 transition-colors shadow-inner overflow-hidden relative">
+                    <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#FF4FA3] transition-colors absolute" />
+                    {artist.hasArtwork && (
                       <img
                         src={`/api/artists/${artist.id}/artwork`}
                         alt={artist.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 relative z-10"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
                       />
-                    ) : (
-                      <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#FF4FA3] transition-colors" />
                     )}
                   </div>
                   <h3 className="font-semibold text-sm text-white truncate w-full group-hover:text-[#FF4FA3] transition-colors">{artist.name}</h3>

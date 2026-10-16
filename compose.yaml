@@ -18,6 +18,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:?Set a unique JWT_SECRET in .env before starting Yimly}
       - DATA_DIR=/app/data
       - WATCH_POLL_INTERVAL_MS=${WATCH_POLL_INTERVAL_MS:-3000}
+      - FANART_TV_API_KEY=${FANART_TV_API_KEY:-}
     volumes:
       # Persistent SQLite database and configuration (never wiped on rebuild)
       - ${DATA_PATH:-./data}:/app/data

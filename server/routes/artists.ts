@@ -107,7 +107,7 @@ router.get('/:id', async (req, res) => {
           ...s,
           artist: formatArtistDisplay(trackArtists),
           artists: trackArtists,
-          hasArtwork: !!s.artworkPath || !!artistRec[0].artworkPath,
+          hasArtwork: !!s.artworkPath,
           hasLrc: lyr.hasLrc,
           hasElrc: lyr.hasElrc,
         };
@@ -129,43 +129,11 @@ router.get('/:id/artwork', async (req, res) => {
 
     if (artist.length === 0) return res.status(404).json({ error: 'Artist not found' });
 
-    let artworkFilename = artist[0].artworkPath;
+    const artworkFilename = artist[0].artworkPath;
 
-    // Fallback: Check any album or song by this artist that has artwork
+    // Do NOT fall back to album or song artwork; artist portraits are dedicated images
     if (!artworkFilename) {
-      const albumWithArt = await db.select({ artworkPath: albums.artworkPath })
-        .from(albums)
-        .where(and(eq(albums.artistId, artistId), isNotNull(albums.artworkPath)))
-        .limit(1);
-      if (albumWithArt.length > 0 && albumWithArt[0].artworkPath) {
-        artworkFilename = albumWithArt[0].artworkPath;
-      }
-    }
-
-    if (!artworkFilename) {
-      // Check via song_artists
-      const songArtistArt = await db.select({ artworkPath: songs.artworkPath })
-        .from(songArtists)
-        .innerJoin(songs, eq(songArtists.songId, songs.id))
-        .where(and(eq(songArtists.artistId, artistId), isNotNull(songs.artworkPath)))
-        .limit(1);
-      if (songArtistArt.length > 0 && songArtistArt[0].artworkPath) {
-        artworkFilename = songArtistArt[0].artworkPath;
-      }
-    }
-
-    if (!artworkFilename) {
-      const songWithArt = await db.select({ artworkPath: songs.artworkPath })
-        .from(songs)
-        .where(and(eq(songs.artistId, artistId), isNotNull(songs.artworkPath)))
-        .limit(1);
-      if (songWithArt.length > 0 && songWithArt[0].artworkPath) {
-        artworkFilename = songWithArt[0].artworkPath;
-      }
-    }
-
-    if (!artworkFilename) {
-      return res.status(404).json({ error: 'No embedded artwork found for this artist' });
+      return res.status(404).json({ error: 'No artist portrait found for this artist' });
     }
 
     const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');

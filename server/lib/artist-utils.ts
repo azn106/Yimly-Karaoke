@@ -74,10 +74,10 @@ export function formatArtistDisplay(artistList: Array<{ name: string } | string>
  * Finds an existing artist by case-insensitive name, or creates a new artist record.
  * Avoids duplicate artist records caused by case or leading/trailing whitespace differences.
  */
-export async function getOrCreateArtist(artistName: string, artworkPath?: string | null): Promise<number> {
+export async function getOrCreateArtist(artistName: string, initialArtistArtwork?: string | null): Promise<number> {
   const trimmed = artistName.trim();
   if (!trimmed) {
-    return getOrCreateArtist('Unknown Artist', artworkPath);
+    return getOrCreateArtist('Unknown Artist', initialArtistArtwork);
   }
 
   // Case-insensitive lookup
@@ -87,19 +87,13 @@ export async function getOrCreateArtist(artistName: string, artworkPath?: string
     .limit(1);
 
   if (existing.length > 0) {
-    const found = existing[0];
-    if (artworkPath && !found.artworkPath) {
-      await db.update(artists)
-        .set({ artworkPath })
-        .where(eq(artists.id, found.id));
-    }
-    return found.id;
+    return existing[0].id;
   }
 
-  // Insert new artist
+  // Insert new artist (dedicated artist portrait remains null until verified from provider)
   const inserted = await db.insert(artists).values({
     name: trimmed,
-    artworkPath: artworkPath || null,
+    artworkPath: initialArtistArtwork || null,
   }).returning();
 
   return inserted[0].id;

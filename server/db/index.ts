@@ -209,6 +209,28 @@ export async function setupDatabase(migrationsFolderOverride?: string) {
     // Column already exists, safe to ignore
   }
 
+  // Ensure artwork_source, artwork_source_url, artwork_verified, and musicbrainz_id columns exist in artists table
+  try {
+    await sqlite.execute('ALTER TABLE artists ADD COLUMN artwork_source text;');
+  } catch (e) {
+    // Column already exists, safe to ignore
+  }
+  try {
+    await sqlite.execute('ALTER TABLE artists ADD COLUMN artwork_source_url text;');
+  } catch (e) {
+    // Column already exists, safe to ignore
+  }
+  try {
+    await sqlite.execute('ALTER TABLE artists ADD COLUMN artwork_verified integer DEFAULT 0;');
+  } catch (e) {
+    // Column already exists, safe to ignore
+  }
+  try {
+    await sqlite.execute('ALTER TABLE artists ADD COLUMN musicbrainz_id text;');
+  } catch (e) {
+    // Column already exists, safe to ignore
+  }
+
   // Ensure queue_items user_id is nullable (allow guest queueing)
   try {
     const tableInfo = await sqlite.execute("PRAGMA table_info(queue_items);");

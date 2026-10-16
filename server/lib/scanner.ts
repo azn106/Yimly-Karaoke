@@ -819,17 +819,17 @@ export async function importSingleAudioFile(
     // 1. Upsert all Artists
     const artistIds: number[] = [];
     for (const artistName of metadata.artists) {
-      const aId = await getOrCreateArtist(artistName, metadata.artworkPath);
+      const aId = await getOrCreateArtist(artistName);
       artistIds.push(aId);
     }
-    const primaryArtistId = artistIds[0] || (await getOrCreateArtist('Unknown Artist', metadata.artworkPath));
+    const primaryArtistId = artistIds[0] || (await getOrCreateArtist('Unknown Artist'));
 
     // 2. Upsert Album
     let albumId: number | null = null;
     if (metadata.album) {
       let albumArtistId = primaryArtistId;
       if (metadata.albumArtist) {
-        albumArtistId = await getOrCreateArtist(metadata.albumArtist, metadata.artworkPath);
+        albumArtistId = await getOrCreateArtist(metadata.albumArtist);
       }
 
       const albumRec = await db.select().from(albums).where(
@@ -1358,16 +1358,16 @@ export async function scanLibrary(libraryId: number, dirPath: string) {
     await withSongLock(libraryId, normTitle, async () => {
       const artistIds: number[] = [];
       for (const artistName of song.artists) {
-        const aId = await getOrCreateArtist(artistName, song.artworkPath);
+        const aId = await getOrCreateArtist(artistName);
         artistIds.push(aId);
       }
-      const primaryArtistId = artistIds[0] || (await getOrCreateArtist('Unknown Artist', song.artworkPath));
+      const primaryArtistId = artistIds[0] || (await getOrCreateArtist('Unknown Artist'));
 
       let albumId: number | null = null;
       if (song.album) {
         let albumArtistId = primaryArtistId;
         if (song.albumArtist) {
-          albumArtistId = await getOrCreateArtist(song.albumArtist, song.artworkPath);
+          albumArtistId = await getOrCreateArtist(song.albumArtist);
         }
 
         const albumRec = await db.select().from(albums).where(

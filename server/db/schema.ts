@@ -41,6 +41,10 @@ export const artists = sqliteTable('artists', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
   artworkPath: text('artwork_path'),
+  artworkSource: text('artwork_source'),
+  artworkSourceUrl: text('artwork_source_url'),
+  artworkVerified: integer('artwork_verified').default(0),
+  musicbrainzId: text('musicbrainz_id'),
 });
 
 export const albums = sqliteTable('albums', {
