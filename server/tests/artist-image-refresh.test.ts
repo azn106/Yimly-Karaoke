@@ -13,6 +13,7 @@ import {
   validateImageMagicBytes,
   selectFanartTvArtistImage,
   queryFanartTvArtist,
+  resolveMusicBrainzId,
 } from '../lib/artist-image-refresher.js';
 import { getOrCreateArtist } from '../lib/artist-utils.js';
 
@@ -53,6 +54,12 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
     assert.strictEqual(normalizeArtistNameForMatching('The Beatles'), 'beatles');
     assert.strictEqual(normalizeArtistNameForMatching('Beyoncé'), 'beyonce');
     assert.strictEqual(normalizeArtistNameForMatching('AC/DC'), 'acdc');
+    assert.strictEqual(normalizeArtistNameForMatching('98º'), '98 degrees');
+    assert.strictEqual(
+      normalizeArtistNameForMatching('98º'),
+      normalizeArtistNameForMatching('98 Degrees'),
+      'Ordinal degree symbols should match the written word in artist names'
+    );
     assert.strictEqual(normalizeArtistNameForMatching('  guns  n\'  roses  '), 'guns n roses');
 
     assert.strictEqual(isValidArtistImageUrl('https://assets.fanart.tv/fanart/music/artist.jpg'), true);
@@ -212,7 +219,65 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
     }
   });
 
-  await t.test('6. Fanart.tv API errors, rate limits (429), timeouts, and malformed responses', async () => {
+  await t.test('6. 98º resolves to 98 Degrees and stores the MusicBrainz ID when no new portrait exists', async () => {
+    process.env.FANART_TV_API_KEY = 'mock_fanart_key';
+
+    const expectedMbid = '177fde26-5a95-46d9-922f-0933940d97e5';
+    const existingPortrait = '98-degrees-existing-portrait.jpg';
+    const [art] = await db.insert(artists).values({
+      name: '98º',
+      musicbrainzId: null,
+      artworkPath: existingPortrait,
+      artworkSource: null,
+      artworkSourceUrl: null,
+      artworkVerified: 0,
+    }).returning();
+
+    const requestedMusicBrainzTerms: string[] = [];
+    let requestedFanartMbid = '';
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      const urlStr = String(input);
+      if (urlStr.includes('musicbrainz.org/ws/2/artist')) {
+        requestedMusicBrainzTerms.push(decodeURIComponent(urlStr));
+        return new Response(JSON.stringify({
+          artists: [{
+            id: expectedMbid,
+            name: '98 Degrees',
+            sortName: 'Degrees, 98',
+          }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (urlStr.includes('webservice.fanart.tv/v3/music/')) {
+        requestedFanartMbid = urlStr.split('/').pop() || '';
+        return new Response(JSON.stringify({
+          name: '98 Degrees',
+          mbid_id: expectedMbid,
+          musiclogo: [{ url: 'https://assets.fanart.tv/logo.png' }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('Not Found', { status: 404 });
+    };
+
+    try {
+      assert.strictEqual(await resolveMusicBrainzId('98º'), expectedMbid);
+      const result = await refreshArtistProfileImage(art.id);
+      assert.strictEqual(result.status, 'unchanged');
+      assert.strictEqual(requestedFanartMbid, expectedMbid);
+      assert.ok(
+        requestedMusicBrainzTerms.some((term) => term.includes('98% C2%BA') || term.includes('98%C2%BA')) ||
+        requestedMusicBrainzTerms.some((term) => term.includes('98')),
+        'MusicBrainz search should be attempted'
+      );
+
+      const [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check.musicbrainzId, expectedMbid, 'Resolved MusicBrainz ID should be persisted');
+      assert.strictEqual(check.artworkPath, existingPortrait, 'Existing portrait must be preserved without a new provider image');
+    } finally {
+      await db.delete(artists).where(eq(artists.id, art.id));
+    }
+  });
+
+  await t.test('7. Fanart.tv API errors, rate limits (429), timeouts, and malformed responses', async () => {
     process.env.FANART_TV_API_KEY = 'mock_fanart_key';
     const mbid = 'mbid-test-error-429';
 
@@ -239,7 +304,7 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
     assert.ok(resTimeout.error?.includes('timed out'));
   });
 
-  await t.test('7. Existing verified image is preserved on provider failure', async () => {
+  await t.test('8. Existing verified image is preserved on provider failure', async () => {
     process.env.FANART_TV_API_KEY = 'mock_fanart_key';
 
     const [art] = await db.insert(artists).values({
@@ -262,7 +327,7 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
     }
   });
 
-  await t.test('8. Song scanning and album extraction never overwrite or populate artist portrait', async () => {
+  await t.test('9. Song scanning and album extraction never overwrite or populate artist portrait', async () => {
     const uniqueName = `Scanner Test Artist ${Date.now()}`;
     const artistId = await getOrCreateArtist(uniqueName);
 
@@ -304,7 +369,7 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
     }
   });
 
-  await t.test('9. Artist artwork endpoint never falls back to song or album covers', async () => {
+  await t.test('10. Artist artwork endpoint never falls back to song or album covers', async () => {
     const express = (await import('express')).default;
     const jwt = (await import('jsonwebtoken')).default;
     const artistsRouter = (await import('../routes/artists.js')).default;
