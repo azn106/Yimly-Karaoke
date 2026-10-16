@@ -10,6 +10,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { setupWebSockets } from './server/ws/index.js';
 import { requireAuth } from './server/middleware/auth.js';
+import { isPreviewMode } from './server/lib/preview-mode.js';
+
+if (isPreviewMode) {
+  console.warn('⚠️  Yimly Karaoke is running in PREVIEW MODE. Features are simulated and data is isolated.');
+}
 
 // Convert import.meta.url for path resolution
 const __filename = fileURLToPath(import.meta.url);
@@ -22,6 +27,11 @@ setupWebSockets(wss);
 
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
+
+if (isPreviewMode && isProd) {
+  console.error('🚨 CRITICAL CONFIGURATION ERROR: PREVIEW_MODE cannot be enabled in production.');
+  process.exit(1);
+}
 
 // Production configuration and secrets verification
 const JWT_SECRET = process.env.JWT_SECRET;

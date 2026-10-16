@@ -9,6 +9,7 @@ import { eq, and, asc, inArray, sql } from 'drizzle-orm';
 import { scanLibrary } from './scanner.js';
 import { fetchLyrics, saveLrcSidecar, stripLrcTimestamps } from './lyrics.js';
 import { matchSpotifyTrackToYouTube } from './youtube-matcher.js';
+import { isPreviewMode, simulateDownload } from './preview-mode.js';
 
 const execFilePromise = promisify(execFile);
 const execPromise = promisify(exec);
@@ -787,25 +788,29 @@ export class DownloadQueueManager {
         const possibleExtensions = ['mp3', 'm4a', 'flac', 'wav', 'opus', 'webm', 'ogg'];
 
         // Stage 3 (Downtify Architecture): Individual yt-dlp download of ONLY the resolved YouTube URL
-        const dlArgs = [
-          '-x',
-          '--audio-format', formatExt === 'opus' ? 'opus' : formatExt,
-          '--audio-quality', job.quality === '128k' ? '5' : job.quality === '192k' ? '2' : '0',
-          '--no-playlist',
-          '--max-filesize', '100M',
-          '--js-runtimes', 'node',
-          '-o', `${tempFileBase}.%(ext)s`,
-          targetDownloadUrl,
-        ];
+        if (isPreviewMode) {
+            simulateDownload(`${tempFileBase}.${formatExt}`);
+        } else {
+            const dlArgs = [
+              '-x',
+              '--audio-format', formatExt === 'opus' ? 'opus' : formatExt,
+              '--audio-quality', job.quality === '128k' ? '5' : job.quality === '192k' ? '2' : '0',
+              '--no-playlist',
+              '--max-filesize', '100M',
+              '--js-runtimes', 'node',
+              '-o', `${tempFileBase}.%(ext)s`,
+              targetDownloadUrl,
+            ];
 
-        await new Promise<void>((resolve, reject) => {
-          const child = execFile(ytDlpPath, dlArgs, { timeout: 300000 }, (err) => {
-            this.activeChildProcesses.delete(track.id);
-            if (err) reject(err);
-            else resolve();
-          });
-          this.activeChildProcesses.set(track.id, child);
-        });
+            await new Promise<void>((resolve, reject) => {
+              const child = execFile(ytDlpPath, dlArgs, { timeout: 300000 }, (err) => {
+                this.activeChildProcesses.delete(track.id);
+                if (err) reject(err);
+                else resolve();
+              });
+              this.activeChildProcesses.set(track.id, child);
+            });
+        }
 
         // Check if audio file was produced
         for (const ext of possibleExtensions) {

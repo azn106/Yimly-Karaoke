@@ -412,8 +412,15 @@ export async function refreshArtistProfileImage(artistId: number): Promise<Artis
     const artistName = artist.name;
     let knownMbid: string | null = artist.musicbrainzId || null;
 
+    // 1. Resolve MBID if needed
     if (!knownMbid) {
         knownMbid = await resolveMusicBrainzId(artistName);
+        // Persist resolved MBID immediately
+        if (knownMbid) {
+             await db.update(artists)
+            .set({ musicbrainzId: knownMbid })
+            .where(eq(artists.id, artistId));
+        }
     }
 
     const fanartApiKey = getFanartTvApiKey();
@@ -427,8 +434,10 @@ export async function refreshArtistProfileImage(artistId: number): Promise<Artis
         };
     }
 
+    // 2. Query Fanart.tv if we have an MBID
     if (knownMbid) {
         const fanartResult = await queryFanartTvArtist(knownMbid);
+        
         if (fanartResult.status === 'found' && fanartResult.imageUrl) {
             const downloadResult = await downloadAndPersistArtistImage(
                 artistId,
@@ -439,15 +448,21 @@ export async function refreshArtistProfileImage(artistId: number): Promise<Artis
             );
             return downloadResult;
         }
+
+        // Handle explicit provider failures
+        if (fanartResult.status === 'failed') {
+             return { 
+                artistId, 
+                artistName, 
+                status: 'failed', 
+                provider: 'fanart_tv', 
+                error: fanartResult.error || 'Fanart.tv query failed' 
+             };
+        }
+        // If 'unavailable', fall through to return 'unchanged' or 'unavailable'
     }
 
-    // Preserve existing image if lookup fails
-    if (knownMbid && knownMbid !== artist.musicbrainzId) {
-        await db.update(artists)
-        .set({ musicbrainzId: knownMbid })
-        .where(eq(artists.id, artistId));
-    }
-
+    // 3. Fallback logic: Preserve existing image if available
     if (artist.artworkPath) {
       return {
         artistId,

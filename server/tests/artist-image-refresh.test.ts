@@ -13,6 +13,7 @@ import {
   validateImageMagicBytes,
   selectFanartTvArtistImage,
   queryFanartTvArtist,
+  resolveMusicBrainzId,
 } from '../lib/artist-image-refresher.js';
 import { getOrCreateArtist } from '../lib/artist-utils.js';
 
@@ -352,6 +353,56 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
       await db.delete(songs).where(eq(songs.id, song.id));
       await db.delete(albums).where(eq(albums.id, alb.id));
       await db.delete(artists).where(eq(artists.id, art.id));
+    }
+  });
+  await t.test('10. Resolve 98 Degrees variants to authoritative MBID', async () => {
+    const targetMbid = '177fde26-5a95-46d9-922f-0933940d97e5';
+    const artistName = '98 Degrees';
+    const artistNameNorm = '98 degrees';
+
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      const urlStr = String(input);
+      if (urlStr.includes('musicbrainz.org/ws/2/artist')) {
+        return new Response(JSON.stringify({
+          artists: [{
+            id: targetMbid,
+            name: artistName,
+            sortName: artistName,
+          }]
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('Not Found', { status: 404 });
+    };
+
+    assert.strictEqual(await resolveMusicBrainzId('98º'), targetMbid);
+    assert.strictEqual(await resolveMusicBrainzId('98°'), targetMbid);
+    assert.strictEqual(await resolveMusicBrainzId('98 Degrees'), targetMbid);
+  });
+
+  await t.test('11. Persist MBID even if Fanart fails', async () => {
+    process.env.FANART_TV_API_KEY = 'mock_fanart_key';
+    const artistName = `MBID Persistence Artist ${Date.now()}`;
+    const [art] = await db.insert(artists).values({ name: artistName }).returning();
+
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+        const urlStr = String(input);
+        if (urlStr.includes('musicbrainz.org/ws/2/artist')) {
+             return new Response(JSON.stringify({ 
+                 artists: [{ id: 'target-mbid-1234', name: artistName }] 
+             }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        // Fail Fanart lookup
+        return new Response('Error', { status: 500 });
+    };
+
+    try {
+        const res = await refreshArtistProfileImage(art.id);
+        assert.strictEqual(res.status, 'failed', 'Should return failed status');
+
+        const [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+        assert.strictEqual(check.musicbrainzId, 'target-mbid-1234', 'MBID must be persisted');
+    } finally {
+        await db.delete(artists).where(eq(artists.id, art.id));
     }
   });
 });

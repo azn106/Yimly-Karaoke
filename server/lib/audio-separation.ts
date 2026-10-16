@@ -3,6 +3,9 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { demucsWorkerManager } from './demucs-worker.js';
 import { getSettings } from '../karaoke-sync-config.js';
+import { isPreviewMode, templateSongPath } from './preview-mode.js';
+import fs from 'fs';
+import path from 'path';
 
 export interface SeparationResult {
   ok: boolean;
@@ -180,14 +183,22 @@ export async function separateAndCreateInstrumental(
   const modelsDir = settings.modelsDir;
 
   // 1. Strict GPU validation: Demucs MUST use NVIDIA GPU. No CPU fallback.
-  const cudaCheck = await checkCudaAvailability(pythonBin);
-  if (!cudaCheck.available) {
-    const errMsg = `NVIDIA GPU / CUDA is required for Demucs separation but is unavailable: ${cudaCheck.error || 'No CUDA device detected'}. Demucs CPU fallback is strictly disabled.`;
-    console.error(`[Demucs] ${errMsg}`);
-    return { ok: false, error: errMsg };
+  if (!isPreviewMode) {
+    const cudaCheck = await checkCudaAvailability(pythonBin);
+    if (!cudaCheck.available) {
+        const errMsg = `NVIDIA GPU / CUDA is required for Demucs separation but is unavailable: ${cudaCheck.error || 'No CUDA device detected'}. Demucs CPU fallback is strictly disabled.`;
+        console.error(`[Demucs] ${errMsg}`);
+        return { ok: false, error: errMsg };
+    }
   }
 
   // 2. Prepare temporary directory for stems
+  if (isPreviewMode) {
+      fs.copyFileSync(templateSongPath, targetInstrumentalPath);
+      console.log(`[PREVIEW] Simulated audio separation: Copied ${templateSongPath} to ${targetInstrumentalPath}`);
+      return { ok: true, instrumentalPath: targetInstrumentalPath };
+  }
+  
   const jobTempDir = path.join(process.cwd(), 'data', 'tmp_downloads', `demucs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
   fs.mkdirSync(jobTempDir, { recursive: true });
 

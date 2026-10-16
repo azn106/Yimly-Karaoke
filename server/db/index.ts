@@ -6,8 +6,11 @@ import path from 'path';
 import { migrate } from 'drizzle-orm/libsql/migrator';
 import { eq } from 'drizzle-orm';
 
+import { isPreviewMode, previewDataDir, ensurePreviewDirectories } from '../lib/preview-mode.js';
+
+ensurePreviewDirectories();
 // Ensure data directory and artwork directory exist
-const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
+const dataDir = isPreviewMode ? previewDataDir! : (process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data'));
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
