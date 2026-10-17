@@ -233,7 +233,7 @@ export async function queryFanartTvArtist(
   timeoutMs = 8000
 ): Promise<{
   imageUrl: string | null;
-  status: 'found' | 'unavailable' | 'failed';
+  status: 'updated' | 'unavailable' | 'failed';
   error?: string;
 }> {
   const apiKey = getFanartTvApiKey();
@@ -286,7 +286,7 @@ export async function queryFanartTvArtist(
       return { imageUrl: null, status: 'unavailable', error: 'No portrait image found on Fanart.tv' };
     }
 
-    return { imageUrl, status: 'found' };
+    return { imageUrl, status: 'updated' };
   } catch (err: any) {
     if (err?.name === 'AbortError') {
       return { imageUrl: null, status: 'failed', error: 'Fanart.tv request timed out' };
@@ -438,7 +438,7 @@ export async function refreshArtistProfileImage(artistId: number): Promise<Artis
     if (knownMbid) {
         const fanartResult = await queryFanartTvArtist(knownMbid);
         
-        if (fanartResult.status === 'found' && fanartResult.imageUrl) {
+        if (fanartResult.status === 'updated' && fanartResult.imageUrl) {
             const downloadResult = await downloadAndPersistArtistImage(
                 artistId,
                 artistName,

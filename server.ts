@@ -71,6 +71,34 @@ let isShuttingDown = false;
 setupDatabase().then(async () => {
   console.log('Database connected.');
   try {
+    const { libraries } = await import('./server/db/schema.js');
+    const { scanLibrary } = await import('./server/lib/scanner.js');
+    const { eq } = await import('drizzle-orm');
+    const existingLibs = await db.select().from(libraries);
+    const sampleDir = path.resolve(process.cwd(), 'sample');
+    let targetLib = existingLibs.find(l => fs.existsSync(l.path));
+    if (!targetLib && fs.existsSync(sampleDir)) {
+      if (existingLibs.length > 0) {
+        await db.update(libraries).set({ path: sampleDir, name: 'Sample Library' }).where(eq(libraries.id, existingLibs[0].id));
+        targetLib = (await db.select().from(libraries).where(eq(libraries.id, existingLibs[0].id)))[0];
+      } else {
+        const [inserted] = await db.insert(libraries).values({
+          name: 'Sample Library',
+          path: sampleDir,
+        }).returning();
+        targetLib = inserted;
+      }
+    }
+    if (targetLib) {
+      console.log(`[Library] Scanning library at: ${targetLib.path}`);
+      await scanLibrary(targetLib.id, targetLib.path);
+      console.log(`[Library] Library scan completed.`);
+    }
+  } catch (initLibErr) {
+    console.error('Failed to auto-register or scan sample library on startup:', initLibErr);
+  }
+
+  try {
     const { downloadQueue } = await import('./server/lib/download-queue.js');
     await downloadQueue.init();
   } catch (qErr) {

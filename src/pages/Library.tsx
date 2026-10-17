@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { Search, Play, Pause, Music, Disc, Mic, RefreshCw, Calendar, FileText, ChevronRight, ArrowLeft, AlertCircle, ListMusic, Trash2, Plus } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../types';
 import CreatePlaylistModal from '../components/playlist/CreatePlaylistModal';
@@ -16,7 +16,18 @@ import { usePlayback, PlaybackSong } from '../context/PlaybackContext';
 
 export default function Library() {
   const { user } = useOutletContext<{ user: any }>() || {};
-  const [tab, setTab] = useState<'artists' | 'albums' | 'songs' | 'playlists'>('artists');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as 'home' | 'artists' | 'albums' | 'songs' | 'playlists' | null;
+  const tab = tabParam && ['home', 'artists', 'albums', 'songs', 'playlists'].includes(tabParam) ? tabParam : 'home';
+
+  const setTab = (newTab: 'home' | 'artists' | 'albums' | 'songs' | 'playlists') => {
+    if (newTab === 'home') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ tab: newTab });
+    }
+  };
+
   const [search, setSearch] = useState('');
   const [stats, setStats] = useState({ artists: 0, albums: 0, songs: 0, playlists: 0 });
   
@@ -195,38 +206,51 @@ export default function Library() {
       }
 
       // 2. Fetch tab data
-      const endpoint = 
-        tab === 'artists' ? '/api/artists' : 
-        tab === 'albums' ? '/api/albums' : 
-        tab === 'songs' ? '/api/songs' : 
-        '/api/playlists';
+      if (tab === 'home') {
+        const [songsRes, artistsRes, albumsRes, playlistsRes] = await Promise.all([
+          fetchWithRetry('/api/songs', 1, 300),
+          fetchWithRetry('/api/artists', 1, 300),
+          fetchWithRetry('/api/albums', 1, 300),
+          fetchWithRetry('/api/playlists', 1, 300),
+        ]);
+        if (songsRes.ok) setSongs(await songsRes.json().catch(() => []));
+        if (artistsRes.ok) setArtists(await artistsRes.json().catch(() => []));
+        if (albumsRes.ok) setAlbums(await albumsRes.json().catch(() => []));
+        if (playlistsRes.ok) setPlaylists(await playlistsRes.json().catch(() => []));
+      } else {
+        const endpoint = 
+          tab === 'artists' ? '/api/artists' : 
+          tab === 'albums' ? '/api/albums' : 
+          tab === 'songs' ? '/api/songs' : 
+          '/api/playlists';
 
-      const dataRes = await fetchWithRetry(endpoint, 2, 500);
-      if (!dataRes.ok) {
-        if (dataRes.status === 401) {
-          clearAuthToken();
-          setError('Session expired or unauthorized. Please log in again.');
-          setLoading(false);
-          return;
+        const dataRes = await fetchWithRetry(endpoint, 2, 500);
+        if (!dataRes.ok) {
+          if (dataRes.status === 401) {
+            clearAuthToken();
+            setError('Session expired or unauthorized. Please log in again.');
+            setLoading(false);
+            return;
+          }
+          let serverError = '';
+          if (dataRes.headers.get('content-type')?.includes('application/json')) {
+            const errJson = await dataRes.json().catch(() => ({}));
+            serverError = errJson.error || errJson.message || '';
+          }
+          throw new Error(serverError || `Failed to fetch ${tab} catalog (${dataRes.status})`);
         }
-        let serverError = '';
-        if (dataRes.headers.get('content-type')?.includes('application/json')) {
-          const errJson = await dataRes.json().catch(() => ({}));
-          serverError = errJson.error || errJson.message || '';
+
+        if (!dataRes.headers.get('content-type')?.includes('application/json')) {
+          throw new Error(`Invalid response format received for ${tab}`);
         }
-        throw new Error(serverError || `Failed to fetch ${tab} catalog (${dataRes.status})`);
+
+        const data = await dataRes.json();
+
+        if (tab === 'artists') setArtists(Array.isArray(data) ? data : []);
+        else if (tab === 'albums') setAlbums(Array.isArray(data) ? data : []);
+        else if (tab === 'songs') setSongs(Array.isArray(data) ? data : []);
+        else if (tab === 'playlists') setPlaylists(Array.isArray(data) ? data : []);
       }
-
-      if (!dataRes.headers.get('content-type')?.includes('application/json')) {
-        throw new Error(`Invalid response format received for ${tab}`);
-      }
-
-      const data = await dataRes.json();
-
-      if (tab === 'artists') setArtists(Array.isArray(data) ? data : []);
-      else if (tab === 'albums') setAlbums(Array.isArray(data) ? data : []);
-      else if (tab === 'songs') setSongs(Array.isArray(data) ? data : []);
-      else if (tab === 'playlists') setPlaylists(Array.isArray(data) ? data : []);
 
       setLoading(false);
     } catch (err: any) {
@@ -1413,6 +1437,12 @@ export default function Library() {
       {/* Tabs & Library Management Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 gap-4 pb-3">
         <div className="flex gap-8 overflow-x-auto">
+          <button 
+            onClick={() => setTab('home')}
+            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'home' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Overview
+          </button>
           <button 
             onClick={() => setTab('artists')}
             className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'artists' ? 'border-[#FF4FA3] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}

@@ -4,7 +4,7 @@ import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'test' ? 'test_secret_for_ci' : undefined);
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET must be set in environment variables');
 }

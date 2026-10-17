@@ -1,13 +1,15 @@
 import { useEffect, useState, ReactNode } from 'react';
 import { Outlet, useNavigate, NavLink, useLocation } from 'react-router-dom';
-import { Home, Music, Mic, Settings, Users, LogOut, Loader2, Disc, Menu, X, Radio, Download } from 'lucide-react';
+import { Home, Music, Mic, Settings, Users, LogOut, Loader2, Disc, Menu, X, Radio, Download, ChevronUp, ChevronDown, ListMusic } from 'lucide-react';
 import { clearAuthToken } from '../lib/auth';
 import PlayerBar from './PlayerBar';
+import NowPlayingOverlay from './NowPlayingOverlay';
 
 export default function Layout() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [jukeboxOpen, setJukeboxOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -33,6 +35,15 @@ export default function Layout() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
+
+  // Open jukebox by default when on library routes
+  useEffect(() => {
+    if (location.pathname.startsWith('/library')) {
+      setJukeboxOpen(true);
+    }
+  }, [location.pathname]);
+
+  const isJukeboxActive = location.pathname.startsWith('/library');
 
   const handleLogout = async () => {
     clearAuthToken();
@@ -81,7 +92,42 @@ export default function Layout() {
               Menu
             </div>
             <NavItem to="/" icon={<Home className="w-4 h-4" />} label="Home" />
-            <NavItem to="/library" icon={<Music className="w-4 h-4" />} label="Library" />
+            <div className="space-y-1">
+              <button 
+                onClick={() => {
+                  setJukeboxOpen(true);
+                  navigate('/library');
+                }} 
+                className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  isJukeboxActive 
+                    ? 'bg-[#FF4FA3]/15 text-[#FF4FA3] font-semibold border border-[#FF4FA3]/25 shadow-sm' 
+                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Music className="w-4 h-4" />
+                  <span>Jukebox</span>
+                </div>
+                <div 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    setJukeboxOpen(!jukeboxOpen); 
+                  }}
+                  className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  {jukeboxOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </div>
+              </button>
+              {jukeboxOpen && (
+                <div className="pl-4 space-y-1">
+                  <NavItem to="/library" icon={<Home className="w-4 h-4" />} label="Jukebox Home" />
+                  <NavItem to="/library?tab=songs" icon={<Music className="w-4 h-4" />} label="All Songs" />
+                  <NavItem to="/library?tab=albums" icon={<Disc className="w-4 h-4" />} label="Albums" />
+                  <NavItem to="/library?tab=artists" icon={<Mic className="w-4 h-4" />} label="Artists" />
+                  <NavItem to="/library?tab=playlists" icon={<ListMusic className="w-4 h-4" />} label="Playlists" />
+                </div>
+              )}
+            </div>
             <NavItem to="/rooms" icon={<Radio className="w-4 h-4" />} label="Karaoke Rooms" badge="Live" />
 
             {user?.role === 'administrator' && (
@@ -206,19 +252,36 @@ export default function Layout() {
           <Outlet context={{ user }} />
         </main>
 
-        {/* Persistent Bottom Jukebox Player */}
-        <PlayerBar />
+        {/* Conditional Player Layout */}
+        {location.pathname.startsWith('/library') ? (
+          <div className="hidden md:block w-80 border-l border-white/5 bg-[#11121A] shrink-0">
+            <PlayerBar />
+          </div>
+        ) : (
+          <NowPlayingOverlay />
+        )}
       </div>
     </div>
   );
 }
 
 function NavItem({ to, icon, label, badge }: { to: string, icon: ReactNode, label: string, badge?: string }) {
+  const location = useLocation();
+  const currentUrl = location.pathname + location.search;
+
+  let isActive = false;
+  if (to === '/') {
+    isActive = location.pathname === '/';
+  } else if (to.includes('?')) {
+    isActive = currentUrl === to;
+  } else {
+    isActive = location.pathname === to && (!location.search || location.search === '?tab=home');
+  }
+
   return (
     <NavLink
       to={to}
-      end={to === '/'}
-      className={({ isActive }) => 
+      className={
         `flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-sm font-medium ${
           isActive 
             ? 'bg-[#FF4FA3]/15 text-[#FF4FA3] font-semibold border border-[#FF4FA3]/25 shadow-sm' 
