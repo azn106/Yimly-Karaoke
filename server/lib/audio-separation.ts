@@ -4,8 +4,6 @@ import { spawn } from 'child_process';
 import { demucsWorkerManager } from './demucs-worker.js';
 import { getSettings } from '../karaoke-sync-config.js';
 import { isPreviewMode, templateSongPath } from './preview-mode.js';
-import fs from 'fs';
-import path from 'path';
 
 export interface SeparationResult {
   ok: boolean;
@@ -182,6 +180,7 @@ export async function separateAndCreateInstrumental(
   const pythonBin = settings.pythonPath;
   const modelsDir = settings.modelsDir;
 
+  let cudaDevice: string | undefined = undefined;
   // 1. Strict GPU validation: Demucs MUST use NVIDIA GPU. No CPU fallback.
   if (!isPreviewMode) {
     const cudaCheck = await checkCudaAvailability(pythonBin);
@@ -190,6 +189,7 @@ export async function separateAndCreateInstrumental(
         console.error(`[Demucs] ${errMsg}`);
         return { ok: false, error: errMsg };
     }
+    cudaDevice = cudaCheck.deviceName;
   }
 
   // 2. Prepare temporary directory for stems
@@ -253,7 +253,7 @@ export async function separateAndCreateInstrumental(
       throw new Error(`Generated instrumental file is invalid or missing at ${targetInstrumentalPath}`);
     }
 
-    return { ok: true, instrumentalPath: targetInstrumentalPath, cudaDevice: cudaCheck.deviceName };
+    return { ok: true, instrumentalPath: targetInstrumentalPath, cudaDevice };
   } catch (err: any) {
     console.error('[Demucs] Separation error:', err);
     return { ok: false, error: err.message };

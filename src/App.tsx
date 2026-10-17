@@ -19,6 +19,8 @@ import RoomSession from './pages/RoomSession.tsx';
 import Join from './pages/Join.tsx';
 import Download from './pages/Download.tsx';
 
+import { PlaybackProvider } from './context/PlaybackContext.tsx';
+
 export default function App() {
   const [setupStatus, setSetupStatus] = useState<boolean | null>(null);
 
@@ -40,33 +42,35 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        {!setupStatus ? (
-          <>
-            <Route path="/setup" element={<Setup onComplete={() => setSetupStatus(true)} />} />
-            <Route path="*" element={<Navigate to="/setup" replace />} />
-          </>
-        ) : (
-          <>
-            <Route path="/setup" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
-            
-            {/* Dedicated Guest Join Route & Public Karaoke Room */}
-            <Route path="/join" element={<Join />} />
-            <Route path="/rooms/:sessionId" element={<RoomSession />} />
+      <PlaybackProvider>
+        <Routes>
+          {!setupStatus ? (
+            <>
+              <Route path="/setup" element={<Setup onComplete={() => setSetupStatus(true)} />} />
+              <Route path="*" element={<Navigate to="/setup" replace />} />
+            </>
+          ) : (
+            <>
+              <Route path="/setup" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<Login />} />
+              
+              {/* Dedicated Guest Join Route & Public Karaoke Room */}
+              <Route path="/join" element={<Join />} />
+              <Route path="/rooms/:sessionId" element={<RoomSession />} />
 
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Home />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="users" element={<Users />} />
-              <Route path="library" element={<Library />} />
-              <Route path="download" element={<Download />} />
-              <Route path="rooms" element={<Rooms />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </>
-        )}
-      </Routes>
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Home />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="users" element={<Users />} />
+                <Route path="library" element={<Library />} />
+                <Route path="download" element={<Download />} />
+                <Route path="rooms" element={<Rooms />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          )}
+        </Routes>
+      </PlaybackProvider>
     </BrowserRouter>
   );
 }

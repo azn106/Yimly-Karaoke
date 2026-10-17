@@ -1,0 +1,785 @@
+/**
+ * PlaybackContext.tsx
+ * Single authoritative playback engine and persistent state management for Yimly Jukebox.
+ * Supports cross-route persistence and cross-tab synchronisation via BroadcastChannel.
+ */
+
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
+
+export interface PlaybackSong {
+  id: number;
+  title: string;
+  artist: string;
+  artists?: Array<{ id: number | null; name: string }>;
+  album?: string;
+  albumId?: number | null;
+  duration?: number;
+  hasArtwork?: boolean;
+  artworkPath?: string | null;
+  variant?: string;
+}
+
+export interface PlaybackContextType {
+  currentSong: PlaybackSong | null;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  isMuted: boolean;
+  queue: PlaybackSong[];
+  queueIndex: number;
+  isShuffle: boolean;
+  repeatMode: 'off' | 'all' | 'one';
+  playbackError: string | null;
+  isLeader: boolean;
+
+  // Actions
+  playSong: (song: PlaybackSong, newQueue?: PlaybackSong[], indexInQueue?: number) => void;
+  playQueue: (songs: PlaybackSong[], startIndex?: number) => void;
+  togglePlay: () => void;
+  pause: () => void;
+  resume: () => void;
+  seek: (timeSeconds: number) => void;
+  next: () => void;
+  previous: () => void;
+  setVolume: (vol: number) => void;
+  toggleMute: () => void;
+  addToQueue: (song: PlaybackSong | PlaybackSong[]) => void;
+  removeFromQueue: (index: number) => void;
+  clearQueue: () => void;
+  jumpToQueueIndex: (index: number) => void;
+  toggleShuffle: () => void;
+  cycleRepeat: () => void;
+}
+
+const PlaybackContext = createContext<PlaybackContextType | null>(null);
+
+const CHANNEL_NAME = 'yimly_jukebox_playback';
+const STORAGE_KEY = 'yimly_jukebox_state';
+
+export function PlaybackProvider({ children }: { children: ReactNode }) {
+  // Generate unique tab ID for leadership election
+  const tabIdRef = useRef<string>('tab_' + Math.random().toString(36).slice(2, 9));
+  const tabId = tabIdRef.current;
+
+  // Playback state
+  const [currentSong, setCurrentSong] = useState<PlaybackSong | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.currentSong || null;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
+  const [volume, setVolumeState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.volume === 'number') return parsed.volume;
+      }
+    } catch {}
+    return 0.8;
+  });
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [queue, setQueue] = useState<PlaybackSong[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.queue)) return parsed.queue;
+      }
+    } catch {}
+    return [];
+  });
+  const [queueIndex, setQueueIndex] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.queueIndex === 'number') return parsed.queueIndex;
+      }
+    } catch {}
+    return -1;
+  });
+  const [isShuffle, setIsShuffle] = useState<boolean>(false);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+
+  // Tab leadership: Only the leader tab actually controls its HTMLAudioElement
+  const [isLeader, setIsLeader] = useState<boolean>(true);
+  const leaderTabIdRef = useRef<string>(tabId);
+
+  // Single HTML Audio element ref
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Ref to track latest state for BroadcastChannel handlers without stale closures
+  const stateRef = useRef({
+    currentSong,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    isMuted,
+    queue,
+    queueIndex,
+    isShuffle,
+    repeatMode,
+    isLeader,
+  });
+
+  stateRef.current = {
+    currentSong,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    isMuted,
+    queue,
+    queueIndex,
+    isShuffle,
+    repeatMode,
+    isLeader,
+  };
+
+  // Broadcast channel for cross-tab synchronisation
+  const channelRef = useRef<BroadcastChannel | null>(null);
+
+  // Persist state to localStorage for hydration
+  const persistState = useCallback(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          currentSong: stateRef.current.currentSong,
+          volume: stateRef.current.volume,
+          queue: stateRef.current.queue,
+          queueIndex: stateRef.current.queueIndex,
+          repeatMode: stateRef.current.repeatMode,
+          isShuffle: stateRef.current.isShuffle,
+        })
+      );
+    } catch {}
+  }, []);
+
+  // Broadcast state changes to all other tabs
+  const broadcastSync = useCallback((customOverrides?: Partial<typeof stateRef.current>) => {
+    if (!channelRef.current) return;
+    const currentState = { ...stateRef.current, ...customOverrides };
+    channelRef.current.postMessage({
+      type: 'SYNC_STATE',
+      fromTabId: tabId,
+      state: {
+        currentSong: currentState.currentSong,
+        isPlaying: currentState.isPlaying,
+        currentTime: currentState.currentTime,
+        duration: currentState.duration,
+        volume: currentState.volume,
+        isMuted: currentState.isMuted,
+        queue: currentState.queue,
+        queueIndex: currentState.queueIndex,
+        isShuffle: currentState.isShuffle,
+        repeatMode: currentState.repeatMode,
+      },
+    });
+    persistState();
+  }, [persistState, tabId]);
+
+  // Take leadership and ensure audio element is ready
+  const claimLeadership = useCallback(() => {
+    setIsLeader(true);
+    leaderTabIdRef.current = tabId;
+    if (channelRef.current) {
+      channelRef.current.postMessage({
+        type: 'CLAIM_LEADERSHIP',
+        fromTabId: tabId,
+      });
+    }
+  }, [tabId]);
+
+  // Audio Engine Lifecycle
+  useEffect(() => {
+    const audio = new Audio();
+    audio.preload = 'metadata';
+    audio.volume = volume;
+    audioRef.current = audio;
+
+    const onTimeUpdate = () => {
+      if (leaderTabIdRef.current === tabId) {
+        const time = audio.currentTime;
+        setCurrentTime(time);
+        // Periodically broadcast progress
+        broadcastSync({ currentTime: time });
+      }
+    };
+
+    const onLoadedMetadata = () => {
+      const dur = audio.duration || 0;
+      setDuration(dur);
+      setPlaybackError(null);
+      if (leaderTabIdRef.current === tabId) {
+        broadcastSync({ duration: dur });
+      }
+    };
+
+    const onPlay = () => {
+      setIsPlaying(true);
+      setPlaybackError(null);
+      if (leaderTabIdRef.current === tabId) {
+        broadcastSync({ isPlaying: true });
+      }
+    };
+
+    const onPause = () => {
+      setIsPlaying(false);
+      if (leaderTabIdRef.current === tabId) {
+        broadcastSync({ isPlaying: false });
+      }
+    };
+
+    const onError = () => {
+      const err = audio.error?.message || 'Error streaming audio file';
+      setPlaybackError(err);
+      setIsPlaying(false);
+      if (leaderTabIdRef.current === tabId) {
+        broadcastSync({ isPlaying: false });
+      }
+    };
+
+    const onEnded = () => {
+      if (leaderTabIdRef.current === tabId) {
+        handleTrackEnded();
+      }
+    };
+
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('error', onError);
+    audio.addEventListener('ended', onEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('error', onError);
+      audio.removeEventListener('ended', onEnded);
+      try {
+        audio.pause();
+        audio.src = '';
+      } catch {}
+    };
+  }, []);
+
+  // Broadcast Channel setup for Cross-Tab Coordination
+  useEffect(() => {
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel(CHANNEL_NAME);
+      channelRef.current = bc;
+
+      bc.onmessage = (event) => {
+        const data = event.data;
+        if (!data || data.fromTabId === tabId) return;
+
+        switch (data.type) {
+          case 'REQUEST_STATE': {
+            // If this tab is the leader, respond with current state
+            if (leaderTabIdRef.current === tabId) {
+              broadcastSync();
+            }
+            break;
+          }
+
+          case 'CLAIM_LEADERSHIP': {
+            // Another tab has taken leadership; yield local audio element
+            if (data.fromTabId !== tabId) {
+              leaderTabIdRef.current = data.fromTabId;
+              setIsLeader(false);
+              if (audioRef.current && !audioRef.current.paused) {
+                try {
+                  audioRef.current.pause();
+                } catch {}
+              }
+            }
+            break;
+          }
+
+          case 'SYNC_STATE': {
+            // Remote leader broadcasted its state; update local display mirrors
+            if (data.fromTabId !== tabId) {
+              leaderTabIdRef.current = data.fromTabId;
+              setIsLeader(false);
+              const s = data.state;
+              if (s) {
+                if (s.currentSong !== undefined) setCurrentSong(s.currentSong);
+                if (s.isPlaying !== undefined) setIsPlaying(s.isPlaying);
+                if (s.currentTime !== undefined) setCurrentTime(s.currentTime);
+                if (s.duration !== undefined) setDuration(s.duration);
+                if (s.volume !== undefined) setVolumeState(s.volume);
+                if (s.isMuted !== undefined) setIsMuted(s.isMuted);
+                if (s.queue !== undefined) setQueue(s.queue);
+                if (s.queueIndex !== undefined) setQueueIndex(s.queueIndex);
+                if (s.isShuffle !== undefined) setIsShuffle(s.isShuffle);
+                if (s.repeatMode !== undefined) setRepeatMode(s.repeatMode);
+              }
+            }
+            break;
+          }
+
+          case 'COMMAND': {
+            // If this tab is the leader, execute the requested action
+            if (leaderTabIdRef.current === tabId) {
+              executeCommand(data.action, data.payload);
+            }
+            break;
+          }
+
+          case 'LEADER_CLOSING': {
+            // Former leader is closing; if user interacts with this tab, it will take over
+            if (leaderTabIdRef.current === data.fromTabId) {
+              leaderTabIdRef.current = '';
+              setIsLeader(true);
+            }
+            break;
+          }
+        }
+      };
+
+      // Request state from any active leader on mount
+      bc.postMessage({ type: 'REQUEST_STATE', fromTabId: tabId });
+    } catch (e) {
+      console.warn('[PlaybackContext] BroadcastChannel unavailable, using single-tab mode:', e);
+    }
+
+    const onBeforeUnload = () => {
+      if (channelRef.current && leaderTabIdRef.current === tabId) {
+        channelRef.current.postMessage({
+          type: 'LEADER_CLOSING',
+          fromTabId: tabId,
+        });
+      }
+    };
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      if (bc) {
+        try {
+          bc.close();
+        } catch {}
+      }
+    };
+  }, [broadcastSync, tabId]);
+
+  // Command executor for remote cross-tab calls
+  const executeCommand = (action: string, payload?: any) => {
+    switch (action) {
+      case 'togglePlay':
+        togglePlay();
+        break;
+      case 'pause':
+        pause();
+        break;
+      case 'resume':
+        resume();
+        break;
+      case 'seek':
+        if (typeof payload === 'number') seek(payload);
+        break;
+      case 'next':
+        next();
+        break;
+      case 'previous':
+        previous();
+        break;
+      case 'setVolume':
+        if (typeof payload === 'number') setVolume(payload);
+        break;
+      case 'toggleMute':
+        toggleMute();
+        break;
+      case 'playSong':
+        if (payload?.song) playSong(payload.song, payload.newQueue, payload.indexInQueue);
+        break;
+      case 'playQueue':
+        if (Array.isArray(payload?.songs)) playQueue(payload.songs, payload.startIndex);
+        break;
+      case 'removeFromQueue':
+        if (typeof payload === 'number') removeFromQueue(payload);
+        break;
+      case 'clearQueue':
+        clearQueue();
+        break;
+      case 'jumpToQueueIndex':
+        if (typeof payload === 'number') jumpToQueueIndex(payload);
+        break;
+      case 'toggleShuffle':
+        toggleShuffle();
+        break;
+      case 'cycleRepeat':
+        cycleRepeat();
+        break;
+    }
+  };
+
+  // Helper to send command if not leader, or execute locally
+  const dispatchOrExecute = (action: string, payload?: any, localFn?: () => void) => {
+    if (leaderTabIdRef.current && leaderTabIdRef.current !== tabId) {
+      // Send command to the active leader tab
+      if (channelRef.current) {
+        channelRef.current.postMessage({
+          type: 'COMMAND',
+          fromTabId: tabId,
+          action,
+          payload,
+        });
+      }
+    } else {
+      // We are leader or taking over leadership
+      claimLeadership();
+      if (localFn) localFn();
+    }
+  };
+
+  // Play a specific song immediately, optionally setting or appending to the queue
+  const playSong = useCallback((song: PlaybackSong, newQueue?: PlaybackSong[], indexInQueue?: number) => {
+    claimLeadership();
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    setCurrentSong(song);
+    setPlaybackError(null);
+    setCurrentTime(0);
+
+    let updatedQueue = queue;
+    let updatedIndex = 0;
+
+    if (newQueue && newQueue.length > 0) {
+      updatedQueue = newQueue;
+      updatedIndex = typeof indexInQueue === 'number' ? indexInQueue : newQueue.findIndex(s => s.id === song.id);
+      if (updatedIndex === -1) updatedIndex = 0;
+      setQueue(updatedQueue);
+      setQueueIndex(updatedIndex);
+    } else {
+      // Check if song is already in queue
+      const existingIdx = queue.findIndex(s => s.id === song.id);
+      if (existingIdx !== -1) {
+        updatedIndex = existingIdx;
+        setQueueIndex(existingIdx);
+      } else {
+        // Prepend or set as first in queue
+        updatedQueue = [song, ...queue];
+        updatedIndex = 0;
+        setQueue(updatedQueue);
+        setQueueIndex(0);
+      }
+    }
+
+    const audioUrl = `/api/songs/${song.id}/audio`;
+    audio.src = audioUrl;
+    audio.currentTime = 0;
+    audio.play().then(() => {
+      setIsPlaying(true);
+      broadcastSync({
+        currentSong: song,
+        isPlaying: true,
+        currentTime: 0,
+        queue: updatedQueue,
+        queueIndex: updatedIndex,
+      });
+    }).catch(err => {
+      console.warn('[PlaybackContext] Audio play was blocked or failed:', err);
+      setIsPlaying(false);
+      broadcastSync({ currentSong: song, isPlaying: false });
+    });
+  }, [broadcastSync, claimLeadership, queue]);
+
+  // Play a full list of songs from a given start index
+  const playQueue = useCallback((songs: PlaybackSong[], startIndex = 0) => {
+    if (!songs || songs.length === 0) return;
+    const targetIdx = Math.max(0, Math.min(startIndex, songs.length - 1));
+    const targetSong = songs[targetIdx];
+    playSong(targetSong, songs, targetIdx);
+  }, [playSong]);
+
+  const resume = useCallback(() => {
+    dispatchOrExecute('resume', undefined, () => {
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      if (!currentSong) {
+        if (queue.length > 0) {
+          const nextIdx = queueIndex >= 0 ? queueIndex : 0;
+          playSong(queue[nextIdx], queue, nextIdx);
+        }
+        return;
+      }
+
+      if (!audio.src || !audio.src.includes(`/api/songs/${currentSong.id}/audio`)) {
+        audio.src = `/api/songs/${currentSong.id}/audio`;
+      }
+
+      audio.play().then(() => {
+        setIsPlaying(true);
+        broadcastSync({ isPlaying: true });
+      }).catch(err => {
+        console.warn('[PlaybackContext] Resume failed:', err);
+        setIsPlaying(false);
+      });
+    });
+  }, [broadcastSync, currentSong, dispatchOrExecute, playSong, queue, queueIndex]);
+
+  const pause = useCallback(() => {
+    dispatchOrExecute('pause', undefined, () => {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        setIsPlaying(false);
+        broadcastSync({ isPlaying: false });
+      }
+    });
+  }, [broadcastSync, dispatchOrExecute]);
+
+  const togglePlay = useCallback(() => {
+    if (isPlaying) {
+      pause();
+    } else {
+      resume();
+    }
+  }, [isPlaying, pause, resume]);
+
+  const seek = useCallback((timeSeconds: number) => {
+    dispatchOrExecute('seek', timeSeconds, () => {
+      const audio = audioRef.current;
+      if (audio && Number.isFinite(timeSeconds)) {
+        audio.currentTime = timeSeconds;
+        setCurrentTime(timeSeconds);
+        broadcastSync({ currentTime: timeSeconds });
+      }
+    });
+  }, [broadcastSync, dispatchOrExecute]);
+
+  // Skip to next track
+  const next = useCallback(() => {
+    dispatchOrExecute('next', undefined, () => {
+      if (queue.length === 0) return;
+
+      let nextIndex = queueIndex + 1;
+
+      if (isShuffle && queue.length > 1) {
+        // Pick random different song
+        let randomIdx = Math.floor(Math.random() * queue.length);
+        if (randomIdx === queueIndex) {
+          randomIdx = (randomIdx + 1) % queue.length;
+        }
+        nextIndex = randomIdx;
+      }
+
+      if (nextIndex >= queue.length) {
+        if (repeatMode === 'all') {
+          nextIndex = 0;
+        } else {
+          // Reached end of queue without repeat all
+          pause();
+          seek(0);
+          return;
+        }
+      }
+
+      const nextSong = queue[nextIndex];
+      if (nextSong) {
+        playSong(nextSong, queue, nextIndex);
+      }
+    });
+  }, [dispatchOrExecute, isShuffle, pause, playSong, queue, queueIndex, repeatMode, seek]);
+
+  // Previous track (if >3s into song, restarts; otherwise goes to previous index)
+  const previous = useCallback(() => {
+    dispatchOrExecute('previous', undefined, () => {
+      const audio = audioRef.current;
+      if (audio && audio.currentTime > 3) {
+        audio.currentTime = 0;
+        setCurrentTime(0);
+        broadcastSync({ currentTime: 0 });
+        return;
+      }
+
+      if (queue.length === 0) return;
+
+      let prevIndex = queueIndex - 1;
+      if (prevIndex < 0) {
+        if (repeatMode === 'all') {
+          prevIndex = queue.length - 1;
+        } else {
+          prevIndex = 0;
+        }
+      }
+
+      const prevSong = queue[prevIndex];
+      if (prevSong) {
+        playSong(prevSong, queue, prevIndex);
+      }
+    });
+  }, [broadcastSync, dispatchOrExecute, playSong, queue, queueIndex, repeatMode]);
+
+  // Handle track naturally finishing
+  const handleTrackEnded = useCallback(() => {
+    if (repeatMode === 'one') {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+        setCurrentTime(0);
+        broadcastSync({ currentTime: 0, isPlaying: true });
+      }
+      return;
+    }
+    next();
+  }, [broadcastSync, next, repeatMode]);
+
+  const setVolume = useCallback((vol: number) => {
+    const clamped = Math.max(0, Math.min(1, vol));
+    dispatchOrExecute('setVolume', clamped, () => {
+      setVolumeState(clamped);
+      setIsMuted(clamped === 0);
+      const audio = audioRef.current;
+      if (audio) {
+        audio.volume = clamped;
+        audio.muted = clamped === 0;
+      }
+      broadcastSync({ volume: clamped, isMuted: clamped === 0 });
+    });
+  }, [broadcastSync, dispatchOrExecute]);
+
+  const toggleMute = useCallback(() => {
+    dispatchOrExecute('toggleMute', undefined, () => {
+      const audio = audioRef.current;
+      const nextMute = !isMuted;
+      setIsMuted(nextMute);
+      if (audio) {
+        audio.muted = nextMute;
+      }
+      broadcastSync({ isMuted: nextMute });
+    });
+  }, [broadcastSync, dispatchOrExecute, isMuted]);
+
+  const addToQueue = useCallback((items: PlaybackSong | PlaybackSong[]) => {
+    const toAdd = Array.isArray(items) ? items : [items];
+    if (toAdd.length === 0) return;
+
+    setQueue(prev => {
+      const updated = [...prev, ...toAdd];
+      broadcastSync({ queue: updated });
+      return updated;
+    });
+  }, [broadcastSync]);
+
+  const removeFromQueue = useCallback((index: number) => {
+    dispatchOrExecute('removeFromQueue', index, () => {
+      setQueue(prev => {
+        const updated = prev.filter((_, i) => i !== index);
+        let newIdx = queueIndex;
+        if (index < queueIndex) {
+          newIdx = queueIndex - 1;
+          setQueueIndex(newIdx);
+        } else if (index === queueIndex) {
+          // If removing currently playing track, keep index bounds safe
+          newIdx = Math.min(queueIndex, updated.length - 1);
+          setQueueIndex(newIdx);
+        }
+        broadcastSync({ queue: updated, queueIndex: newIdx });
+        return updated;
+      });
+    });
+  }, [broadcastSync, dispatchOrExecute, queueIndex]);
+
+  const clearQueue = useCallback(() => {
+    dispatchOrExecute('clearQueue', undefined, () => {
+      if (currentSong) {
+        setQueue([currentSong]);
+        setQueueIndex(0);
+        broadcastSync({ queue: [currentSong], queueIndex: 0 });
+      } else {
+        setQueue([]);
+        setQueueIndex(-1);
+        broadcastSync({ queue: [], queueIndex: -1 });
+      }
+    });
+  }, [broadcastSync, currentSong, dispatchOrExecute]);
+
+  const jumpToQueueIndex = useCallback((index: number) => {
+    dispatchOrExecute('jumpToQueueIndex', index, () => {
+      if (index >= 0 && index < queue.length) {
+        playSong(queue[index], queue, index);
+      }
+    });
+  }, [dispatchOrExecute, playSong, queue]);
+
+  const toggleShuffle = useCallback(() => {
+    dispatchOrExecute('toggleShuffle', undefined, () => {
+      const nextShuffle = !isShuffle;
+      setIsShuffle(nextShuffle);
+      broadcastSync({ isShuffle: nextShuffle });
+    });
+  }, [broadcastSync, dispatchOrExecute, isShuffle]);
+
+  const cycleRepeat = useCallback(() => {
+    dispatchOrExecute('cycleRepeat', undefined, () => {
+      const modes: Array<'off' | 'all' | 'one'> = ['off', 'all', 'one'];
+      const nextMode = modes[(modes.indexOf(repeatMode) + 1) % modes.length];
+      setRepeatMode(nextMode);
+      broadcastSync({ repeatMode: nextMode });
+    });
+  }, [broadcastSync, dispatchOrExecute, repeatMode]);
+
+  const value: PlaybackContextType = {
+    currentSong,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    isMuted,
+    queue,
+    queueIndex,
+    isShuffle,
+    repeatMode,
+    playbackError,
+    isLeader,
+    playSong,
+    playQueue,
+    togglePlay,
+    pause,
+    resume,
+    seek,
+    next,
+    previous,
+    setVolume,
+    toggleMute,
+    addToQueue,
+    removeFromQueue,
+    clearQueue,
+    jumpToQueueIndex,
+    toggleShuffle,
+    cycleRepeat,
+  };
+
+  return <PlaybackContext.Provider value={value}>{children}</PlaybackContext.Provider>;
+}
+
+export function usePlayback() {
+  const ctx = useContext(PlaybackContext);
+  if (!ctx) {
+    throw new Error('usePlayback must be used within a PlaybackProvider');
+  }
+  return ctx;
+}

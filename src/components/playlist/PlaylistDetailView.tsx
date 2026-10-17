@@ -20,10 +20,13 @@ import {
   ArrowUp, 
   ArrowDown,
   Loader2,
-  Shield
+  Shield,
+  Pause,
+  Radio
 } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../../types';
 import LyricBadges from '../LyricBadges';
+import { usePlayback, PlaybackSong } from '../../context/PlaybackContext';
 
 interface PlaylistDetailViewProps {
   playlist: Playlist;
@@ -77,6 +80,61 @@ export default function PlaylistDetailView({
   const isAdmin = currentUser?.role === 'administrator';
   const canEdit = playlist.canEdit || isOwner || isAdmin;
   const songs = playlist.songs || [];
+
+  const { 
+    currentSong: jukeboxCurrentSong, 
+    isPlaying: jukeboxIsPlaying, 
+    playSong: playJukeboxSong, 
+    playQueue: playJukeboxQueue, 
+    togglePlay: toggleJukeboxPlay,
+    addToQueue: addSongToJukeboxQueue
+  } = usePlayback();
+
+  const handlePlayAllInJukebox = () => {
+    if (songs.length === 0) return;
+    const formatted: PlaybackSong[] = songs.map(s => ({
+      id: s.id,
+      title: s.title,
+      artist: s.artist || 'Unknown Artist',
+      artists: s.artists,
+      album: s.album,
+      albumId: s.albumId,
+      duration: s.duration,
+      hasArtwork: s.hasArtwork,
+      variant: s.variant,
+    }));
+    playJukeboxQueue(formatted, 0);
+  };
+
+  const handlePlaySongInJukebox = (song: PlaylistSongItem, idx: number) => {
+    if (jukeboxCurrentSong?.id === song.id) {
+      toggleJukeboxPlay();
+      return;
+    }
+    const formatted: PlaybackSong = {
+      id: song.id,
+      title: song.title,
+      artist: song.artist || 'Unknown Artist',
+      artists: song.artists,
+      album: song.album,
+      albumId: song.albumId,
+      duration: song.duration,
+      hasArtwork: song.hasArtwork,
+      variant: song.variant,
+    };
+    const formattedList: PlaybackSong[] = songs.map(s => ({
+      id: s.id,
+      title: s.title,
+      artist: s.artist || 'Unknown Artist',
+      artists: s.artists,
+      album: s.album,
+      albumId: s.albumId,
+      duration: s.duration,
+      hasArtwork: s.hasArtwork,
+      variant: s.variant,
+    }));
+    playJukeboxSong(formatted, formattedList, idx);
+  };
 
   const handleFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -212,14 +270,24 @@ export default function PlaylistDetailView({
           <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3">
             <button
               type="button"
+              onClick={handlePlayAllInJukebox}
+              disabled={songs.length === 0}
+              className="px-5 py-2.5 bg-[#FF4FA3] hover:bg-[#ff68b1] text-white rounded-xl text-xs font-bold shadow-lg shadow-[#FF4FA3]/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-2 active:scale-95"
+            >
+              <Play className="w-4 h-4 fill-white" />
+              <span>Play in Jukebox</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => onPlayAll(playlist)}
               disabled={songs.length === 0 || playingAll}
-              className="px-5 py-2.5 bg-[#FF4FA3] hover:bg-[#e0378b] text-white rounded-xl text-xs font-bold shadow-lg shadow-[#FF4FA3]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-2"
+              className="px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white rounded-xl text-xs font-bold border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-2"
             >
               {playingAll ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Play className="w-4 h-4 fill-white" />
+                <Radio className="w-4 h-4 text-[#FF4FA3]" />
               )}
               <span>{playingAll ? 'Adding to Room...' : 'Play in Room'}</span>
             </button>
@@ -394,7 +462,12 @@ export default function PlaylistDetailView({
 
                     {/* Title */}
                     <td className="px-4 py-3.5 font-medium text-white flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => handlePlaySongInJukebox(song, idx)}
+                        className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden relative group/play cursor-pointer border border-white/5 hover:border-[#FF4FA3]/40 transition-colors"
+                        title={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'Pause' : 'Play in Jukebox'}
+                      >
                         {song.hasArtwork ? (
                           <img
                             src={`/api/songs/${song.id}/artwork`}
@@ -407,10 +480,17 @@ export default function PlaylistDetailView({
                         ) : (
                           <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#FF4FA3] transition-colors" />
                         )}
-                      </div>
+                        <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'opacity-100' : 'opacity-0 group-hover/play:opacity-100'}`}>
+                          {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? (
+                            <Pause className="w-4 h-4 text-[#FF4FA3] fill-current" />
+                          ) : (
+                            <Play className="w-4 h-4 text-white fill-current ml-0.5" />
+                          )}
+                        </div>
+                      </button>
 
                       <div className="min-w-0 flex items-center gap-2">
-                        <span className="truncate block">{song.title}</span>
+                        <span className={`truncate block ${jukeboxCurrentSong?.id === song.id ? 'text-[#FF4FA3] font-semibold' : ''}`}>{song.title}</span>
                         <LyricBadges
                           hasLrc={song.hasLrc}
                           hasElrc={song.hasElrc}
@@ -466,6 +546,23 @@ export default function PlaylistDetailView({
                     {/* Actions */}
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handlePlaySongInJukebox(song, idx)}
+                          className={`p-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
+                            jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying
+                              ? 'bg-[#FF4FA3] text-white shadow-sm'
+                              : 'bg-white/5 hover:bg-white/15 text-zinc-300 hover:text-white border border-white/5'
+                          }`}
+                          title="Play in Jukebox"
+                        >
+                          {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? (
+                            <Pause className="w-3.5 h-3.5 fill-current" />
+                          ) : (
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                          )}
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => onAddToQueue(song.id)}

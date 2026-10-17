@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, ReactNode } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
-import { Play, Mic, Radio, Users, Music, Disc, ChevronRight, Plus, Sparkles, Folder, Download } from 'lucide-react';
+import { Play, Pause, Mic, Radio, Users, Music, Disc, ChevronRight, Plus, Sparkles, Folder, Download } from 'lucide-react';
 import { getAuthToken } from '../lib/auth';
+import { usePlayback, PlaybackSong } from '../context/PlaybackContext';
 
 export default function Home() {
   const { user } = useOutletContext<{ user: any }>() || {};
@@ -11,6 +12,41 @@ export default function Home() {
   const [featuredSongs, setFeaturedSongs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const hostButtonRef = useRef<HTMLButtonElement>(null);
+
+  const { 
+    currentSong: jukeboxCurrentSong, 
+    isPlaying: jukeboxIsPlaying, 
+    playSong: playJukeboxSong, 
+    togglePlay: toggleJukeboxPlay 
+  } = usePlayback();
+
+  const handlePlayInJukebox = (song: any) => {
+    if (jukeboxCurrentSong?.id === song.id) {
+      toggleJukeboxPlay();
+      return;
+    }
+    const formatted: PlaybackSong = {
+      id: song.id,
+      title: song.title,
+      artist: song.artist || 'Unknown Artist',
+      artists: song.artists,
+      album: song.album,
+      duration: song.duration,
+      hasArtwork: song.hasArtwork,
+      variant: song.variant,
+    };
+    const formattedList: PlaybackSong[] = featuredSongs.map(s => ({
+      id: s.id,
+      title: s.title,
+      artist: s.artist || 'Unknown Artist',
+      artists: s.artists,
+      album: s.album,
+      duration: s.duration,
+      hasArtwork: s.hasArtwork,
+      variant: s.variant,
+    }));
+    playJukeboxSong(formatted, formattedList);
+  };
 
   useEffect(() => {
     if (user?.role === 'user') {
@@ -226,7 +262,7 @@ export default function Home() {
               className="px-6 py-3.5 bg-[#1C1E2D] hover:bg-[#25283C] text-zinc-200 hover:text-white font-medium rounded-xl border border-white/10 transition-all flex items-center gap-2"
             >
               <Music className="w-5 h-5 text-zinc-400" />
-              <span>Browse Catalog</span>
+              <span>Jukebox</span>
             </Link>
           </div>
         </div>
@@ -338,44 +374,73 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {featuredSongs.map((song) => (
-              <div
-                key={song.id}
-                className="bg-[#141622] hover:bg-[#1A1C2C] border border-white/5 hover:border-white/15 rounded-2xl p-4 transition-all group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="w-full aspect-square rounded-xl bg-[#1C1E2D] border border-white/5 mb-3 flex items-center justify-center relative overflow-hidden group-hover:border-[#FF4FA3]/30 transition-colors">
-                    {song.hasArtwork ? (
-                      <img
-                        src={`/api/songs/${song.id}/artwork`}
-                        alt={song.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#FF4FA3] transition-colors" />
-                    )}
+            {featuredSongs.map((song) => {
+              const isCurrent = jukeboxCurrentSong?.id === song.id;
+              const isThisPlaying = isCurrent && jukeboxIsPlaying;
+              return (
+                <div
+                  key={song.id}
+                  className={`border rounded-2xl p-4 transition-all group flex flex-col justify-between ${
+                    isCurrent 
+                      ? 'bg-[#181524] border-[#FF4FA3]/30 shadow-lg shadow-[#FF4FA3]/10' 
+                      : 'bg-[#141622] hover:bg-[#1A1C2C] border-white/5 hover:border-white/15'
+                  }`}
+                >
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => handlePlayInJukebox(song)}
+                      className="w-full aspect-square rounded-xl bg-[#1C1E2D] border border-white/5 mb-3 flex items-center justify-center relative overflow-hidden group-hover:border-[#FF4FA3]/30 transition-colors cursor-pointer group/art"
+                      title={isThisPlaying ? 'Pause song' : 'Play in Jukebox'}
+                    >
+                      {song.hasArtwork ? (
+                        <img
+                          src={`/api/songs/${song.id}/artwork`}
+                          alt={song.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#FF4FA3] transition-colors" />
+                      )}
+                      <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity ${isThisPlaying ? 'opacity-100' : 'opacity-0 group-hover/art:opacity-100'}`}>
+                        {isThisPlaying ? (
+                          <Pause className="w-8 h-8 text-[#FF4FA3] fill-current" />
+                        ) : (
+                          <Play className="w-8 h-8 text-white fill-current ml-1" />
+                        )}
+                      </div>
+                    </button>
+                    <h3 className={`font-semibold text-sm truncate group-hover:text-[#FF4FA3] transition-colors ${isCurrent ? 'text-[#FF4FA3]' : 'text-white'}`}>
+                      {song.title}
+                    </h3>
+                    <p className="text-xs text-zinc-400 truncate mt-0.5">{song.artist || 'Unknown Artist'}</p>
                   </div>
-                  <h3 className="font-semibold text-sm text-white truncate group-hover:text-[#FF4FA3] transition-colors">
-                    {song.title}
-                  </h3>
-                  <p className="text-xs text-zinc-400 truncate mt-0.5">{song.artist || 'Unknown Artist'}</p>
-                </div>
 
-                <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
-                  <span className="text-[11px] text-zinc-500 capitalize">{song.variant}</span>
-                  <button
-                    onClick={() => handleQueueSong(song.id)}
-                    className="p-1.5 bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white rounded-lg text-xs font-medium transition-colors"
-                    title="Add to active room queue"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => handlePlayInJukebox(song)}
+                      className={`text-xs font-semibold inline-flex items-center gap-1 transition-colors ${
+                        isThisPlaying ? 'text-[#FF4FA3]' : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {isThisPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                      <span>{isThisPlaying ? 'Playing' : 'Play'}</span>
+                    </button>
+                    <button
+                      onClick={() => handleQueueSong(song.id)}
+                      className="p-1.5 bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white rounded-lg text-xs font-medium transition-colors"
+                      title="Add to active room queue"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
