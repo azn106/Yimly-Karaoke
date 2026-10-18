@@ -838,6 +838,19 @@ export default function Library() {
           onOpenLyrics={(songId, title, format) => {
             setEditorState({ isOpen: true, songId, title, format });
           }}
+          onSongAdded={(song) => {
+            setSelectedPlaylist(prev => {
+              if (!prev) return null;
+              const newSongs = [...(prev.songs || []), song];
+              return { ...prev, songs: newSongs, songCount: newSongs.length };
+            });
+            setPlaylists(prev => prev.map(p => {
+              if (p.id === selectedPlaylist.id) {
+                return { ...p, songCount: (p.songCount || 0) + 1 };
+              }
+              return p;
+            }));
+          }}
         />
 
         <AddSongsModal

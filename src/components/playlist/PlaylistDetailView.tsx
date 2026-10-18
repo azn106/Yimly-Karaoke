@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Play, 
@@ -22,7 +22,8 @@ import {
   Loader2,
   Shield,
   Pause,
-  Radio
+  Radio,
+  Search
 } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../../types';
 import LyricBadges from '../LyricBadges';
@@ -49,6 +50,7 @@ interface PlaylistDetailViewProps {
   queuedSongId: number | null;
   playingAll?: boolean;
   onOpenLyrics?: (songId: number, title: string, format: 'lrc' | 'elrc') => void;
+  onSongAdded?: (song: PlaylistSongItem) => void;
 }
 
 export default function PlaylistDetailView({
@@ -72,6 +74,7 @@ export default function PlaylistDetailView({
   onReorderSong,
   queuedSongId,
   playingAll = false,
+  onSongAdded,
 }: PlaylistDetailViewProps) {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -89,6 +92,66 @@ export default function PlaylistDetailView({
     togglePlay: toggleJukeboxPlay,
     addToQueue: addSongToJukeboxQueue
   } = usePlayback();
+
+  const [recSearch, setRecSearch] = useState('');
+  const [allLibrarySongs, setAllLibrarySongs] = useState<any[]>([]);
+  const [addingSongId, setAddingSongId] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch('/api/songs')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setAllLibrarySongs(data);
+      })
+      .catch(err => console.error('Failed to load library songs for recommendations:', err));
+  }, []);
+
+  const playlistSongIds = new Set(songs.map(s => s.id));
+  const availableSongs = allLibrarySongs.filter(s => !playlistSongIds.has(s.id));
+  const filteredRecommendations = recSearch.trim()
+    ? availableSongs.filter(s => 
+        s.title?.toLowerCase().includes(recSearch.toLowerCase()) ||
+        s.artist?.toLowerCase().includes(recSearch.toLowerCase()) ||
+        s.album?.toLowerCase().includes(recSearch.toLowerCase())
+      )
+    : availableSongs.slice(0, 8);
+
+  const handleAddRecommended = async (song: any) => {
+    if (addingSongId) return;
+    setAddingSongId(song.id);
+    try {
+      const res = await fetch(`/api/playlists/${playlist.id}/songs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ songId: song.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to add song');
+      }
+      const inserted = await res.json();
+      onSongAdded?.({
+        playlistSongId: inserted.id,
+        position: inserted.position,
+        addedAt: inserted.addedAt,
+        id: song.id,
+        title: song.title,
+        artist: song.artist,
+        artists: song.artists,
+        album: song.album,
+        albumId: song.albumId,
+        duration: song.duration,
+        variant: song.variant,
+        hasArtwork: song.hasArtwork,
+        hasLrc: song.hasLrc,
+        hasElrc: song.hasElrc,
+      });
+    } catch (e: any) {
+      alert(e.message || 'Failed to add song');
+    } finally {
+      setAddingSongId(null);
+    }
+  };
 
   const handlePlayAllInJukebox = () => {
     if (songs.length === 0) return;
@@ -615,6 +678,96 @@ export default function PlaylistDetailView({
           </table>
         </div>
       </div>
+
+      {/* Recommended Songs Section */}
+      {canEdit && (
+        <div className="mt-10 space-y-4 pt-6 border-t border-white/10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-white tracking-tight">Recommended Songs</h2>
+              <p className="text-xs text-zinc-400 mt-0.5">Discover and add tracks from your media library</p>
+            </div>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Search available songs to recommend and add..."
+              value={recSearch}
+              onChange={(e) => setRecSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-[#141622] border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all"
+            />
+          </div>
+
+          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-3.5">Title</th>
+                  <th className="px-5 py-3.5 hidden sm:table-cell">Artist</th>
+                  <th className="px-5 py-3.5 hidden md:table-cell">Album</th>
+                  <th className="px-5 py-3.5">Duration</th>
+                  <th className="px-5 py-3.5 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredRecommendations.map((song) => (
+                  <tr key={song.id} className="hover:bg-[#1A1C2C]/60 transition-colors">
+                    <td className="px-5 py-3.5 font-medium text-white flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden border border-white/5">
+                        {song.hasArtwork ? (
+                          <img
+                            src={`/api/songs/${song.id}/artwork`}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <Music className="w-4 h-4 text-zinc-400" />
+                        )}
+                      </div>
+                      <span className="truncate">{song.title}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-zinc-300 text-xs truncate max-w-xs hidden sm:table-cell">
+                      {song.artist || 'Unknown Artist'}
+                    </td>
+                    <td className="px-5 py-3.5 text-zinc-400 text-xs truncate max-w-xs hidden md:table-cell">
+                      {song.album || '—'}
+                    </td>
+                    <td className="px-5 py-3.5 text-zinc-400 text-xs font-mono">
+                      {formatDuration(song.duration)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        type="button"
+                        disabled={addingSongId === song.id}
+                        onClick={() => handleAddRecommended(song)}
+                        className="px-3.5 py-1.5 bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white rounded-lg text-xs font-semibold border border-[#FF4FA3]/30 transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {addingSongId === song.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="w-3.5 h-3.5" />
+                        )}
+                        <span>Add</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredRecommendations.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-zinc-500 text-xs">
+                      {recSearch.trim() ? 'No matching songs found in library.' : 'No additional songs available to recommend.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

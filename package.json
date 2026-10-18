@@ -4,13 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch server.ts",
+    "dev": "AUTO_REGISTER_SAMPLE_LIBRARY=true tsx watch server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
     "start": "NODE_ENV=production node dist/server.js",
     "preview": "npm run start",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "DATA_DIR=data/test_db_runner tsx --test server/tests/backend.test.ts server/tests/download-queue-concurrency.test.ts server/tests/backup-restore-queue.test.ts server/tests/canonical-metadata-and-matching.test.ts server/tests/artist-image-refresh.test.ts"
+    "test": "DATA_DIR=data/test_db_runner tsx --test server/tests/backend.test.ts server/tests/download-queue-concurrency.test.ts server/tests/backup-restore-queue.test.ts server/tests/canonical-metadata-and-matching.test.ts server/tests/artist-image-refresh.test.ts server/tests/library-registration.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
