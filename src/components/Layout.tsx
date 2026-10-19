@@ -32,10 +32,10 @@ export default function Layout() {
       });
   }, [navigate]);
 
-  // Close mobile menu on route change
+  // Close the drawer when the destination changes, including Jukebox tab changes.
   useEffect(() => {
     setMobileMenuOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   // Keep the relevant section expanded while navigating within it.
   // Only one submenu can be open at a time.
@@ -70,9 +70,9 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans md:grid md:grid-cols-[230px_minmax(0,1fr)_346px]">
+    <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans xl:grid xl:grid-cols-[230px_minmax(0,1fr)_346px]">
       {/* Desktop & Tablet Sidebar */}
-      <aside className="hidden md:flex md:col-start-1 md:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
+      <aside className="hidden xl:flex xl:col-start-1 xl:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
           {/* Brand Header */}
           <div className="p-6 pb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -91,6 +91,7 @@ export default function Layout() {
             expandedSection={expandedSection}
             onToggleSection={(section) => setExpandedSection(current => current === section ? null : section)}
             variant="desktop"
+            onNavigate={() => {}}
           />
 
           {/* User Profile & Logout */}
@@ -118,7 +119,7 @@ export default function Layout() {
 
       {/* Mobile Drawer Backdrop & Menu */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
+        <div className="fixed inset-0 z-50 xl:hidden flex">
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
             onClick={() => setMobileMenuOpen(false)} 
@@ -144,6 +145,7 @@ export default function Layout() {
               expandedSection={expandedSection}
               onToggleSection={(section) => setExpandedSection(current => current === section ? null : section)}
               variant="mobile"
+              onNavigate={() => setMobileMenuOpen(false)}
             />
 
             <div className="pt-4 border-t border-white/5 flex items-center justify-between">
@@ -164,9 +166,9 @@ export default function Layout() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#0A0B10] md:col-start-2 md:row-start-1">
+      <div className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#0A0B10] xl:col-start-2 xl:row-start-1">
         {/* Mobile Header Bar */}
-        <div className="md:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
+        <div className="xl:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#FF4FA3] flex items-center justify-center text-white">
                 <Mic className="w-4 h-4" />
@@ -187,7 +189,7 @@ export default function Layout() {
           <main className="min-h-0 min-w-0 flex-1 overflow-y-auto pb-28">
             <Outlet context={{ user }} />
           </main>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 hidden md:block">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 hidden xl:block">
             <div className="pointer-events-auto">
               <PlayerBar />
             </div>
@@ -197,7 +199,7 @@ export default function Layout() {
       </div>
 
       {/* Right panel is a separate full-height grid column, outside the player overlay. */}
-      <aside className="hidden md:flex md:col-start-3 md:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
+      <aside className="hidden xl:flex xl:col-start-3 xl:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
           <NowPlayingPanel />
       </aside>
     </div>
@@ -211,11 +213,13 @@ function NavigationSections({
   expandedSection,
   onToggleSection,
   variant,
+  onNavigate,
 }: {
   user: any;
   expandedSection: NavigationSection | null;
   onToggleSection: (section: NavigationSection) => void;
   variant: 'desktop' | 'mobile';
+  onNavigate: () => void;
 }) {
   const isMobile = variant === 'mobile';
   const location = useLocation();
@@ -228,11 +232,11 @@ function NavigationSections({
       {!isMobile && (
         <div className="px-3 pb-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Menu</div>
       )}
-      <NavItem to="/" icon={<Home className={iconSize} />} label="Home" />
+      <NavItem to="/" icon={<Home className={iconSize} />} label="Home" onNavigate={onNavigate} />
 
       <div className="space-y-1">
         <div className={`flex items-center rounded-xl transition-colors ${isJukeboxActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
-          <NavLink to="/library" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxActive ? 'page' : undefined}>
+          <NavLink to="/library" onClick={onNavigate} className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxActive ? 'page' : undefined}>
             <Music className={iconSize} /><span>Jukebox</span>
           </NavLink>
           <button type="button" onClick={() => onToggleSection('jukebox')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'jukebox' ? 'Collapse Jukebox menu' : 'Expand Jukebox menu'} aria-expanded={expandedSection === 'jukebox'}>
@@ -241,19 +245,19 @@ function NavigationSections({
         </div>
         {expandedSection === 'jukebox' && (
           <div className="pl-4 space-y-1">
-            <NavItem to="/library?tab=songs" icon={<Music className={iconSize} />} label="Songs" />
-            <NavItem to="/library?tab=albums" icon={<Disc className={iconSize} />} label="Albums" />
-            <NavItem to="/library?tab=artists" icon={<Mic className={iconSize} />} label="Artists" />
-            <NavItem to="/library?tab=playlists" icon={<ListMusic className={iconSize} />} label="Playlists" />
+            <NavItem to="/library?tab=songs" icon={<Music className={iconSize} />} label="Songs" onNavigate={onNavigate} />
+            <NavItem to="/library?tab=albums" icon={<Disc className={iconSize} />} label="Albums" onNavigate={onNavigate} />
+            <NavItem to="/library?tab=artists" icon={<Mic className={iconSize} />} label="Artists" onNavigate={onNavigate} />
+            <NavItem to="/library?tab=playlists" icon={<ListMusic className={iconSize} />} label="Playlists" onNavigate={onNavigate} />
           </div>
         )}
       </div>
 
-      <NavItem to="/rooms" icon={<Radio className={iconSize} />} label="Karaoke Room" />
+      <NavItem to="/rooms" icon={<Radio className={iconSize} />} label="Karaoke Room" onNavigate={onNavigate} />
 
       <div className="space-y-1">
         <div className={`flex items-center rounded-xl transition-colors ${isSettingsHomeActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
-          <NavLink to="/settings" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isSettingsHomeActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
+          <NavLink to="/settings" onClick={onNavigate} className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isSettingsHomeActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
             <Settings className={iconSize} /><span>Settings</span>
           </NavLink>
           <button type="button" onClick={() => onToggleSection('settings')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'settings' ? 'Collapse Settings menu' : 'Expand Settings menu'} aria-expanded={expandedSection === 'settings'}>
@@ -262,8 +266,8 @@ function NavigationSections({
         </div>
         {expandedSection === 'settings' && user?.role === 'administrator' && (
           <div className="pl-4 space-y-1">
-            <NavItem to="/download" icon={<Download className={iconSize} />} label="Download Music" />
-            <NavItem to="/users" icon={<Users className={iconSize} />} label="Users" />
+            <NavItem to="/download" icon={<Download className={iconSize} />} label="Download Music" onNavigate={onNavigate} />
+            <NavItem to="/users" icon={<Users className={iconSize} />} label="Users" onNavigate={onNavigate} />
           </div>
         )}
       </div>
@@ -271,7 +275,7 @@ function NavigationSections({
   );
 }
 
-function NavItem({ to, icon, label, badge, activeWhen }: { to: string, icon: ReactNode, label: string, badge?: string, activeWhen?: boolean }) {
+function NavItem({ to, icon, label, badge, activeWhen, onNavigate }: { to: string, icon: ReactNode, label: string, badge?: string, activeWhen?: boolean, onNavigate?: () => void }) {
   const location = useLocation();
   const currentUrl = location.pathname + location.search;
 
@@ -289,6 +293,7 @@ function NavItem({ to, icon, label, badge, activeWhen }: { to: string, icon: Rea
   return (
     <NavLink
       to={to}
+      onClick={onNavigate}
       className={
         `flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-sm font-medium ${
           isActive 
