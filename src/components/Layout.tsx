@@ -71,7 +71,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans md:grid md:grid-cols-[minmax(220px,1fr)_minmax(0,2fr)_minmax(280px,1fr)]">
+    <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans md:grid md:grid-cols-[25%_50%_25%]">
       {/* Desktop & Tablet Sidebar */}
       {sidePanelsVisible && (
         <aside className="hidden md:flex md:col-start-1 md:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
