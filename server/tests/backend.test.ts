@@ -23,7 +23,7 @@ import albumsRoutes from '../routes/albums.js';
 import searchRoutes from '../routes/search.js';
 import { requireAuth } from '../middleware/auth.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev';
+const JWT_SECRET = process.env.JWT_SECRET || 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe';
 
 import { createRateLimiter } from '../middleware/rate-limiter.js';
 

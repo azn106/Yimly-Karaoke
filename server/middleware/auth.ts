@@ -4,7 +4,9 @@ import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
-const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'test' ? 'test_secret_for_ci' : undefined);
+const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.DATA_DIR?.includes('test'));
+const DETERMINISTIC_TEST_JWT_SECRET = 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe';
+const JWT_SECRET = process.env.JWT_SECRET || (isTestEnv ? DETERMINISTIC_TEST_JWT_SECRET : undefined);
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET must be set in environment variables');
 }

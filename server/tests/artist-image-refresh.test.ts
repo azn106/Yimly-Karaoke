@@ -2,6 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
+
+// Isolate test database to prevent race conditions with other test suites
+const testDataDir = path.resolve(process.cwd(), 'data', 'test_artist_image_refresh');
+process.env.DATA_DIR = testDataDir;
+
 import { db, setupDatabase } from '../db/index.js';
 import { artists, songs, albums, libraries } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -278,8 +283,20 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
       artworkPath: 'album_embedded_cover.jpg',
     }).returning();
 
+    // Ensure valid library exists for foreign-key constraints
+    let activeLibId = libraryId;
+    const [existingLib] = await db.select().from(libraries).where(eq(libraries.id, activeLibId));
+    if (!existingLib) {
+      const [newLib] = await db.insert(libraries).values({
+        name: `Test Artist Image Library ${Date.now()}`,
+        path: `/mock/test/library_${Date.now()}`,
+      }).returning();
+      activeLibId = newLib.id;
+      libraryId = activeLibId;
+    }
+
     const [song] = await db.insert(songs).values({
-      libraryId,
+      libraryId: activeLibId,
       artistId,
       albumId: alb.id,
       title: 'Scanned Song',
@@ -319,7 +336,7 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
     const baseUrl = `http://127.0.0.1:${address.port}`;
     const token = jwt.sign(
       { id: 1, username: 'test_admin', role: 'administrator' },
-      process.env.JWT_SECRET || 'fallback_secret_for_dev'
+      process.env.JWT_SECRET || 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe'
     );
 
     // Create artist with NO artwork, but associated album and song WITH artwork

@@ -1,10 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
+import fs from 'fs';
+import path from 'path';
+
+// Isolate test database to prevent race conditions with other test suites
+const testDataDir = path.resolve(process.cwd(), 'data', 'test_library_registration');
+process.env.DATA_DIR = testDataDir;
+
 import { setupDatabase, db } from '../db/index.js';
 import { libraries } from '../db/schema.js';
 import { registerSampleLibraryIfNeeded } from '../lib/library-registration.js';
-import fs from 'fs';
-import path from 'path';
 
 test('Library Registration Tests', async (t) => {
     await setupDatabase();
