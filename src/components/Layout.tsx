@@ -220,7 +220,7 @@ function NavigationSections({
   const isMobile = variant === 'mobile';
   const location = useLocation();
   const iconSize = isMobile ? 'w-5 h-5' : 'w-4 h-4';
-  const isJukeboxActive = location.pathname.startsWith('/library');
+  const isJukeboxActive = location.pathname === '/library' && (!location.search || location.search === '?tab=home');
   const isSettingsHomeActive = location.pathname === '/settings';
 
   return (
