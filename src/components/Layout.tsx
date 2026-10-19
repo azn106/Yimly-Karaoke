@@ -1,15 +1,17 @@
 import { useEffect, useState, ReactNode } from 'react';
 import { Outlet, useNavigate, NavLink, useLocation } from 'react-router-dom';
-import { Home, Music, Mic, Settings, Users, LogOut, Loader2, Disc, Menu, X, Radio, Download, ChevronUp, ChevronDown, ListMusic } from 'lucide-react';
+import { Home, Music, Mic, Settings, Users, LogOut, Disc, Menu, X, Radio, Download, ChevronUp, ChevronDown, ListMusic, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { clearAuthToken } from '../lib/auth';
 import PlayerBar from './PlayerBar';
 import NowPlayingOverlay from './NowPlayingOverlay';
+import NowPlayingPanel from './NowPlayingPanel';
 
 export default function Layout() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [jukeboxOpen, setJukeboxOpen] = useState(false);
+  const [sidePanelsVisible, setSidePanelsVisible] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -44,6 +46,7 @@ export default function Layout() {
   }, [location.pathname]);
 
   const isJukeboxActive = location.pathname.startsWith('/library');
+  const isLibraryRoute = isJukeboxActive;
 
   const handleLogout = async () => {
     clearAuthToken();
@@ -71,7 +74,7 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans">
       {/* Desktop & Tablet Sidebar */}
-      {!hideSidebar && (
+      {!hideSidebar && sidePanelsVisible && (
         <aside className="w-64 bg-[#11121A] border-r border-white/5 flex flex-col hidden md:flex shrink-0">
           {/* Brand Header */}
           <div className="p-6 pb-5 flex items-center justify-between">
@@ -228,7 +231,7 @@ export default function Layout() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0A0B10]">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#0A0B10]">
         {/* Mobile Header Bar */}
         {!hideSidebar && (
           <div className="md:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
@@ -241,25 +244,44 @@ export default function Layout() {
             <button 
               onClick={() => setMobileMenuOpen(true)}
               className="p-2 text-zinc-300 hover:text-white rounded-lg bg-zinc-800/60"
+              aria-label="Open navigation menu"
             >
               <Menu className="w-5 h-5" />
             </button>
           </div>
         )}
 
-        {/* Page Content Scroll View */}
-        <main className="flex-1 overflow-y-auto">
-          <Outlet context={{ user }} />
-        </main>
-
-        {/* Conditional Player Layout */}
-        {location.pathname.startsWith('/library') ? (
-          <div className="hidden md:block w-80 border-l border-white/5 bg-[#11121A] shrink-0">
-            <PlayerBar />
+        {/* One desktop control toggles both side panels without touching playback state. */}
+        {isLibraryRoute && (
+          <div className="hidden md:flex items-center justify-between px-4 py-2 border-b border-white/5 bg-[#0D0E15] shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Jukebox</span>
+            <button
+              type="button"
+              onClick={() => setSidePanelsVisible(visible => !visible)}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-300 hover:bg-white/10 hover:text-white transition-colors"
+              aria-label={sidePanelsVisible ? 'Hide sidebar and now playing panel' : 'Show sidebar and now playing panel'}
+              title={sidePanelsVisible ? 'Hide side panels' : 'Show side panels'}
+            >
+              {sidePanelsVisible ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+              <span>{sidePanelsVisible ? 'Hide panels' : 'Show panels'}</span>
+            </button>
           </div>
-        ) : (
-          <NowPlayingOverlay />
         )}
+
+        {/* Content and desktop Now Playing panel share a row; playback remains mounted below. */}
+        <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
+          <main className="flex-1 min-w-0 overflow-y-auto">
+            <Outlet context={{ user }} />
+          </main>
+          {isLibraryRoute && sidePanelsVisible && (
+            <aside className="hidden md:flex w-80 xl:w-96 border-l border-white/5 bg-[#11121A] shrink-0 min-h-0 overflow-hidden">
+              <NowPlayingPanel />
+            </aside>
+          )}
+        </div>
+
+        {/* Keep the persistent playback controls mounted when either side panel is hidden. */}
+        {isLibraryRoute ? <PlayerBar /> : <NowPlayingOverlay />}
       </div>
     </div>
   );
