@@ -60,8 +60,8 @@ export default function Layout() {
     return (
       <div className="flex h-screen items-center justify-center bg-[#0A0B10] text-white">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-[#FF4FA3]/10 border border-[#FF4FA3]/20 flex items-center justify-center">
-            <Disc className="w-6 h-6 text-[#FF4FA3] animate-spin" />
+          <div className="w-12 h-12 rounded-2xl bg-[#FA243C]/10 border border-[#FA243C]/20 flex items-center justify-center">
+            <Disc className="w-6 h-6 text-[#FA243C] animate-spin" />
           </div>
           <span className="text-xs text-zinc-400 font-medium tracking-wide">Loading Yimly...</span>
         </div>
@@ -76,7 +76,7 @@ export default function Layout() {
           {/* Brand Header */}
           <div className="p-6 pb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF4FA3] to-[#e0378b] flex items-center justify-center shadow-lg shadow-[#FF4FA3]/20">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FA243C] to-[#d91e36] flex items-center justify-center shadow-lg shadow-[#FA243C]/20">
                 <Mic className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -108,7 +108,7 @@ export default function Layout() {
               </div>
               <button 
                 onClick={handleLogout}
-                className="p-1.5 text-zinc-400 hover:text-[#FF4FA3] hover:bg-[#FF4FA3]/10 rounded-lg transition-colors shrink-0"
+                className="p-1.5 text-zinc-400 hover:text-[#FA243C] hover:bg-[#FA243C]/10 rounded-lg transition-colors shrink-0"
                 title="Logout"
               >
                 <LogOut className="w-4 h-4" />
@@ -127,7 +127,7 @@ export default function Layout() {
           <div className="relative w-4/5 max-w-xs bg-[#11121A] border-r border-white/10 h-full flex flex-col z-10 p-5">
             <div className="flex items-center justify-between pb-6 border-b border-white/5">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#FF4FA3] flex items-center justify-center text-white shadow-md shadow-[#FF4FA3]/25">
+                <div className="w-9 h-9 rounded-xl bg-[#FA243C] flex items-center justify-center text-white shadow-md shadow-[#FA243C]/25">
                   <Mic className="w-5 h-5" />
                 </div>
                 <span className="text-lg font-bold text-white">Yimly</span>
@@ -155,7 +155,7 @@ export default function Layout() {
               </div>
               <button 
                 onClick={handleLogout}
-                className="p-2 text-zinc-400 hover:text-[#FF4FA3] hover:bg-[#FF4FA3]/10 rounded-lg transition-colors"
+                className="p-2 text-zinc-400 hover:text-[#FA243C] hover:bg-[#FA243C]/10 rounded-lg transition-colors"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />
@@ -170,7 +170,7 @@ export default function Layout() {
         {/* Mobile Header Bar */}
         <div className="xl:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#FF4FA3] flex items-center justify-center text-white">
+              <div className="w-8 h-8 rounded-lg bg-[#FA243C] flex items-center justify-center text-white">
                 <Mic className="w-4 h-4" />
               </div>
               <span className="font-bold text-white tracking-tight">Yimly</span>
@@ -242,8 +242,8 @@ function NavigationSections({
       <NavItem to="/" icon={<Home className={iconSize} />} label="Home" onNavigate={onNavigate} />
 
       <div className="space-y-1">
-        <div className={`flex items-center rounded-xl transition-colors ${isJukeboxActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
-          <NavLink to="/library" onClick={onNavigate} className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxActive ? 'page' : undefined}>
+        <div className={`flex items-center rounded-xl transition-colors ${isJukeboxActive ? 'bg-[#FA243C]/15 border border-[#FA243C]/25' : 'hover:bg-white/5'}`}>
+          <NavLink to="/library" onClick={onNavigate} className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxActive ? 'text-[#FA243C] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxActive ? 'page' : undefined}>
             <Music className={iconSize} /><span>Jukebox</span>
           </NavLink>
           <button type="button" onClick={() => onToggleSection('jukebox')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'jukebox' ? 'Collapse Jukebox menu' : 'Expand Jukebox menu'} aria-expanded={expandedSection === 'jukebox'}>
@@ -263,8 +263,8 @@ function NavigationSections({
       <NavItem to="/rooms" icon={<Radio className={iconSize} />} label="Karaoke Room" onNavigate={onNavigate} />
 
       <div className="space-y-1">
-        <div className={`flex items-center rounded-xl transition-colors ${isSettingsHomeActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
-          <NavLink to="/settings" onClick={onNavigate} className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isSettingsHomeActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
+        <div className={`flex items-center rounded-xl transition-colors ${isSettingsHomeActive ? 'bg-[#FA243C]/15 border border-[#FA243C]/25' : 'hover:bg-white/5'}`}>
+          <NavLink to="/settings" onClick={onNavigate} className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isSettingsHomeActive ? 'text-[#FA243C] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
             <Settings className={iconSize} /><span>Settings</span>
           </NavLink>
           <button type="button" onClick={() => onToggleSection('settings')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'settings' ? 'Collapse Settings menu' : 'Expand Settings menu'} aria-expanded={expandedSection === 'settings'}>
@@ -304,7 +304,7 @@ function NavItem({ to, icon, label, badge, activeWhen, onNavigate }: { to: strin
       className={
         `flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-sm font-medium ${
           isActive 
-            ? 'bg-[#FF4FA3]/15 text-[#FF4FA3] font-semibold border border-[#FF4FA3]/25 shadow-sm' 
+            ? 'bg-[#FA243C]/15 text-[#FA243C] font-semibold border border-[#FA243C]/25 shadow-sm' 
             : 'text-zinc-400 hover:text-white hover:bg-white/5'
         }`
       }
@@ -314,7 +314,7 @@ function NavItem({ to, icon, label, badge, activeWhen, onNavigate }: { to: strin
         <span>{label}</span>
       </div>
       {badge && (
-        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#FF4FA3]/20 text-[#FF4FA3] border border-[#FF4FA3]/30">
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#FA243C]/20 text-[#FA243C] border border-[#FA243C]/30">
           {badge}
         </span>
       )}
