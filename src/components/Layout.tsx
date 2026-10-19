@@ -45,6 +45,8 @@ export default function Layout() {
       setExpandedSection('jukebox');
     } else if (['/settings', '/download', '/users'].includes(location.pathname)) {
       setExpandedSection('settings');
+    } else {
+      setExpandedSection(null);
     }
   }, [location.pathname]);
 
@@ -93,7 +95,6 @@ export default function Layout() {
             expandedSection={expandedSection}
             onToggleSection={(section) => setExpandedSection(current => current === section ? null : section)}
             variant="desktop"
-            isJukeboxActive={isJukeboxActive}
           />
 
           {/* User Profile & Logout */}
@@ -148,7 +149,6 @@ export default function Layout() {
               expandedSection={expandedSection}
               onToggleSection={(section) => setExpandedSection(current => current === section ? null : section)}
               variant="mobile"
-              isJukeboxActive={isJukeboxActive}
             />
 
             <div className="pt-4 border-t border-white/5 flex items-center justify-between">
@@ -230,13 +230,11 @@ function NavigationSections({
   expandedSection,
   onToggleSection,
   variant,
-  isJukeboxActive,
 }: {
   user: any;
   expandedSection: NavigationSection | null;
   onToggleSection: (section: NavigationSection) => void;
   variant: 'desktop' | 'mobile';
-  isJukeboxActive: boolean;
 }) {
   const isMobile = variant === 'mobile';
   const location = useLocation();
