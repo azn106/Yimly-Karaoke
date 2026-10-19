@@ -70,7 +70,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans md:grid md:grid-cols-[192px_minmax(0,1fr)_192px]">
+    <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans md:grid md:grid-cols-[192px_minmax(0,1fr)_288px]">
       {/* Desktop & Tablet Sidebar */}
       <aside className="hidden md:flex md:col-start-1 md:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
           {/* Brand Header */}
