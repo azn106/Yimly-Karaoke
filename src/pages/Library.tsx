@@ -1021,7 +1021,7 @@ export default function Library() {
                 <div 
                   key={album.id}
                   onClick={() => openAlbum(album.id)}
-                  className="bg-[#141622] hover:bg-[#1A1C2C] p-4 rounded-2xl border border-white/5 hover:border-[#FA243C]/30 cursor-pointer transition-all group"
+                  className="group cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]"
                 >
                   <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center relative overflow-hidden group-hover:border-[#FA243C]/20 border border-white/5">
                     {album.hasArtwork ? (
@@ -1048,9 +1048,9 @@ export default function Library() {
         {/* Songs by Artist */}
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-white tracking-tight">Songs</h2>
-          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+          <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
+              <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
                 <tr>
                   <th className="px-5 py-3.5">Title</th>
                   <th className="px-5 py-3.5">Duration</th>
@@ -1206,9 +1206,9 @@ export default function Library() {
           </div>
         </div>
 
-        <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+        <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
+            <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="px-5 py-3.5 w-16">#</th>
                 <th className="px-5 py-3.5">Title</th>
@@ -1365,9 +1365,9 @@ export default function Library() {
       {search.trim() && !loading && (
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-white">Search Results for "{search}"</h2>
-          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+          <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
+              <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
                 <tr>
                   <th className="px-5 py-3.5">Type</th>
                   <th className="px-5 py-3.5">Name / Title</th>
@@ -1718,7 +1718,7 @@ export default function Library() {
                 <div 
                   key={artist.id}
                   onClick={() => openArtist(artist.id)}
-                  className="bg-[#141622] hover:bg-[#1A1C2C] p-5 rounded-2xl border border-white/5 hover:border-[#FA243C]/30 cursor-pointer transition-all group flex flex-col items-center text-center shadow-lg"
+                  className="group flex cursor-pointer flex-col items-center rounded-xl p-3 text-center transition hover:bg-white/[0.04]"
                 >
                   <div className="w-24 h-24 rounded-full bg-[#1C1E2D] flex items-center justify-center mb-4 border border-white/10 group-hover:border-[#FA243C]/40 transition-colors shadow-inner overflow-hidden relative">
                     <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#FA243C] transition-colors absolute" />
@@ -1752,7 +1752,7 @@ export default function Library() {
                 <div 
                   key={album.id}
                   onClick={() => openAlbum(album.id)}
-                  className="bg-[#141622] hover:bg-[#1A1C2C] p-4 rounded-2xl border border-white/5 hover:border-[#FA243C]/30 cursor-pointer transition-all group shadow-lg"
+                  className="group cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]"
                 >
                   <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center border border-white/5 group-hover:border-[#FA243C]/40 transition-colors shadow-inner overflow-hidden">
                     {album.hasArtwork ? (
@@ -1783,9 +1783,9 @@ export default function Library() {
 
           {/* Songs Table */}
           {tab === 'songs' && (
-            <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+            <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
               <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
+                <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
                   <tr>
                     <th className="px-5 py-3.5">Title</th>
                     <th className="px-5 py-3.5">Artist</th>
