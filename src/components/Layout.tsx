@@ -281,7 +281,7 @@ export default function Layout() {
         </div>
 
         {/* Keep the persistent playback controls mounted when either side panel is hidden. */}
-        {isLibraryRoute ? <PlayerBar /> : <NowPlayingOverlay />}
+        {isLibraryRoute ? <><div className="hidden md:block"><PlayerBar /></div><NowPlayingOverlay /></> : <NowPlayingOverlay />}
       </div>
     </div>
   );
