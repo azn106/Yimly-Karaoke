@@ -115,6 +115,38 @@ export default function Library() {
     });
   };
 
+  const handlePlayPlaylistInJukebox = async (playlist: Playlist) => {
+    try {
+      let playlistSongs = playlist.songs;
+      if (!playlistSongs) {
+        const response = await fetch('/api/playlists/' + playlist.id);
+        if (!response.ok) throw new Error('Could not load playlist songs.');
+        const details: Playlist = await response.json();
+        playlistSongs = details.songs;
+      }
+
+      if (!playlistSongs?.length) {
+        alert('This playlist has no songs to play yet.');
+        return;
+      }
+
+      playJukeboxQueue(playlistSongs.map(song => ({
+        id: song.id,
+        title: song.title,
+        artist: song.artist || 'Unknown Artist',
+        artists: song.artists,
+        album: song.album,
+        albumId: song.albumId,
+        duration: song.duration,
+        hasArtwork: song.hasArtwork,
+        variant: song.variant,
+      })), 0);
+    } catch (err: any) {
+      console.error('Could not play playlist in Jukebox:', err);
+      alert(err?.message || 'Could not play this playlist.');
+    }
+  };
+
   const handleRefreshAllArtists = async () => {
     if (refreshingAll) return;
     setRefreshingAll(true);
@@ -1016,8 +1048,8 @@ export default function Library() {
         {/* Songs by Artist */}
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-white tracking-tight">Songs</h2>
-          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-            <table className="w-full text-left text-sm">
+          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-5 py-3.5">Title</th>
@@ -1174,8 +1206,8 @@ export default function Library() {
           </div>
         </div>
 
-        <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-          <table className="w-full text-left text-sm">
+        <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3.5 w-16">#</th>
@@ -1270,7 +1302,7 @@ export default function Library() {
   // MAIN VIEW: Library Catalogs & Search
   // -----------------------------------------------------------------
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
+    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 xl:p-10 pb-24 md:pb-8 space-y-8">
       {/* Header & Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1335,8 +1367,8 @@ export default function Library() {
       {search.trim() && !loading && (
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-white">Search Results for "{search}"</h2>
-          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-            <table className="w-full text-left text-sm">
+          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-5 py-3.5">Type</th>
@@ -1550,6 +1582,125 @@ export default function Library() {
       {!loading && !error && (
 
         <>
+
+          {/* Jukebox Overview Dashboard */}
+          {tab === 'home' && (
+            <div className="space-y-10">
+              <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#21152A] via-[#171827] to-[#10111A] p-6 sm:p-8 lg:p-10">
+                <div className="pointer-events-none absolute -right-10 -top-16 h-64 w-64 rounded-full bg-[#FF4FA3]/15 blur-3xl" />
+                <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="min-w-0 max-w-2xl">
+                    <span className="inline-flex rounded-full border border-[#FF4FA3]/30 bg-[#FF4FA3]/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#FF4FA3]">Your Jukebox</span>
+                    <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+                      {playlists[0]?.name || 'Your music, your moment'}
+                    </h2>
+                    <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-300">
+                      {playlists[0]
+                        ? (playlists[0].description || ('Start playing ' + playlists[0].name + ' or explore your music library.'))
+                        : 'Your music collection in one place. Create a playlist or start with your most recently added songs.'}
+                    </p>
+                    <div className="mt-6 flex flex-wrap gap-3">
+                      {playlists[0] ? (
+                        <button type="button" onClick={() => handlePlayPlaylistInJukebox(playlists[0])} className="inline-flex items-center gap-2 rounded-full bg-[#FF4FA3] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#FF4FA3]/20 transition hover:bg-[#e0378b]">
+                          <Play className="h-4 w-4 fill-current" /> Play Playlist
+                        </button>
+                      ) : songs.length > 0 ? (
+                        <button type="button" onClick={() => playJukeboxQueue(songs.slice(0, 50).map(song => ({ id: song.id, title: song.title, artist: song.artist || 'Unknown Artist', artists: song.artists, album: song.album, albumId: song.albumId, duration: song.duration, hasArtwork: song.hasArtwork, artworkPath: song.artworkPath, variant: song.variant })), 0)} className="inline-flex items-center gap-2 rounded-full bg-[#FF4FA3] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#FF4FA3]/20 transition hover:bg-[#e0378b]">
+                          <Play className="h-4 w-4 fill-current" /> Play Recent Songs
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => setIsCreatePlaylistOpen(true)} className="inline-flex items-center gap-2 rounded-full bg-[#FF4FA3] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#FF4FA3]/20 transition hover:bg-[#e0378b]">
+                          <Plus className="h-4 w-4" /> Create Playlist
+                        </button>
+                      )}
+                      <button type="button" onClick={() => setTab('songs')} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
+                        Browse All Songs <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:min-w-48">
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs text-zinc-400">Songs</p><p className="mt-1 text-2xl font-extrabold text-white">{stats.songs}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs text-zinc-400">Playlists</p><p className="mt-1 text-2xl font-extrabold text-white">{stats.playlists || playlists.length}</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div><h2 className="text-xl font-bold text-white">Recently added albums</h2><p className="mt-1 text-xs text-zinc-500">Pick up where your collection is growing.</p></div>
+                  <button type="button" onClick={() => setTab('albums')} className="shrink-0 text-xs font-semibold text-[#FF4FA3] hover:text-white">View all <ChevronRight className="ml-1 inline h-4 w-4" /></button>
+                </div>
+                {albums.length ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                    {albums.slice(0, 6).map(album => (
+                      <button type="button" key={album.id} onClick={() => openAlbum(album.id)} className="group min-w-0 rounded-2xl border border-white/5 bg-[#141622] p-3 text-left transition hover:border-[#FF4FA3]/30 hover:bg-[#1A1C2C]">
+                        <div className="mb-3 aspect-square overflow-hidden rounded-xl bg-[#1C1E2D] flex items-center justify-center">
+                          {album.hasArtwork ? <img src={'/api/albums/' + album.id + '/artwork'} alt="" className="h-full w-full object-cover transition group-hover:scale-105" onError={e => { (e.target as HTMLElement).style.display = 'none'; }} /> : <Disc className="h-9 w-9 text-zinc-600" />}
+                        </div>
+                        <span className="block truncate text-sm font-semibold text-white">{album.title}</span>
+                        <span className="mt-1 block truncate text-xs text-zinc-400">{album.artist || 'Unknown Artist'}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No albums yet. Scan your media library to populate this section.</div>}
+              </section>
+
+              <section className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div><h2 className="text-xl font-bold text-white">Artists</h2><p className="mt-1 text-xs text-zinc-500">Explore music by artist.</p></div>
+                  <button type="button" onClick={() => setTab('artists')} className="shrink-0 text-xs font-semibold text-[#FF4FA3] hover:text-white">View all <ChevronRight className="ml-1 inline h-4 w-4" /></button>
+                </div>
+                {artists.length ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                    {artists.slice(0, 6).map(artist => (
+                      <button type="button" key={artist.id} onClick={() => openArtist(artist.id)} className="group flex min-w-0 flex-col items-center rounded-2xl border border-white/5 bg-[#141622] p-4 text-center transition hover:border-[#FF4FA3]/30 hover:bg-[#1A1C2C]">
+                        <div className="relative mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D]">
+                          {artist.hasArtwork ? <img src={'/api/artists/' + artist.id + '/artwork'} alt="" className="h-full w-full object-cover" onError={e => { (e.target as HTMLElement).style.display = 'none'; }} /> : <Mic className="h-8 w-8 text-zinc-600" />}
+                        </div>
+                        <span className="w-full truncate text-sm font-semibold text-white">{artist.name}</span>
+                        <span className="mt-1 text-xs text-zinc-500">{artist.songCount || 0} songs</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No artists yet. Artists will appear after songs are scanned.</div>}
+              </section>
+
+              <section className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div><h2 className="text-xl font-bold text-white">Recently added songs</h2><p className="mt-1 text-xs text-zinc-500">Play a track or add it to your Jukebox queue.</p></div>
+                  <button type="button" onClick={() => setTab('songs')} className="shrink-0 text-xs font-semibold text-[#FF4FA3] hover:text-white">View all <ChevronRight className="ml-1 inline h-4 w-4" /></button>
+                </div>
+                {songs.length ? (
+                  <div className="overflow-hidden rounded-2xl border border-white/5 bg-[#141622]">
+                    {songs.slice(0, 8).map((song, index) => (
+                      <div key={song.id} className="flex items-center gap-3 border-b border-white/5 p-3 last:border-b-0 hover:bg-white/[0.03]">
+                        <span className="hidden w-5 shrink-0 text-center text-xs text-zinc-600 sm:block">{index + 1}</span>
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1C1E2D]">
+                          {song.hasArtwork ? <img src={'/api/songs/' + song.id + '/artwork'} alt="" className="h-full w-full object-cover" onError={e => { (e.target as HTMLElement).style.display = 'none'; }} /> : <Music className="h-5 w-5 text-zinc-600" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-white">{song.title}</p>
+                          <p className="truncate text-xs text-zinc-400">{song.artist || 'Unknown Artist'}{song.album ? ' · ' + song.album : ''}</p>
+                        </div>
+                        <span className="hidden shrink-0 text-xs tabular-nums text-zinc-500 sm:block">{Math.floor((song.duration || 0) / 60)}:{String((song.duration || 0) % 60).padStart(2, '0')}</span>
+                        <button type="button" onClick={() => handlePlayInJukebox(song, songs, index)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-white transition hover:bg-[#FF4FA3]" aria-label={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'Pause ' + song.title : 'Play ' + song.title}>
+                          {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
+                        </button>
+                        <button type="button" onClick={() => handleQueueInJukebox(song)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 text-zinc-300 transition hover:border-[#FF4FA3]/40 hover:text-white" aria-label={'Add ' + song.title + ' to queue'}>
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No songs yet. Add music to a configured library and run a scan.</div>}
+              </section>
+            </div>
+          )}
+
           {/* Artists Grid */}
           {tab === 'artists' && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
@@ -1622,8 +1773,8 @@ export default function Library() {
 
           {/* Songs Table */}
           {tab === 'songs' && (
-            <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-              <table className="w-full text-left text-sm">
+            <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+              <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
                   <tr>
                     <th className="px-5 py-3.5">Title</th>

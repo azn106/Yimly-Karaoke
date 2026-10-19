@@ -474,8 +474,8 @@ export default function PlaylistDetailView({
           <span className="text-xs text-zinc-400">{songs.length} song{songs.length === 1 ? '' : 's'}</span>
         </div>
 
-        <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-          <table className="w-full text-left text-sm">
+        <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3.5 w-14">#</th>
@@ -699,8 +699,8 @@ export default function PlaylistDetailView({
             />
           </div>
 
-          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-            <table className="w-full text-left text-sm">
+          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-5 py-3.5">Title</th>
