@@ -1048,8 +1048,8 @@ export default function Library() {
         {/* Songs by Artist */}
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-white tracking-tight">Songs</h2>
-          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-            <table className="w-full text-left text-sm">
+          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-5 py-3.5">Title</th>
@@ -1206,8 +1206,8 @@ export default function Library() {
           </div>
         </div>
 
-        <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-          <table className="w-full text-left text-sm">
+        <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3.5 w-16">#</th>
@@ -1367,8 +1367,8 @@ export default function Library() {
       {search.trim() && !loading && (
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-white">Search Results for "{search}"</h2>
-          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-            <table className="w-full text-left text-sm">
+          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-5 py-3.5">Type</th>
@@ -1773,8 +1773,8 @@ export default function Library() {
 
           {/* Songs Table */}
           {tab === 'songs' && (
-            <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-              <table className="w-full text-left text-sm">
+            <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
+              <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
                   <tr>
                     <th className="px-5 py-3.5">Title</th>
