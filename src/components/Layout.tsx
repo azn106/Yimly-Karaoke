@@ -10,7 +10,7 @@ export default function Layout() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [jukeboxOpen, setJukeboxOpen] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<'jukebox' | 'settings' | null>(null);
   const [sidePanelsVisible, setSidePanelsVisible] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,14 +38,18 @@ export default function Layout() {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Open jukebox by default when on library routes
+  // Keep the relevant section expanded while navigating within it.
+  // Only one submenu can be open at a time.
   useEffect(() => {
     if (location.pathname.startsWith('/library')) {
-      setJukeboxOpen(true);
+      setExpandedSection('jukebox');
+    } else if (['/settings', '/download', '/users'].includes(location.pathname)) {
+      setExpandedSection('settings');
     }
   }, [location.pathname]);
 
   const isJukeboxActive = location.pathname.startsWith('/library');
+  const isSettingsSectionActive = ['/settings', '/download', '/users'].includes(location.pathname);
   const isLibraryRoute = isJukeboxActive;
 
   const handleLogout = async () => {
@@ -53,10 +57,6 @@ export default function Layout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     navigate('/login');
   };
-
-  const isHome = location.pathname === '/';
-  const isNormalUser = user?.role === 'user';
-  const hideSidebar = isNormalUser && isHome;
 
   if (loading) {
     return (
@@ -74,7 +74,7 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans">
       {/* Desktop & Tablet Sidebar */}
-      {!hideSidebar && sidePanelsVisible && (
+      {(!isJukeboxActive || sidePanelsVisible) && (
         <aside className="w-64 bg-[#11121A] border-r border-white/5 flex flex-col hidden md:flex shrink-0">
           {/* Brand Header */}
           <div className="p-6 pb-5 flex items-center justify-between">
@@ -89,63 +89,14 @@ export default function Layout() {
             </div>
           </div>
 
-          {/* Navigation Sections */}
-          <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-            <div className="px-3 pb-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
-              Menu
-            </div>
-            <NavItem to="/" icon={<Home className="w-4 h-4" />} label="Home" />
-            <div className="space-y-1">
-              <button 
-                onClick={() => {
-                  setJukeboxOpen(true);
-                  navigate('/library');
-                }} 
-                className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  isJukeboxActive 
-                    ? 'bg-[#FF4FA3]/15 text-[#FF4FA3] font-semibold border border-[#FF4FA3]/25 shadow-sm' 
-                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Music className="w-4 h-4" />
-                  <span>Jukebox</span>
-                </div>
-                <div 
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    setJukeboxOpen(!jukeboxOpen); 
-                  }}
-                  className="p-1 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  {jukeboxOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </div>
-              </button>
-              {jukeboxOpen && (
-                <div className="pl-4 space-y-1">
-                  <NavItem to="/library" icon={<Home className="w-4 h-4" />} label="Jukebox Home" />
-                  <NavItem to="/library?tab=songs" icon={<Music className="w-4 h-4" />} label="All Songs" />
-                  <NavItem to="/library?tab=albums" icon={<Disc className="w-4 h-4" />} label="Albums" />
-                  <NavItem to="/library?tab=artists" icon={<Mic className="w-4 h-4" />} label="Artists" />
-                  <NavItem to="/library?tab=playlists" icon={<ListMusic className="w-4 h-4" />} label="Playlists" />
-                </div>
-              )}
-            </div>
-            <NavItem to="/rooms" icon={<Radio className="w-4 h-4" />} label="Karaoke Rooms" badge="Live" />
-
-            {user?.role === 'administrator' && (
-              <div className="pt-6">
-                <div className="px-3 pb-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
-                  Administration
-                </div>
-                <div className="space-y-1.5">
-                  <NavItem to="/download" icon={<Download className="w-4 h-4" />} label="Download Music" />
-                  <NavItem to="/users" icon={<Users className="w-4 h-4" />} label="Users" />
-                  <NavItem to="/settings" icon={<Settings className="w-4 h-4" />} label="Settings" />
-                </div>
-              </div>
-            )}
-          </nav>
+          <NavigationSections
+            user={user}
+            expandedSection={expandedSection}
+            onToggleSection={(section) => setExpandedSection(current => current === section ? null : section)}
+            variant="desktop"
+            isJukeboxActive={isJukeboxActive}
+            isSettingsSectionActive={isSettingsSectionActive}
+          />
 
           {/* User Profile & Logout */}
           <div className="p-3 border-t border-white/5 bg-[#0D0E15]">
@@ -172,7 +123,7 @@ export default function Layout() {
       )}
 
       {/* Mobile Drawer Backdrop & Menu */}
-      {!hideSidebar && mobileMenuOpen && (
+      {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
@@ -194,24 +145,14 @@ export default function Layout() {
               </button>
             </div>
 
-            <nav className="flex-1 py-6 space-y-2 overflow-y-auto">
-              <NavItem to="/" icon={<Home className="w-5 h-5" />} label="Home" />
-              <NavItem to="/library" icon={<Music className="w-5 h-5" />} label="Library" />
-              <NavItem to="/rooms" icon={<Radio className="w-5 h-5" />} label="Karaoke Rooms" />
-
-              {user?.role === 'administrator' && (
-                <div className="pt-6">
-                  <div className="px-3 pb-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
-                    Administration
-                  </div>
-                  <div className="space-y-2">
-                    <NavItem to="/download" icon={<Download className="w-5 h-5" />} label="Download Music" />
-                    <NavItem to="/users" icon={<Users className="w-5 h-5" />} label="Users" />
-                    <NavItem to="/settings" icon={<Settings className="w-5 h-5" />} label="Settings" />
-                  </div>
-                </div>
-              )}
-            </nav>
+            <NavigationSections
+              user={user}
+              expandedSection={expandedSection}
+              onToggleSection={(section) => setExpandedSection(current => current === section ? null : section)}
+              variant="mobile"
+              isJukeboxActive={isJukeboxActive}
+              isSettingsSectionActive={isSettingsSectionActive}
+            />
 
             <div className="pt-4 border-t border-white/5 flex items-center justify-between">
               <div className="min-w-0">
@@ -233,7 +174,7 @@ export default function Layout() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#0A0B10]">
         {/* Mobile Header Bar */}
-        {!hideSidebar && (
+        <div className="md:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
           <div className="md:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#FF4FA3] flex items-center justify-center text-white">
@@ -287,17 +228,89 @@ export default function Layout() {
   );
 }
 
-function NavItem({ to, icon, label, badge }: { to: string, icon: ReactNode, label: string, badge?: string }) {
+type NavigationSection = 'jukebox' | 'settings';
+
+function NavigationSections({
+  user,
+  expandedSection,
+  onToggleSection,
+  variant,
+  isJukeboxActive,
+  isSettingsSectionActive,
+}: {
+  user: any;
+  expandedSection: NavigationSection | null;
+  onToggleSection: (section: NavigationSection) => void;
+  variant: 'desktop' | 'mobile';
+  isJukeboxActive: boolean;
+  isSettingsSectionActive: boolean;
+}) {
+  const isMobile = variant === 'mobile';
+  const location = useLocation();
+  const iconSize = isMobile ? 'w-5 h-5' : 'w-4 h-4';
+
+  return (
+    <nav className={isMobile ? 'flex-1 py-6 space-y-2 overflow-y-auto' : 'flex-1 px-3 py-4 space-y-1.5 overflow-y-auto'}>
+      {!isMobile && (
+        <div className="px-3 pb-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Menu</div>
+      )}
+      <NavItem to="/" icon={<Home className={iconSize} />} label="Home" />
+
+      <div className="space-y-1">
+        <div className={`flex items-center rounded-xl transition-colors ${isJukeboxActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
+          <NavLink to="/library" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxActive ? 'page' : undefined}>
+            <Music className={iconSize} /><span>Jukebox</span>
+          </NavLink>
+          <button type="button" onClick={() => onToggleSection('jukebox')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'jukebox' ? 'Collapse Jukebox menu' : 'Expand Jukebox menu'} aria-expanded={expandedSection === 'jukebox'}>
+            {expandedSection === 'jukebox' ? <ChevronUp className={iconSize} /> : <ChevronDown className={iconSize} />}
+          </button>
+        </div>
+        {expandedSection === 'jukebox' && (
+          <div className="pl-4 space-y-1">
+            <NavItem to="/library" icon={<Home className={iconSize} />} label="Overview" />
+            <NavItem to="/library?tab=songs" icon={<Music className={iconSize} />} label="Songs" />
+            <NavItem to="/library?tab=albums" icon={<Disc className={iconSize} />} label="Albums" />
+            <NavItem to="/library?tab=artists" icon={<Mic className={iconSize} />} label="Artists" />
+            <NavItem to="/library?tab=playlists" icon={<ListMusic className={iconSize} />} label="Playlists" />
+          </div>
+        )}
+      </div>
+
+      <NavItem to="/rooms" icon={<Radio className={iconSize} />} label="Karaoke Room" />
+
+      <div className="space-y-1">
+        <div className={`flex items-center rounded-xl transition-colors ${isSettingsSectionActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
+          <NavLink to="/settings" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isSettingsSectionActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
+            <Settings className={iconSize} /><span>Settings</span>
+          </NavLink>
+          <button type="button" onClick={() => onToggleSection('settings')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'settings' ? 'Collapse Settings menu' : 'Expand Settings menu'} aria-expanded={expandedSection === 'settings'}>
+            {expandedSection === 'settings' ? <ChevronUp className={iconSize} /> : <ChevronDown className={iconSize} />}
+          </button>
+        </div>
+        {expandedSection === 'settings' && user?.role === 'administrator' && (
+          <div className="pl-4 space-y-1">
+            <NavItem to="/download" icon={<Download className={iconSize} />} label="Download Music" />
+            <NavItem to="/users" icon={<Users className={iconSize} />} label="Users" />
+          </div>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+function NavItem({ to, icon, label, badge, activeWhen }: { to: string, icon: ReactNode, label: string, badge?: string, activeWhen?: boolean }) {
   const location = useLocation();
   const currentUrl = location.pathname + location.search;
 
-  let isActive = false;
-  if (to === '/') {
-    isActive = location.pathname === '/';
-  } else if (to.includes('?')) {
-    isActive = currentUrl === to;
-  } else {
-    isActive = location.pathname === to && (!location.search || location.search === '?tab=home');
+  let isActive = activeWhen ?? false;
+  if (activeWhen === undefined) {
+    if (to === '/') {
+      isActive = location.pathname === '/';
+    } else if (to.includes('?')) {
+      isActive = currentUrl === to;
+    } else {
+      isActive = location.pathname === to && (!location.search || location.search === '?tab=home');
+    }
   }
 
   return (
