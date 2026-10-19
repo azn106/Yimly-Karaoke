@@ -49,7 +49,6 @@ export default function Layout() {
   }, [location.pathname]);
 
   const isJukeboxActive = location.pathname.startsWith('/library');
-  const isSettingsSectionActive = ['/settings', '/download', '/users'].includes(location.pathname);
   const isLibraryRoute = isJukeboxActive;
 
   const handleLogout = async () => {
@@ -95,7 +94,6 @@ export default function Layout() {
             onToggleSection={(section) => setExpandedSection(current => current === section ? null : section)}
             variant="desktop"
             isJukeboxActive={isJukeboxActive}
-            isSettingsSectionActive={isSettingsSectionActive}
           />
 
           {/* User Profile & Logout */}
@@ -151,7 +149,6 @@ export default function Layout() {
               onToggleSection={(section) => setExpandedSection(current => current === section ? null : section)}
               variant="mobile"
               isJukeboxActive={isJukeboxActive}
-              isSettingsSectionActive={isSettingsSectionActive}
             />
 
             <div className="pt-4 border-t border-white/5 flex items-center justify-between">
@@ -234,18 +231,18 @@ function NavigationSections({
   onToggleSection,
   variant,
   isJukeboxActive,
-  isSettingsSectionActive,
 }: {
   user: any;
   expandedSection: NavigationSection | null;
   onToggleSection: (section: NavigationSection) => void;
   variant: 'desktop' | 'mobile';
   isJukeboxActive: boolean;
-  isSettingsSectionActive: boolean;
 }) {
   const isMobile = variant === 'mobile';
   const location = useLocation();
   const iconSize = isMobile ? 'w-5 h-5' : 'w-4 h-4';
+  const isJukeboxOverviewActive = location.pathname === '/library' && (!location.search || location.search === '?tab=home');
+  const isSettingsHomeActive = location.pathname === '/settings';
 
   return (
     <nav className={isMobile ? 'flex-1 py-6 space-y-2 overflow-y-auto' : 'flex-1 px-3 py-4 space-y-1.5 overflow-y-auto'}>
@@ -255,8 +252,8 @@ function NavigationSections({
       <NavItem to="/" icon={<Home className={iconSize} />} label="Home" />
 
       <div className="space-y-1">
-        <div className={`flex items-center rounded-xl transition-colors ${isJukeboxActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
-          <NavLink to="/library" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxActive ? 'page' : undefined}>
+        <div className={`flex items-center rounded-xl transition-colors ${isJukeboxOverviewActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
+          <NavLink to="/library" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxOverviewActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxOverviewActive ? 'page' : undefined}>
             <Music className={iconSize} /><span>Jukebox</span>
           </NavLink>
           <button type="button" onClick={() => onToggleSection('jukebox')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'jukebox' ? 'Collapse Jukebox menu' : 'Expand Jukebox menu'} aria-expanded={expandedSection === 'jukebox'}>
@@ -277,8 +274,8 @@ function NavigationSections({
       <NavItem to="/rooms" icon={<Radio className={iconSize} />} label="Karaoke Room" />
 
       <div className="space-y-1">
-        <div className={`flex items-center rounded-xl transition-colors ${isSettingsSectionActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
-          <NavLink to="/settings" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isSettingsSectionActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
+        <div className={`flex items-center rounded-xl transition-colors ${isSettingsHomeActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
+          <NavLink to="/settings" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isSettingsHomeActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={location.pathname === '/settings' ? 'page' : undefined}>
             <Settings className={iconSize} /><span>Settings</span>
           </NavLink>
           <button type="button" onClick={() => onToggleSection('settings')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'settings' ? 'Collapse Settings menu' : 'Expand Settings menu'} aria-expanded={expandedSection === 'settings'}>
