@@ -1327,7 +1327,7 @@ export default function Library() {
             </button>
           )}
         </div>
-      </div>>
+      </div>
 
       {/* Error state alert banner */}
       {error && (
