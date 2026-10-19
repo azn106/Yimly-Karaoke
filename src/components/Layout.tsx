@@ -35,7 +35,7 @@ export default function Layout() {
   // Close the drawer when the destination changes, including Jukebox tab changes.
   useEffect(() => {
     setMobileMenuOpen(false);
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, location.key]);
 
   // Keep the relevant section expanded while navigating within it.
   // Only one submenu can be open at a time.
@@ -228,7 +228,14 @@ function NavigationSections({
   const isSettingsHomeActive = location.pathname === '/settings';
 
   return (
-    <nav className={isMobile ? 'flex-1 py-6 space-y-2 overflow-y-auto' : 'flex-1 px-3 py-4 space-y-1.5 overflow-y-auto'}>
+    <nav
+      onClick={(event) => {
+        // Delegate to the drawer so links that switch query-string tabs
+        // (e.g. Songs -> Albums) also dismiss it reliably.
+        if (isMobile && (event.target as HTMLElement).closest('a')) onNavigate();
+      }}
+      className={isMobile ? 'flex-1 py-6 space-y-2 overflow-y-auto' : 'flex-1 px-3 py-4 space-y-1.5 overflow-y-auto'}
+    >
       {!isMobile && (
         <div className="px-3 pb-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Menu</div>
       )}
