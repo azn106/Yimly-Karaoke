@@ -1302,7 +1302,7 @@ export default function Library() {
   // MAIN VIEW: Library Catalogs & Search
   // -----------------------------------------------------------------
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 xl:p-10 pb-24 md:pb-8 space-y-7">
+    <div className="w-full min-w-0 max-w-[1600px] mx-auto p-3 sm:p-6 lg:p-8 xl:p-10 pb-24 md:pb-8 space-y-6 sm:space-y-7">
       {/* Search */}
       <div className="flex justify-end">
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -1546,8 +1546,8 @@ export default function Library() {
 
           {/* Jukebox Overview Dashboard */}
           {tab === 'home' && (
-            <div className="space-y-10">
-              <section className="relative isolate overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#17171B] p-5 sm:p-8 lg:p-10">
+            <div className="min-w-0 space-y-7 sm:space-y-10">
+              <section className="relative isolate overflow-hidden rounded-2xl sm:rounded-[28px] border border-white/[0.08] bg-[#17171B] p-4 sm:p-8 lg:p-10">
                 <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-[#FA243C]/20 via-[#17171B] to-[#17171B]" />
                 <div className="flex flex-col-reverse gap-7 sm:flex-row sm:items-center sm:justify-between lg:gap-12">
                   <div className="min-w-0 flex-1">
@@ -1628,9 +1628,9 @@ export default function Library() {
                   <button type="button" onClick={() => setTab('artists')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">View all <ChevronRight className="ml-1 inline h-4 w-4" /></button>
                 </div>
                 {artists.length ? (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                  <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:snap-none lg:grid-cols-4 xl:grid-cols-6">
                     {artists.slice(0, 6).map(artist => (
-                      <button type="button" key={artist.id} onClick={() => openArtist(artist.id)} className="group flex min-w-0 flex-col items-center rounded-2xl border border-white/5 bg-[#141622] p-4 text-center transition hover:border-[#FA243C]/30 hover:bg-[#1A1C2C]">
+                      <button type="button" key={artist.id} onClick={() => openArtist(artist.id)} className="group flex w-[124px] shrink-0 snap-start flex-col items-center rounded-2xl border border-white/5 bg-[#141622] p-3 text-center transition hover:border-[#FA243C]/30 hover:bg-[#1A1C2C] sm:w-auto sm:min-w-0 sm:shrink sm:p-4">
                         <div className="relative mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D]">
                           {artist.hasArtwork ? <img src={'/api/artists/' + artist.id + '/artwork'} alt="" className="h-full w-full object-cover" onError={e => { (e.target as HTMLElement).style.display = 'none'; }} /> : <Mic className="h-8 w-8 text-zinc-600" />}
                         </div>
@@ -1650,9 +1650,9 @@ export default function Library() {
                 {songs.length ? (
                   <div className="overflow-hidden rounded-2xl border border-white/5 bg-[#141622]">
                     {songs.slice(0, 8).map((song, index) => (
-                      <div key={song.id} className="flex items-center gap-3 border-b border-white/5 p-3 last:border-b-0 hover:bg-white/[0.03]">
+                      <div key={song.id} className="flex min-w-0 items-center gap-2 sm:gap-3 border-b border-white/5 p-2.5 sm:p-3 last:border-b-0 hover:bg-white/[0.03]">
                         <span className="hidden w-5 shrink-0 text-center text-xs text-zinc-600 sm:block">{index + 1}</span>
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1C1E2D]">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1C1E2D]">
                           {song.hasArtwork ? <img src={'/api/songs/' + song.id + '/artwork'} alt="" className="h-full w-full object-cover" onError={e => { (e.target as HTMLElement).style.display = 'none'; }} /> : <Music className="h-5 w-5 text-zinc-600" />}
                         </div>
                         <div className="min-w-0 flex-1">
