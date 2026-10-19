@@ -175,7 +175,6 @@ export default function Layout() {
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#0A0B10]">
         {/* Mobile Header Bar */}
         <div className="md:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
-          <div className="md:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#FF4FA3] flex items-center justify-center text-white">
                 <Mic className="w-4 h-4" />
@@ -190,7 +189,6 @@ export default function Layout() {
               <Menu className="w-5 h-5" />
             </button>
           </div>
-        )}
 
         {/* One desktop control toggles both side panels without touching playback state. */}
         {isLibraryRoute && (
