@@ -73,9 +73,9 @@
 }
 
 :root {
-  --accent: #FF4FA3;
+  --accent: #FA243C;
   --accent-hover: #ff6eb3;
-  --accent-glow: rgba(255, 79, 163, 0.25);
+  --accent-glow: rgba(250, 36, 60, 0.25);
   --bg-main: #0a0b10;
   --bg-surface: #12131c;
   --bg-card: #181926;
@@ -156,7 +156,7 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 79, 163, 0.4);
+  background: rgba(250, 36, 60, 0.4);
 }
 
 /* Fallback immersive view for legacy browsers (iOS 10 Safari) lacking native Element Fullscreen API */
