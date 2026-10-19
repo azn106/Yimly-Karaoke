@@ -50,8 +50,6 @@ export default function Layout() {
     }
   }, [location.pathname]);
 
-  const isJukeboxActive = location.pathname.startsWith('/library');
-  const isLibraryRoute = isJukeboxActive;
 
   const handleLogout = async () => {
     clearAuthToken();
@@ -73,10 +71,10 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans md:grid md:grid-cols-[minmax(220px,1fr)_minmax(0,2fr)_minmax(280px,1fr)]">
       {/* Desktop & Tablet Sidebar */}
-      {(!isJukeboxActive || sidePanelsVisible) && (
-        <aside className="w-64 bg-[#11121A] border-r border-white/5 flex flex-col hidden md:flex shrink-0">
+      {sidePanelsVisible && (
+        <aside className="hidden md:flex md:col-start-1 md:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
           {/* Brand Header */}
           <div className="p-6 pb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -169,7 +167,7 @@ export default function Layout() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#0A0B10]">
+      <div className={`flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#0A0B10] ${sidePanelsVisible ? 'md:col-start-2 md:row-start-1' : 'md:col-span-3 md:row-start-1'}`}>
         {/* Mobile Header Bar */}
         <div className="md:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
@@ -188,9 +186,8 @@ export default function Layout() {
           </div>
 
         {/* One desktop control toggles both side panels without touching playback state. */}
-        {isLibraryRoute && (
-          <div className="hidden md:flex items-center justify-between px-4 py-2 border-b border-white/5 bg-[#0D0E15] shrink-0">
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Jukebox</span>
+        <div className="hidden md:flex items-center justify-between px-4 py-2 border-b border-white/5 bg-[#0D0E15] shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Workspace</span>
             <button
               type="button"
               onClick={() => setSidePanelsVisible(visible => !visible)}
@@ -201,24 +198,28 @@ export default function Layout() {
               {sidePanelsVisible ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
               <span>{sidePanelsVisible ? 'Hide panels' : 'Show panels'}</span>
             </button>
-          </div>
-        )}
-
-        {/* Content and desktop Now Playing panel share a row; playback remains mounted below. */}
-        <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
-          <main className="flex-1 min-w-0 overflow-y-auto">
-            <Outlet context={{ user }} />
-          </main>
-          {isLibraryRoute && sidePanelsVisible && (
-            <aside className="hidden md:flex w-80 xl:w-96 border-l border-white/5 bg-[#11121A] shrink-0 min-h-0 overflow-hidden">
-              <NowPlayingPanel />
-            </aside>
-          )}
         </div>
 
-        {/* Keep the persistent playback controls mounted when either side panel is hidden. */}
-        {isLibraryRoute ? <><div className="hidden md:block"><PlayerBar /></div><NowPlayingOverlay /></> : <NowPlayingOverlay />}
+        {/* Centre content occupies the middle column; the player overlays only this area. */}
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#0A0B10]">
+          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto pb-28">
+            <Outlet context={{ user }} />
+          </main>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 hidden md:block">
+            <div className="pointer-events-auto">
+              <PlayerBar />
+            </div>
+          </div>
+          <NowPlayingOverlay />
+        </div>
       </div>
+
+      {/* Right panel is a separate full-height grid column, outside the player overlay. */}
+      {sidePanelsVisible && (
+        <aside className="hidden md:flex md:col-start-3 md:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
+          <NowPlayingPanel />
+        </aside>
+      )}
     </div>
   );
 }
