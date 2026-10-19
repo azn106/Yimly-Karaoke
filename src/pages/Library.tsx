@@ -1125,7 +1125,7 @@ export default function Library() {
                           </button>
                           <button
                             onClick={() => handleDeleteSong(song)}
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 hover:border-red-500"
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-transparent text-zinc-500 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
                             title="Delete song from library"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1273,7 +1273,7 @@ export default function Library() {
                         </button>
                         <button
                           onClick={() => handleDeleteSong(song)}
-                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 hover:border-red-500"
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-transparent text-zinc-500 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
                           title="Delete song from library"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1456,7 +1456,7 @@ export default function Library() {
                           </button>
                           <button
                             onClick={() => handleDeleteSong(item)}
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 hover:border-red-500"
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-transparent text-zinc-500 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
                             title="Delete song from library"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1478,35 +1478,35 @@ export default function Library() {
       )}
 
       {/* Tabs & Library Management Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 gap-4 pb-3">
-        <div className="flex gap-8 overflow-x-auto">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full gap-1.5 overflow-x-auto rounded-2xl bg-[#19191E] p-1.5 sm:w-auto">
           <button 
             onClick={() => setTab('home')}
-            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'home' ? 'border-[#FA243C] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'home' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
           >
             Overview
           </button>
           <button 
             onClick={() => setTab('artists')}
-            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'artists' ? 'border-[#FA243C] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'artists' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
           >
             Artists ({stats.artists})
           </button>
           <button 
             onClick={() => setTab('albums')}
-            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'albums' ? 'border-[#FA243C] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'albums' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
           >
             Albums ({stats.albums})
           </button>
           <button 
             onClick={() => setTab('songs')}
-            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'songs' ? 'border-[#FA243C] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'songs' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
           >
             Songs ({stats.songs})
           </button>
           <button 
             onClick={() => setTab('playlists')}
-            className={`pb-3 font-semibold text-sm border-b-2 transition-all shrink-0 ${tab === 'playlists' ? 'border-[#FA243C] text-white' : 'border-transparent text-zinc-400 hover:text-zinc-200'}`}
+            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'playlists' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
           >
             Playlists ({stats.playlists || playlists.length})
           </button>
@@ -1866,7 +1866,7 @@ export default function Library() {
                             </button>
                             <button
                               onClick={() => handleDeleteSong(song)}
-                              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 hover:border-red-500"
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-transparent text-zinc-500 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
                               title="Delete song from library"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
