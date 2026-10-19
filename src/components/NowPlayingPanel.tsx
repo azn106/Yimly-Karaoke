@@ -48,7 +48,7 @@ export default function NowPlayingPanel() {
     <aside className="flex h-full min-h-0 w-full min-w-0 flex-col bg-[#111217]">
       <header className="flex shrink-0 items-center justify-between border-b border-white/[0.06] px-5 py-4">
         <div className="flex items-center gap-2.5">
-          <ListMusic className="h-[18px] w-[18px] text-[#FF4FA3]" />
+          <ListMusic className="h-[18px] w-[18px] text-[#FA243C]" />
           <h2 className="text-sm font-semibold tracking-tight text-white">Now Playing</h2>
         </div>
         {queue.length > 0 && (
@@ -110,9 +110,9 @@ export default function NowPlayingPanel() {
                   onChange={event => seek(Number(event.currentTarget.value))}
                   disabled={!trackDuration}
                   aria-label="Seek within current song"
-                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full accent-[#FF4FA3] disabled:cursor-default disabled:opacity-40"
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full accent-[#FA243C] disabled:cursor-default disabled:opacity-40"
                   style={{
-                    background: `linear-gradient(to right, #FF4FA3 0%, #FF4FA3 ${progress}%, rgba(255,255,255,0.12) ${progress}%, rgba(255,255,255,0.12) 100%)`,
+                    background: `linear-gradient(to right, #FA243C 0%, #FA243C ${progress}%, rgba(255,255,255,0.12) ${progress}%, rgba(255,255,255,0.12) 100%)`,
                   }}
                 />
                 <div className="mt-1.5 flex justify-between text-[10px] font-medium tabular-nums text-zinc-500">
@@ -128,7 +128,7 @@ export default function NowPlayingPanel() {
                   aria-label={isShuffle ? 'Turn shuffle off' : 'Turn shuffle on'}
                   aria-pressed={isShuffle}
                   title={isShuffle ? 'Shuffle on' : 'Shuffle off'}
-                  className={`rounded-lg p-2 transition-colors hover:bg-white/[0.06] ${isShuffle ? 'text-[#FF4FA3]' : 'text-zinc-500 hover:text-white'}`}
+                  className={`rounded-lg p-2 transition-colors hover:bg-white/[0.06] ${isShuffle ? 'text-[#FA243C]' : 'text-zinc-500 hover:text-white'}`}
                 >
                   <Shuffle className="h-[18px] w-[18px]" />
                 </button>
@@ -146,7 +146,7 @@ export default function NowPlayingPanel() {
                   onClick={togglePlay}
                   aria-label={isPlaying ? 'Pause current song' : 'Play current song'}
                   title={isPlaying ? 'Pause' : 'Play'}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FF4FA3] text-white shadow-lg shadow-[#FF4FA3]/20 transition hover:scale-[1.04] hover:bg-[#ff68b1] active:scale-95"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FA243C] text-white shadow-lg shadow-[#FA243C]/20 transition hover:scale-[1.04] hover:bg-[#ff68b1] active:scale-95"
                 >
                   {isPlaying
                     ? <Pause className="h-5 w-5 fill-current" />
@@ -167,7 +167,7 @@ export default function NowPlayingPanel() {
                   aria-label={`Repeat mode: ${repeatMode}`}
                   aria-pressed={repeatMode !== 'off'}
                   title={`Repeat: ${repeatMode}`}
-                  className={`rounded-lg p-2 transition-colors hover:bg-white/[0.06] ${repeatMode !== 'off' ? 'text-[#FF4FA3]' : 'text-zinc-500 hover:text-white'}`}
+                  className={`rounded-lg p-2 transition-colors hover:bg-white/[0.06] ${repeatMode !== 'off' ? 'text-[#FA243C]' : 'text-zinc-500 hover:text-white'}`}
                 >
                   {repeatMode === 'one'
                     ? <Repeat1 className="h-[18px] w-[18px]" />
