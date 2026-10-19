@@ -1302,7 +1302,7 @@ export default function Library() {
   // MAIN VIEW: Library Catalogs & Search
   // -----------------------------------------------------------------
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 xl:p-10 space-y-8">
+    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 xl:p-10 pb-24 md:pb-8 space-y-8">
       {/* Header & Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
