@@ -1302,14 +1302,9 @@ export default function Library() {
   // MAIN VIEW: Library Catalogs & Search
   // -----------------------------------------------------------------
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 xl:p-10 pb-24 md:pb-8 space-y-8">
-      {/* Header & Search */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">Listen Now</h1>
-          <p className="mt-1 text-sm text-zinc-400">Your music, ready when you are. Browse albums, artists, songs and playlists.</p>
-        </div>
-
+    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 xl:p-10 pb-24 md:pb-8 space-y-7">
+      {/* Search */}
+      <div className="flex justify-end">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-80">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
@@ -1332,7 +1327,7 @@ export default function Library() {
             </button>
           )}
         </div>
-      </div>
+      </div>>
 
       {/* Error state alert banner */}
       {error && (
@@ -1477,41 +1472,9 @@ export default function Library() {
         </div>
       )}
 
-      {/* Tabs & Library Management Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex w-full gap-1.5 overflow-x-auto rounded-2xl bg-[#19191E] p-1.5 sm:w-auto">
-          <button 
-            onClick={() => setTab('home')}
-            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'home' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
-          >
-            Overview
-          </button>
-          <button 
-            onClick={() => setTab('artists')}
-            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'artists' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
-          >
-            Artists ({stats.artists})
-          </button>
-          <button 
-            onClick={() => setTab('albums')}
-            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'albums' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
-          >
-            Albums ({stats.albums})
-          </button>
-          <button 
-            onClick={() => setTab('songs')}
-            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'songs' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
-          >
-            Songs ({stats.songs})
-          </button>
-          <button 
-            onClick={() => setTab('playlists')}
-            className={`rounded-xl px-4 py-2.5 font-medium text-sm transition-all shrink-0 ${tab === 'playlists' ? 'bg-white/[0.10] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'}`}
-          >
-            Playlists ({stats.playlists || playlists.length})
-          </button>
-        </div>
-        {tab === 'artists' && (
+      {/* Library sections are navigated from the app sidebar. Keep artist tools available without duplicating navigation. */}
+      {tab === 'artists' && (
+        <div className="flex justify-end">
           <button
             onClick={handleRefreshAllArtists}
             disabled={refreshingAll}
@@ -1520,8 +1483,8 @@ export default function Library() {
             <RefreshCw className={`w-3.5 h-3.5 ${refreshingAll ? 'animate-spin text-[#FA243C]' : ''}`} />
             <span>{refreshingAll ? 'Refreshing All Artists...' : 'Refresh All Artist Images'}</span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Refresh Summary Modal */}
       {refreshSummary && (
