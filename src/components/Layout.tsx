@@ -220,7 +220,7 @@ function NavigationSections({
   const isMobile = variant === 'mobile';
   const location = useLocation();
   const iconSize = isMobile ? 'w-5 h-5' : 'w-4 h-4';
-  const isJukeboxOverviewActive = location.pathname === '/library' && (!location.search || location.search === '?tab=home');
+  const isJukeboxActive = location.pathname.startsWith('/library');
   const isSettingsHomeActive = location.pathname === '/settings';
 
   return (
@@ -231,8 +231,8 @@ function NavigationSections({
       <NavItem to="/" icon={<Home className={iconSize} />} label="Home" />
 
       <div className="space-y-1">
-        <div className={`flex items-center rounded-xl transition-colors ${isJukeboxOverviewActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
-          <NavLink to="/library" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxOverviewActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxOverviewActive ? 'page' : undefined}>
+        <div className={`flex items-center rounded-xl transition-colors ${isJukeboxActive ? 'bg-[#FF4FA3]/15 border border-[#FF4FA3]/25' : 'hover:bg-white/5'}`}>
+          <NavLink to="/library" className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxActive ? 'text-[#FF4FA3] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxActive ? 'page' : undefined}>
             <Music className={iconSize} /><span>Jukebox</span>
           </NavLink>
           <button type="button" onClick={() => onToggleSection('jukebox')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'jukebox' ? 'Collapse Jukebox menu' : 'Expand Jukebox menu'} aria-expanded={expandedSection === 'jukebox'}>
@@ -241,7 +241,6 @@ function NavigationSections({
         </div>
         {expandedSection === 'jukebox' && (
           <div className="pl-4 space-y-1">
-            <NavItem to="/library" icon={<Home className={iconSize} />} label="Overview" />
             <NavItem to="/library?tab=songs" icon={<Music className={iconSize} />} label="Songs" />
             <NavItem to="/library?tab=albums" icon={<Disc className={iconSize} />} label="Albums" />
             <NavItem to="/library?tab=artists" icon={<Mic className={iconSize} />} label="Artists" />
