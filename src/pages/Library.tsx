@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { Search, Play, Pause, Music, Disc, Mic, RefreshCw, Calendar, FileText, ChevronRight, ArrowLeft, AlertCircle, ListMusic, Trash2, Plus } from 'lucide-react';
+import { Search, Play, Pause, Music, Disc, Mic, RefreshCw, Calendar, FileText, ChevronRight, ChevronLeft, ArrowLeft, AlertCircle, ListMusic, Trash2, Plus, Heart } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../types';
 import CreatePlaylistModal from '../components/playlist/CreatePlaylistModal';
 import EditPlaylistModal from '../components/playlist/EditPlaylistModal';
@@ -58,6 +58,141 @@ export default function Library() {
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshingArtistId, setRefreshingArtistId] = useState<number | null>(null);
   const [refreshSummary, setRefreshSummary] = useState<any | null>(null);
+
+  // Featured Playlist Carousel state & touch tracking
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const carouselTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchEndXRef = useRef<number | null>(null);
+
+  // Favourites tracking state
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+  const [favoritingSongIds, setFavoritingSongIds] = useState<Set<number>>(new Set());
+
+  // Carousel timer logic: auto-advances every 5 seconds, resets on manual interaction, pauses on document hidden
+  const resetCarouselTimer = useCallback(() => {
+    if (carouselTimerRef.current) {
+      clearTimeout(carouselTimerRef.current);
+      carouselTimerRef.current = null;
+    }
+    if (playlists.length < 2 || (typeof document !== 'undefined' && document.hidden)) return;
+
+    carouselTimerRef.current = setTimeout(() => {
+      setCarouselIndex(prev => (prev + 1) % playlists.length);
+    }, 5000);
+  }, [playlists.length]);
+
+  useEffect(() => {
+    resetCarouselTimer();
+    return () => {
+      if (carouselTimerRef.current) {
+        clearTimeout(carouselTimerRef.current);
+        carouselTimerRef.current = null;
+      }
+    };
+  }, [carouselIndex, resetCarouselTimer]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (carouselTimerRef.current) {
+          clearTimeout(carouselTimerRef.current);
+          carouselTimerRef.current = null;
+        }
+      } else {
+        resetCarouselTimer();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [resetCarouselTimer]);
+
+  const handleNextPlaylist = useCallback(() => {
+    if (playlists.length < 2) return;
+    setCarouselIndex(prev => (prev + 1) % playlists.length);
+    resetCarouselTimer();
+  }, [playlists.length, resetCarouselTimer]);
+
+  const handlePrevPlaylist = useCallback(() => {
+    if (playlists.length < 2) return;
+    setCarouselIndex(prev => (prev - 1 + playlists.length) % playlists.length);
+    resetCarouselTimer();
+  }, [playlists.length, resetCarouselTimer]);
+
+  const handleSelectPlaylistIndex = useCallback((idx: number) => {
+    setCarouselIndex(idx);
+    resetCarouselTimer();
+  }, [resetCarouselTimer]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.targetTouches[0].clientX;
+    touchEndXRef.current = null;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndXRef.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartXRef.current === null || touchEndXRef.current === null) return;
+    const diff = touchStartXRef.current - touchEndXRef.current;
+    const minSwipeDistance = 45;
+    if (diff > minSwipeDistance) {
+      handleNextPlaylist();
+    } else if (diff < -minSwipeDistance) {
+      handlePrevPlaylist();
+    }
+    touchStartXRef.current = null;
+    touchEndXRef.current = null;
+  };
+
+  const handleToggleFavorite = async (songId: number) => {
+    if (favoritingSongIds.has(songId)) return;
+    const isCurrentlyFavorited = favoriteIds.has(songId);
+
+    // Optimistic update
+    setFavoriteIds(prev => {
+      const next = new Set(prev);
+      if (isCurrentlyFavorited) {
+        next.delete(songId);
+      } else {
+        next.add(songId);
+      }
+      return next;
+    });
+
+    setFavoritingSongIds(prev => new Set(prev).add(songId));
+
+    try {
+      const res = await fetch(`/api/favorites/${songId}`, {
+        method: isCurrentlyFavorited ? 'DELETE' : 'POST',
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update favorite status');
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      // Rollback on failure
+      setFavoriteIds(prev => {
+        const next = new Set(prev);
+        if (isCurrentlyFavorited) {
+          next.add(songId);
+        } else {
+          next.delete(songId);
+        }
+        return next;
+      });
+    } finally {
+      setFavoritingSongIds(prev => {
+        const next = new Set(prev);
+        next.delete(songId);
+        return next;
+      });
+    }
+  };
 
   const { 
     currentSong: jukeboxCurrentSong, 
@@ -239,16 +374,23 @@ export default function Library() {
 
       // 2. Fetch tab data
       if (tab === 'home') {
-        const [songsRes, artistsRes, albumsRes, playlistsRes] = await Promise.all([
+        const [songsRes, artistsRes, albumsRes, playlistsRes, favsRes] = await Promise.all([
           fetchWithRetry('/api/songs', 1, 300),
           fetchWithRetry('/api/artists', 1, 300),
           fetchWithRetry('/api/albums', 1, 300),
           fetchWithRetry('/api/playlists', 1, 300),
+          fetchWithRetry('/api/favorites', 1, 300).catch(() => null),
         ]);
         if (songsRes.ok) setSongs(await songsRes.json().catch(() => []));
         if (artistsRes.ok) setArtists(await artistsRes.json().catch(() => []));
         if (albumsRes.ok) setAlbums(await albumsRes.json().catch(() => []));
         if (playlistsRes.ok) setPlaylists(await playlistsRes.json().catch(() => []));
+        if (favsRes && favsRes.ok) {
+          const favs = await favsRes.json().catch(() => []);
+          if (Array.isArray(favs)) {
+            setFavoriteIds(new Set(favs.map((f: any) => f.id)));
+          }
+        }
       } else {
         const endpoint = 
           tab === 'artists' ? '/api/artists' : 
@@ -280,7 +422,18 @@ export default function Library() {
 
         if (tab === 'artists') setArtists(Array.isArray(data) ? data : []);
         else if (tab === 'albums') setAlbums(Array.isArray(data) ? data : []);
-        else if (tab === 'songs') setSongs(Array.isArray(data) ? data : []);
+        else if (tab === 'songs') {
+          setSongs(Array.isArray(data) ? data : []);
+          try {
+            const favsRes = await fetchWithRetry('/api/favorites', 1, 300);
+            if (favsRes.ok) {
+              const favs = await favsRes.json().catch(() => []);
+              if (Array.isArray(favs)) {
+                setFavoriteIds(new Set(favs.map((f: any) => f.id)));
+              }
+            }
+          } catch (e) {}
+        }
         else if (tab === 'playlists') setPlaylists(Array.isArray(data) ? data : []);
       }
 
@@ -1545,134 +1698,337 @@ export default function Library() {
         <>
 
           {/* Jukebox Overview Dashboard */}
-          {tab === 'home' && (
-            <div className="space-y-10">
-              <section className="relative isolate overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#17171B] p-5 sm:p-8 lg:p-10">
-                <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-[#FA243C]/20 via-[#17171B] to-[#17171B]" />
-                <div className="flex flex-col-reverse gap-7 sm:flex-row sm:items-center sm:justify-between lg:gap-12">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FA243C]">
-                      {jukeboxCurrentSong ? 'Now Playing' : 'Your Library'}
-                    </p>
-                    <h2 className="mt-3 max-w-2xl text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
-                      {jukeboxCurrentSong?.title || 'Your music, your moment'}
-                    </h2>
-                    <p className="mt-2 text-base text-zinc-300">
-                      {jukeboxCurrentSong?.artist || (albums[0]?.artist ? 'Explore ' + albums[0].artist + ' and more.' : 'A home for the music you love.')}
-                    </p>
-                    <p className="mt-4 text-sm text-zinc-500">
-                      {stats.songs} songs <span className="px-1.5 text-zinc-700">·</span> {stats.albums} albums <span className="px-1.5 text-zinc-700">·</span> {stats.artists} artists
-                    </p>
-                    <div className="mt-7 flex flex-wrap gap-3">
+          {tab === 'home' && (() => {
+            const featuredPlaylist = playlists.length > 0 ? playlists[carouselIndex % playlists.length] : null;
+            const isCurrentPlaylistPlaying = !!(
+              featuredPlaylist &&
+              jukeboxIsPlaying &&
+              (jukeboxCurrentSong?.albumId === featuredPlaylist.id || featuredPlaylist.songs?.some(s => s.id === jukeboxCurrentSong?.id))
+            );
+
+            return (
+              <div className="space-y-10">
+                {/* 1. Featured Playlist Carousel Banner */}
+                {featuredPlaylist ? (
+                  <section className="space-y-4">
+                    <div
+                      className="relative w-full aspect-[21/9] sm:aspect-[2.4/1] md:aspect-[2.8/1] max-h-[460px] rounded-2xl sm:rounded-3xl overflow-hidden group select-none cursor-pointer"
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                      onClick={() => openPlaylist(featuredPlaylist.id)}
+                    >
+                      {featuredPlaylist.coverImageUrl || featuredPlaylist.coverPath ? (
+                        <img
+                          key={featuredPlaylist.id}
+                          src={featuredPlaylist.coverImageUrl || `/api/playlists/${featuredPlaylist.id}/cover`}
+                          alt={featuredPlaylist.name}
+                          className="w-full h-full object-cover transition-all duration-500 ease-out"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-[#24242B] to-[#111114] flex items-center justify-center">
+                          <Disc className="h-20 w-20 text-white/20" strokeWidth={1} />
+                        </div>
+                      )}
+
+                      {/* Manual Desktop Navigation Arrows */}
+                      {playlists.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePrevPlaylist();
+                            }}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/70 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 shadow-lg"
+                            aria-label="Previous playlist"
+                            title="Previous playlist"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNextPlaylist();
+                            }}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/70 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 shadow-lg"
+                            aria-label="Next playlist"
+                            title="Next playlist"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Directly below the cover: Playlist title & count on left, circular pink Play button on right */}
+                    <div className="flex items-center justify-between gap-4 px-1">
+                      <div className="min-w-0 flex-1">
+                        <h2
+                          onClick={() => openPlaylist(featuredPlaylist.id)}
+                          className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight truncate cursor-pointer hover:text-[#FA243C] transition-colors"
+                        >
+                          {featuredPlaylist.name}
+                        </h2>
+                        <p className="text-sm text-zinc-400 mt-0.5">
+                          {featuredPlaylist.songCount || featuredPlaylist.songs?.length || 0} songs
+                        </p>
+                      </div>
+
                       <button
                         type="button"
-                        onClick={() => {
-                          if (jukeboxCurrentSong) {
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isCurrentPlaylistPlaying) {
                             toggleJukeboxPlay();
-                          } else if (playlists[0]) {
-                            handlePlayPlaylistInJukebox(playlists[0]);
-                          } else if (songs.length) {
-                            playJukeboxQueue(songs.slice(0, 50).map(song => ({ id: song.id, title: song.title, artist: song.artist || 'Unknown Artist', artists: song.artists, album: song.album, albumId: song.albumId, duration: song.duration, hasArtwork: song.hasArtwork, artworkPath: song.artworkPath, variant: song.variant })), 0);
                           } else {
-                            setIsCreatePlaylistOpen(true);
+                            handlePlayPlaylistInJukebox(featuredPlaylist);
                           }
                         }}
-                        className="inline-flex items-center gap-2.5 rounded-full bg-[#FA243C] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#FA243C]/20 transition hover:bg-[#ff4054] active:scale-[0.98]"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#FA243C] hover:bg-[#ff4054] text-white flex items-center justify-center shadow-lg shadow-[#FA243C]/25 transition-all active:scale-95 shrink-0"
+                        aria-label={isCurrentPlaylistPlaying ? 'Pause ' + featuredPlaylist.name : 'Play ' + featuredPlaylist.name}
+                        title={isCurrentPlaylistPlaying ? 'Pause' : 'Play ' + featuredPlaylist.name}
                       >
-                        {jukeboxCurrentSong && jukeboxIsPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
-                        {jukeboxCurrentSong ? (jukeboxIsPlaying ? 'Pause' : 'Resume listening') : playlists[0] ? 'Play your playlist' : songs.length ? 'Play your music' : 'Create a playlist'}
-                      </button>
-                      <button type="button" onClick={() => setTab('songs')} className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.13]">
-                        Browse songs <ChevronRight className="h-4 w-4" />
+                        {isCurrentPlaylistPlaying ? (
+                          <Pause className="w-6 h-6 fill-current" />
+                        ) : (
+                          <Play className="w-6 h-6 fill-current ml-0.5" />
+                        )}
                       </button>
                     </div>
-                  </div>
-                  <div className="mx-auto w-full max-w-[240px] shrink-0 sm:mx-0 sm:w-[34%] sm:max-w-[300px]">
-                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-[#29292F] shadow-2xl shadow-black/40 ring-1 ring-white/10">
-                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#FA243C]/25 via-[#24242B] to-[#111114]">
-                        <Disc className="h-20 w-20 text-white/20" strokeWidth={1} />
+
+                    {/* Small, subtle carousel dots below details */}
+                    {playlists.length > 1 && (
+                      <div className="flex items-center justify-center gap-1.5 pt-1">
+                        {playlists.map((pl, idx) => (
+                          <button
+                            key={pl.id}
+                            type="button"
+                            onClick={() => handleSelectPlaylistIndex(idx)}
+                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                              idx === (carouselIndex % playlists.length)
+                                ? 'w-6 bg-[#FA243C]'
+                                : 'w-1.5 bg-white/20 hover:bg-white/40'
+                            }`}
+                            aria-label={`Go to playlist ${pl.name}`}
+                            title={pl.name}
+                          />
+                        ))}
                       </div>
-                      {jukeboxCurrentSong?.hasArtwork ? (
-                        <img src={`/api/songs/${jukeboxCurrentSong.id}/artwork`} alt={jukeboxCurrentSong.title} className="absolute inset-0 h-full w-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-                      ) : albums[0]?.hasArtwork ? (
-                        <img src={`/api/albums/${albums[0].id}/artwork`} alt={albums[0].title} className="absolute inset-0 h-full w-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-                      ) : null}
+                    )}
+                  </section>
+                ) : (
+                  <div className="w-full aspect-[2.4/1] rounded-2xl sm:rounded-3xl bg-[#141416] flex flex-col items-center justify-center text-center p-6 border border-dashed border-white/10">
+                    <ListMusic className="w-12 h-12 text-zinc-600 mb-3" />
+                    <h3 className="text-lg font-bold text-white">No playlists yet</h3>
+                    <p className="text-xs text-zinc-400 mt-1 mb-4">Create your first playlist to feature it here.</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatePlaylistOpen(true)}
+                      className="px-5 py-2.5 rounded-full bg-[#FA243C] hover:bg-[#ff4054] text-white text-xs font-bold transition shadow-lg shadow-[#FA243C]/20"
+                    >
+                      Create Playlist
+                    </button>
+                  </div>
+                )}
+
+                {/* 2. Artists Row (immediately below featured playlist) */}
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Artists</h2>
+                      <p className="mt-1 text-xs text-zinc-500">Explore music by artist.</p>
                     </div>
+                    <button type="button" onClick={() => setTab('artists')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">
+                      View all <ChevronRight className="ml-1 inline h-4 w-4" />
+                    </button>
                   </div>
-                </div>
-              </section>
-
-              <section className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div><h2 className="text-xl font-bold text-white">Recently added albums</h2><p className="mt-1 text-xs text-zinc-500">Pick up where your collection is growing.</p></div>
-                  <button type="button" onClick={() => setTab('albums')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">View all <ChevronRight className="ml-1 inline h-4 w-4" /></button>
-                </div>
-                {albums.length ? (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                    {albums.slice(0, 6).map(album => (
-                      <button type="button" key={album.id} onClick={() => openAlbum(album.id)} className="group min-w-0 rounded-2xl border border-white/5 bg-[#141622] p-3 text-left transition hover:border-[#FA243C]/30 hover:bg-[#1A1C2C]">
-                        <div className="mb-3 aspect-square overflow-hidden rounded-xl bg-[#1C1E2D] flex items-center justify-center">
-                          {album.hasArtwork ? <img src={'/api/albums/' + album.id + '/artwork'} alt="" className="h-full w-full object-cover transition group-hover:scale-105" onError={e => { (e.target as HTMLElement).style.display = 'none'; }} /> : <Disc className="h-9 w-9 text-zinc-600" />}
-                        </div>
-                        <span className="block truncate text-sm font-semibold text-white">{album.title}</span>
-                        <span className="mt-1 block truncate text-xs text-zinc-400">{album.artist || 'Unknown Artist'}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No albums yet. Scan your media library to populate this section.</div>}
-              </section>
-
-              <section className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div><h2 className="text-xl font-bold text-white">Artists</h2><p className="mt-1 text-xs text-zinc-500">Explore music by artist.</p></div>
-                  <button type="button" onClick={() => setTab('artists')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">View all <ChevronRight className="ml-1 inline h-4 w-4" /></button>
-                </div>
-                {artists.length ? (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                    {artists.slice(0, 6).map(artist => (
-                      <button type="button" key={artist.id} onClick={() => openArtist(artist.id)} className="group flex min-w-0 flex-col items-center rounded-2xl border border-white/5 bg-[#141622] p-4 text-center transition hover:border-[#FA243C]/30 hover:bg-[#1A1C2C]">
-                        <div className="relative mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D]">
-                          {artist.hasArtwork ? <img src={'/api/artists/' + artist.id + '/artwork'} alt="" className="h-full w-full object-cover" onError={e => { (e.target as HTMLElement).style.display = 'none'; }} /> : <Mic className="h-8 w-8 text-zinc-600" />}
-                        </div>
-                        <span className="w-full truncate text-sm font-semibold text-white">{artist.name}</span>
-                        <span className="mt-1 text-xs text-zinc-500">{artist.songCount || 0} songs</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No artists yet. Artists will appear after songs are scanned.</div>}
-              </section>
-
-              <section className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div><h2 className="text-xl font-bold text-white">Recently added songs</h2><p className="mt-1 text-xs text-zinc-500">Play a track or add it to your Jukebox queue.</p></div>
-                  <button type="button" onClick={() => setTab('songs')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">View all <ChevronRight className="ml-1 inline h-4 w-4" /></button>
-                </div>
-                {songs.length ? (
-                  <div className="overflow-hidden rounded-2xl border border-white/5 bg-[#141622]">
-                    {songs.slice(0, 8).map((song, index) => (
-                      <div key={song.id} className="flex items-center gap-3 border-b border-white/5 p-3 last:border-b-0 hover:bg-white/[0.03]">
-                        <span className="hidden w-5 shrink-0 text-center text-xs text-zinc-600 sm:block">{index + 1}</span>
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1C1E2D]">
-                          {song.hasArtwork ? <img src={'/api/songs/' + song.id + '/artwork'} alt="" className="h-full w-full object-cover" onError={e => { (e.target as HTMLElement).style.display = 'none'; }} /> : <Music className="h-5 w-5 text-zinc-600" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-white">{song.title}</p>
-                          <p className="truncate text-xs text-zinc-400">{song.artist || 'Unknown Artist'}{song.album ? ' · ' + song.album : ''}</p>
-                        </div>
-                        <span className="hidden shrink-0 text-xs tabular-nums text-zinc-500 sm:block">{Math.floor((song.duration || 0) / 60)}:{String((song.duration || 0) % 60).padStart(2, '0')}</span>
-                        <button type="button" onClick={() => handlePlayInJukebox(song, songs, index)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-white transition hover:bg-[#FA243C]" aria-label={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'Pause ' + song.title : 'Play ' + song.title}>
-                          {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
+                  {artists.length ? (
+                    <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-none">
+                      {artists.map(artist => (
+                        <button
+                          type="button"
+                          key={artist.id}
+                          onClick={() => openArtist(artist.id)}
+                          className="group flex flex-col items-center shrink-0 w-28 text-center transition hover:opacity-90 cursor-pointer"
+                        >
+                          <div className="relative mb-2.5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#FA243C]/40 transition-colors shadow-md">
+                            {artist.hasArtwork ? (
+                              <img
+                                src={'/api/artists/' + artist.id + '/artwork'}
+                                alt={artist.name}
+                                className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                              />
+                            ) : (
+                              <Mic className="h-8 w-8 text-zinc-600 group-hover:text-[#FA243C] transition-colors" />
+                            )}
+                          </div>
+                          <span className="w-full truncate text-xs font-semibold text-white group-hover:text-[#FA243C] transition-colors">{artist.name}</span>
+                          <span className="mt-0.5 text-[11px] text-zinc-500">{artist.songCount || 0} songs</span>
                         </button>
-                        <button type="button" onClick={() => handleQueueInJukebox(song)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 text-zinc-300 transition hover:border-[#FA243C]/40 hover:text-white" aria-label={'Add ' + song.title + ' to queue'}>
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No artists yet. Artists will appear after songs are scanned.</div>
+                  )}
+                </section>
+
+                {/* 3. Recently Added (below Artists) */}
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Recently Added</h2>
+                      <p className="mt-1 text-xs text-zinc-500">Pick up where your collection is growing.</p>
+                    </div>
+                    <button type="button" onClick={() => setTab('songs')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">
+                      View all <ChevronRight className="ml-1 inline h-4 w-4" />
+                    </button>
                   </div>
-                ) : <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No songs yet. Add music to a configured library and run a scan.</div>}
-              </section>
-            </div>
-          )}
+                  {songs.length ? (
+                    <div className="flex items-start gap-3 overflow-x-auto pb-2 scrollbar-none">
+                      {songs.slice(0, 10).map((song, idx) => (
+                        <div
+                          key={song.id}
+                          className="group flex flex-col shrink-0 w-36 rounded-xl p-2 transition hover:bg-white/[0.04] cursor-pointer"
+                          onClick={() => handlePlayInJukebox(song, songs, idx)}
+                        >
+                          <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#1C1E2D] flex items-center justify-center">
+                            {song.hasArtwork ? (
+                              <img
+                                src={'/api/songs/' + song.id + '/artwork'}
+                                alt=""
+                                className="h-full w-full object-cover transition group-hover:scale-105"
+                                onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                              />
+                            ) : (
+                              <Music className="h-7 w-7 text-zinc-600" />
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <div className="w-8 h-8 rounded-full bg-[#FA243C] text-white flex items-center justify-center shadow-md">
+                                <Play className="w-4 h-4 fill-current ml-0.5" />
+                              </div>
+                            </div>
+                          </div>
+                          <span className="block truncate text-xs font-semibold text-white group-hover:text-[#FA243C] transition-colors">{song.title}</span>
+                          <span className="mt-0.5 block truncate text-[11px] text-zinc-400">{song.artist || 'Unknown Artist'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No songs yet. Add music to a configured library and run a scan.</div>
+                  )}
+                </section>
+
+                {/* 4. Songs list (below Recently Added) */}
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Songs</h2>
+                      <p className="mt-1 text-xs text-zinc-500">Play a track, favourite it, or add it to your queue.</p>
+                    </div>
+                    <button type="button" onClick={() => setTab('songs')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">
+                      View all <ChevronRight className="ml-1 inline h-4 w-4" />
+                    </button>
+                  </div>
+                  {songs.length ? (
+                    <div className="overflow-hidden rounded-2xl border border-white/5 bg-[#141622] divide-y divide-white/5">
+                      {songs.slice(0, 10).map((song, index) => {
+                        const isCurrent = jukeboxCurrentSong?.id === song.id;
+                        const isThisPlaying = isCurrent && jukeboxIsPlaying;
+                        const isFav = favoriteIds.has(song.id);
+
+                        return (
+                          <div
+                            key={song.id}
+                            className={`flex items-center gap-3 p-3 transition-colors ${
+                              isCurrent ? 'bg-[#FA243C]/10' : 'hover:bg-white/[0.03]'
+                            }`}
+                          >
+                            {/* Small square artwork */}
+                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1C1E2D]">
+                              {song.hasArtwork ? (
+                                <img
+                                  src={'/api/songs/' + song.id + '/artwork'}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                  onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                                />
+                              ) : (
+                                <Music className="h-5 w-5 text-zinc-600" />
+                              )}
+                            </div>
+
+                            {/* Song title on first line, artist name underneath */}
+                            <div className="min-w-0 flex-1">
+                              <p className={`truncate text-sm font-semibold ${isCurrent ? 'text-[#FA243C]' : 'text-white'}`}>
+                                {song.title}
+                              </p>
+                              <p className="truncate text-xs text-zinc-400">
+                                {song.artist || 'Unknown Artist'}{song.album ? ' · ' + song.album : ''}
+                              </p>
+                            </div>
+
+                            {/* Duration aligned on right */}
+                            <span className="shrink-0 text-xs tabular-nums text-zinc-500 font-mono hidden sm:block">
+                              {Math.floor((song.duration || 0) / 60)}:{String((song.duration || 0) % 60).padStart(2, '0')}
+                            </span>
+
+                            {/* Play/Pause, favourite-heart, and add-to-queue on the same row */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handlePlayInJukebox(song, songs, index)}
+                                className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition ${
+                                  isThisPlaying
+                                    ? 'bg-[#FA243C] text-white shadow-sm'
+                                    : 'bg-white/5 hover:bg-[#FA243C] text-white'
+                                }`}
+                                aria-label={isThisPlaying ? 'Pause ' + song.title : 'Play ' + song.title}
+                                title={isThisPlaying ? 'Pause' : 'Play ' + song.title}
+                              >
+                                {isThisPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFavorite(song.id)}
+                                className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition ${
+                                  isFav
+                                    ? 'text-[#FA243C] bg-[#FA243C]/15 hover:bg-[#FA243C]/25'
+                                    : 'text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10'
+                                }`}
+                                aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
+                                title={isFav ? 'Remove from favourites' : 'Add to favourites'}
+                              >
+                                <Heart className={`h-4 w-4 ${isFav ? 'fill-current' : ''}`} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleQueueInJukebox(song)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white transition"
+                                aria-label={'Add ' + song.title + ' to queue'}
+                                title={'Add ' + song.title + ' to queue'}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No songs yet. Add music to a configured library and run a scan.</div>
+                  )}
+                </section>
+              </div>
+            );
+          })()}
 
           {/* Artists Grid */}
           {tab === 'artists' && (
