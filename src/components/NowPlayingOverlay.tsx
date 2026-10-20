@@ -53,6 +53,7 @@ export default function NowPlayingOverlay() {
   // React state can be stale inside touch handlers on fast mobile gestures.
   const touchStartY = useRef<number | null>(null);
   const dragDistanceRef = useRef<number>(0);
+  const compactTouchStartY = useRef<number | null>(null);
   const [dragOffset, setDragOffset] = useState<number>(0);
 
   const resetTouchDrag = () => {
@@ -121,6 +122,30 @@ export default function NowPlayingOverlay() {
     seek(seekTime);
   };
 
+  const handleCompactTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    // Do not turn gestures on transport controls into player-opening gestures.
+    if (target.closest('button') || e.touches.length !== 1) {
+      compactTouchStartY.current = null;
+      return;
+    }
+    compactTouchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleCompactTouchEnd = (e: React.TouchEvent) => {
+    if (compactTouchStartY.current === null || e.changedTouches.length !== 1) {
+      compactTouchStartY.current = null;
+      return;
+    }
+    const deltaY = e.changedTouches[0].clientY - compactTouchStartY.current;
+    compactTouchStartY.current = null;
+    if (deltaY <= -80) setIsExpanded(true);
+  };
+
+  const handleCompactTouchCancel = () => {
+    compactTouchStartY.current = null;
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
     touchStartY.current = e.touches[0].clientY;
@@ -160,6 +185,9 @@ export default function NowPlayingOverlay() {
         className="fixed bottom-0 left-0 right-0 xl:left-[230px] z-40 bg-[#11121A]/95 backdrop-blur-md border-t border-white/10 shadow-2xl transition-all select-none pb-[max(0.45rem,env(safe-area-inset-bottom))]"
         role="region"
         aria-label="Compact media player"
+        onTouchStart={handleCompactTouchStart}
+        onTouchEnd={handleCompactTouchEnd}
+        onTouchCancel={handleCompactTouchCancel}
       >
         {/* Subtle rose-pink progress bar across top edge */}
         <div className="w-full h-[2.5px] bg-white/10 relative overflow-hidden">
