@@ -129,14 +129,14 @@ export default function EditPlaylistModal({
           {/* Name */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block">
-              Playlist Name <span className="text-[#FF4FA3]">*</span>
+              Playlist Name <span className="text-[#F472B6]">*</span>
             </label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#0D0E15] border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all"
+              className="w-full px-4 py-2.5 bg-[#0D0E15] border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all"
             />
           </div>
 
@@ -150,7 +150,7 @@ export default function EditPlaylistModal({
               placeholder="Add a description..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2 bg-[#0D0E15] border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all resize-none"
+              className="w-full px-4 py-2 bg-[#0D0E15] border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all resize-none"
             />
           </div>
 
@@ -165,11 +165,11 @@ export default function EditPlaylistModal({
                 onClick={() => setIsPublic(false)}
                 className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all ${
                   !isPublic
-                    ? 'bg-[#FF4FA3]/10 border-[#FF4FA3] text-white shadow-sm'
+                    ? 'bg-[#F472B6]/10 border-[#F472B6] text-white shadow-sm'
                     : 'bg-[#0D0E15] border-white/5 text-zinc-400 hover:text-zinc-200 hover:border-white/15'
                 }`}
               >
-                <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${!isPublic ? 'text-[#FF4FA3]' : 'text-zinc-500'}`} />
+                <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${!isPublic ? 'text-[#F472B6]' : 'text-zinc-500'}`} />
                 <div>
                   <span className="text-xs font-bold block text-white">Private</span>
                   <span className="text-[11px] text-zinc-400 block mt-0.5">Only you and collaborators</span>
@@ -181,11 +181,11 @@ export default function EditPlaylistModal({
                 onClick={() => setIsPublic(true)}
                 className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all ${
                   isPublic
-                    ? 'bg-[#FF4FA3]/10 border-[#FF4FA3] text-white shadow-sm'
+                    ? 'bg-[#F472B6]/10 border-[#F472B6] text-white shadow-sm'
                     : 'bg-[#0D0E15] border-white/5 text-zinc-400 hover:text-zinc-200 hover:border-white/15'
                 }`}
               >
-                <Globe className={`w-4 h-4 mt-0.5 shrink-0 ${isPublic ? 'text-[#FF4FA3]' : 'text-zinc-500'}`} />
+                <Globe className={`w-4 h-4 mt-0.5 shrink-0 ${isPublic ? 'text-[#F472B6]' : 'text-zinc-500'}`} />
                 <div>
                   <span className="text-xs font-bold block text-white">Public</span>
                   <span className="text-[11px] text-zinc-400 block mt-0.5">Visible to all server users</span>
@@ -231,7 +231,7 @@ export default function EditPlaylistModal({
             <button
               type="submit"
               disabled={loading || !name.trim()}
-              className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#FF4FA3] hover:bg-[#e0378b] text-white shadow-lg shadow-[#FF4FA3]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#F472B6] hover:bg-[#e0378b] text-white shadow-lg shadow-[#F472B6]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-1.5"
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <span>{loading ? 'Saving...' : 'Save Changes'}</span>

@@ -145,7 +145,7 @@ export default function AddSongsModal({
               placeholder="Search library songs by title, artist, or album..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-[#141622] border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#141622] border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all"
             />
           </div>
         </div>
@@ -154,7 +154,7 @@ export default function AddSongsModal({
         <div className="flex-1 overflow-y-auto divide-y divide-white/5 max-h-96 p-2">
           {loading && (
             <div className="py-16 text-center text-zinc-400 text-xs flex flex-col items-center gap-2">
-              <Loader2 className="w-6 h-6 animate-spin text-[#FF4FA3]" />
+              <Loader2 className="w-6 h-6 animate-spin text-[#F472B6]" />
               <span>Loading media library...</span>
             </div>
           )}
@@ -216,7 +216,7 @@ export default function AddSongsModal({
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
                       isAdded
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white border border-[#FF4FA3]/30'
+                        : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
                     }`}
                   >
                     {isAdding ? (
@@ -248,7 +248,7 @@ export default function AddSongsModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 bg-[#FF4FA3] hover:bg-[#e0378b] text-white rounded-xl text-xs font-semibold shadow-md shadow-[#FF4FA3]/20 transition-colors"
+            className="px-5 py-2 bg-[#F472B6] hover:bg-[#e0378b] text-white rounded-xl text-xs font-semibold shadow-md shadow-[#F472B6]/20 transition-colors"
           >
             Done
           </button>

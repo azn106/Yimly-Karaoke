@@ -128,7 +128,7 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
           {/* Name */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block">
-              Playlist Name <span className="text-[#FF4FA3]">*</span>
+              Playlist Name <span className="text-[#F472B6]">*</span>
             </label>
             <input
               type="text"
@@ -137,7 +137,7 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
               placeholder="e.g. 90s Karaoke Party"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#0D0E15] border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all"
+              className="w-full px-4 py-2.5 bg-[#0D0E15] border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all"
             />
           </div>
 
@@ -151,7 +151,7 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
               placeholder="Add an optional description..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2 bg-[#0D0E15] border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all resize-none"
+              className="w-full px-4 py-2 bg-[#0D0E15] border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all resize-none"
             />
           </div>
 
@@ -166,11 +166,11 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
                 onClick={() => setIsPublic(false)}
                 className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all ${
                   !isPublic
-                    ? 'bg-[#FF4FA3]/10 border-[#FF4FA3] text-white shadow-sm'
+                    ? 'bg-[#F472B6]/10 border-[#F472B6] text-white shadow-sm'
                     : 'bg-[#0D0E15] border-white/5 text-zinc-400 hover:text-zinc-200 hover:border-white/15'
                 }`}
               >
-                <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${!isPublic ? 'text-[#FF4FA3]' : 'text-zinc-500'}`} />
+                <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${!isPublic ? 'text-[#F472B6]' : 'text-zinc-500'}`} />
                 <div>
                   <span className="text-xs font-bold block text-white">Private</span>
                   <span className="text-[11px] text-zinc-400 block mt-0.5">Only you and collaborators</span>
@@ -182,11 +182,11 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
                 onClick={() => setIsPublic(true)}
                 className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all ${
                   isPublic
-                    ? 'bg-[#FF4FA3]/10 border-[#FF4FA3] text-white shadow-sm'
+                    ? 'bg-[#F472B6]/10 border-[#F472B6] text-white shadow-sm'
                     : 'bg-[#0D0E15] border-white/5 text-zinc-400 hover:text-zinc-200 hover:border-white/15'
                 }`}
               >
-                <Globe className={`w-4 h-4 mt-0.5 shrink-0 ${isPublic ? 'text-[#FF4FA3]' : 'text-zinc-500'}`} />
+                <Globe className={`w-4 h-4 mt-0.5 shrink-0 ${isPublic ? 'text-[#F472B6]' : 'text-zinc-500'}`} />
                 <div>
                   <span className="text-xs font-bold block text-white">Public</span>
                   <span className="text-[11px] text-zinc-400 block mt-0.5">Visible to all server users</span>
@@ -211,17 +211,17 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
 
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-4 p-3 bg-[#0D0E15] border border-dashed border-white/15 hover:border-[#FF4FA3]/40 rounded-xl cursor-pointer transition-colors group"
+              className="flex items-center gap-4 p-3 bg-[#0D0E15] border border-dashed border-white/15 hover:border-[#F472B6]/40 rounded-xl cursor-pointer transition-colors group"
             >
-              <div className="w-14 h-14 rounded-lg bg-zinc-800/80 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden group-hover:border-[#FF4FA3]/30">
+              <div className="w-14 h-14 rounded-lg bg-zinc-800/80 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden group-hover:border-[#F472B6]/30">
                 {coverPreview ? (
                   <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
                 ) : (
-                  <ImageIcon className="w-6 h-6 text-zinc-500 group-hover:text-[#FF4FA3] transition-colors" />
+                  <ImageIcon className="w-6 h-6 text-zinc-500 group-hover:text-[#F472B6] transition-colors" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-xs font-medium text-white block group-hover:text-[#FF4FA3] transition-colors">
+                <span className="text-xs font-medium text-white block group-hover:text-[#F472B6] transition-colors">
                   {coverFile ? coverFile.name : 'Upload playlist artwork'}
                 </span>
                 <span className="text-[11px] text-zinc-500 block mt-0.5">
@@ -230,7 +230,7 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
               </div>
               <button
                 type="button"
-                className="px-3 py-1.5 bg-white/5 group-hover:bg-[#FF4FA3]/15 text-zinc-300 group-hover:text-[#FF4FA3] rounded-lg text-xs font-semibold border border-white/10 group-hover:border-[#FF4FA3]/30 transition-all shrink-0"
+                className="px-3 py-1.5 bg-white/5 group-hover:bg-[#F472B6]/15 text-zinc-300 group-hover:text-[#F472B6] rounded-lg text-xs font-semibold border border-white/10 group-hover:border-[#F472B6]/30 transition-all shrink-0"
               >
                 <Upload className="w-3.5 h-3.5 inline mr-1" /> Browse
               </button>
@@ -250,7 +250,7 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
             <button
               type="submit"
               disabled={loading || !name.trim()}
-              className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#FF4FA3] hover:bg-[#e0378b] text-white shadow-lg shadow-[#FF4FA3]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#F472B6] hover:bg-[#e0378b] text-white shadow-lg shadow-[#F472B6]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-1.5"
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <span>{loading ? 'Creating...' : 'Create Playlist'}</span>

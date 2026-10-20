@@ -26,7 +26,7 @@ export default function LyricBadges({ hasLrc, hasElrc, onOpenLyrics, className =
         }}
         className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors cursor-pointer select-none inline-flex items-center justify-center ${
           isLrcActive
-            ? 'bg-[#FF4FA3]/15 text-[#FF4FA3] border border-[#FF4FA3]/30 hover:bg-[#FF4FA3]/30'
+            ? 'bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/30 hover:bg-[#F472B6]/30'
             : 'bg-white/5 text-zinc-500 border border-white/10 hover:text-zinc-300 hover:bg-white/10 hover:border-white/20'
         }`}
         title={isLrcActive ? 'Edit LRC lyrics' : 'Add LRC lyrics (click to create)'}

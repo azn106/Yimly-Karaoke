@@ -107,7 +107,7 @@ export default function LyricsEditorModal({ isOpen, songId, songTitle, format, o
           <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#12131C]">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                format === 'elrc' ? 'bg-[#3B82F6]/15 text-[#3B82F6]' : 'bg-[#FF4FA3]/15 text-[#FF4FA3]'
+                format === 'elrc' ? 'bg-[#3B82F6]/15 text-[#3B82F6]' : 'bg-[#F472B6]/15 text-[#F472B6]'
               }`}>
                 <Music className="w-5 h-5" />
               </div>
@@ -149,7 +149,7 @@ export default function LyricsEditorModal({ isOpen, songId, songTitle, format, o
                     ? "[00:00.00] <00:00.00>Enter <00:00.50>word-synced <00:01.00>ELRC <00:01.50>lyrics\n[00:02.00] <00:02.00>Next <00:02.50>line..."
                     : "[00:00.00] Enter line-synced LRC lyrics here\n[00:04.00] Next line..."
                 }
-                className="flex-1 w-full bg-black/40 border border-white/10 rounded-xl p-4 text-zinc-300 font-mono text-sm focus:outline-none focus:border-[#FF4FA3]/50 focus:ring-1 focus:ring-[#FF4FA3]/50 resize-none"
+                className="flex-1 w-full bg-black/40 border border-white/10 rounded-xl p-4 text-zinc-300 font-mono text-sm focus:outline-none focus:border-[#F472B6]/50 focus:ring-1 focus:ring-[#F472B6]/50 resize-none"
                 spellCheck={false}
               />
             )}
@@ -181,7 +181,7 @@ export default function LyricsEditorModal({ isOpen, songId, songTitle, format, o
                 type="button"
                 onClick={handleSave}
                 disabled={isSaving || isLoading}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#FF4FA3] hover:bg-[#FF4FA3]/90 transition-colors flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-[#FF4FA3]/20"
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#F472B6] hover:bg-[#F472B6]/90 transition-colors flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-[#F472B6]/20"
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? 'Saving...' : (isNew ? `Create ${format === 'elrc' ? 'ELRC' : 'LRC'} File` : 'Save Lyrics')}

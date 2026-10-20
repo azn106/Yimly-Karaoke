@@ -102,15 +102,15 @@ export default function PlaylistsGrid({
 
         <button
           onClick={onCreateNew}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#FF4FA3] hover:bg-[#E0378B] text-white rounded-full text-xs font-semibold shadow-lg shadow-[#FF4FA3]/20 transition-all shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#F472B6] hover:bg-[#e0378b] text-white rounded-full text-xs font-semibold shadow-lg shadow-[#F472B6]/20 transition-all shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>New Playlist</span>
         </button>
       </div>
 
-      {/* Playlist browse layout */}
-      <div className={layout === 'carousel' ? 'yk-horizontal-rail flex items-stretch gap-4 overflow-x-auto pb-4 snap-x snap-mandatory' : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5'}>
+      {/* Playlists Grid */}
+      <div className={`${layout === 'carousel' ? 'yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-mandatory' : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5'}`}>
         {playlists.map((playlist) => {
           const isOwner = playlist.userId === currentUser?.id;
           const canEdit = playlist.canEdit || isOwner || isAdmin;
@@ -120,10 +120,10 @@ export default function PlaylistsGrid({
             <div
               key={playlist.id}
               onClick={() => onOpenPlaylist(playlist.id)}
-              className={`bg-[#141622] hover:bg-[#1A1C2C] p-4 rounded-2xl border border-white/5 hover:border-[#FF4FA3]/30 cursor-pointer transition-all group shadow-lg flex flex-col justify-between relative ${layout === 'carousel' ? 'w-56 shrink-0 snap-start' : ''}`}
+              className={`bg-[#141622] hover:bg-[#1A1C2C] p-4 rounded-2xl border border-white/5 hover:border-[#F472B6]/30 cursor-pointer transition-all group shadow-lg flex flex-col justify-between relative ${layout === 'carousel' ? 'w-44 shrink-0 snap-start' : ''}`}
             >
               {/* Artwork / Cover Container */}
-              <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center border border-white/5 group-hover:border-[#FF4FA3]/30 transition-all relative overflow-hidden shadow-inner">
+              <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center border border-white/5 group-hover:border-[#F472B6]/30 transition-all relative overflow-hidden shadow-inner">
                 {playlist.coverPath || playlist.coverImageUrl ? (
                   <img
                     src={playlist.coverImageUrl && /^(https?:|data:)/i.test(playlist.coverImageUrl) ? playlist.coverImageUrl : `/api/playlists/${playlist.id}/cover`}
@@ -134,7 +134,7 @@ export default function PlaylistsGrid({
                     }}
                   />
                 ) : (
-                  <ListMusic className="w-12 h-12 text-zinc-500 group-hover:text-[#FF4FA3] transition-colors" />
+                  <ListMusic className="w-12 h-12 text-zinc-500 group-hover:text-[#F472B6] transition-colors" />
                 )}
 
                 {/* Hover Play button */}
@@ -144,7 +144,7 @@ export default function PlaylistsGrid({
                     e.stopPropagation();
                     onPlayAll(playlist);
                   }}
-                  className="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-[#FF4FA3] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all shadow-lg hover:scale-110 active:scale-95 z-10"
+                  className="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-[#F472B6] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all shadow-lg hover:scale-110 active:scale-95 z-10"
                   title="Queue All Songs into Karaoke Room"
                 >
                   <Play className="w-4 h-4 fill-white translate-x-0.5" />
@@ -169,7 +169,7 @@ export default function PlaylistsGrid({
                   )}
                   {playlist.permission === 'edit' && !isOwner && !isAdmin && (
                     <span 
-                      className="px-1.5 py-0.5 rounded-md bg-[#FF4FA3]/80 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-wider"
+                      className="px-1.5 py-0.5 rounded-md bg-[#F472B6]/80 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-wider"
                       title="Collaborative Editor"
                     >
                       Edit
@@ -182,7 +182,7 @@ export default function PlaylistsGrid({
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-1">
                   <h3 
-                    className="font-semibold text-sm text-white truncate group-hover:text-[#FF4FA3] transition-colors"
+                    className="font-semibold text-sm text-white truncate group-hover:text-[#F472B6] transition-colors"
                     title={playlist.name}
                   >
                     {playlist.name}
@@ -212,7 +212,7 @@ export default function PlaylistsGrid({
                               setActiveMenuId(null);
                               onPlayAll(playlist);
                             }}
-                            className="w-full px-3.5 py-2 text-left hover:bg-[#FF4FA3]/15 hover:text-[#FF4FA3] flex items-center gap-2 transition-colors"
+                            className="w-full px-3.5 py-2 text-left hover:bg-[#F472B6]/15 hover:text-[#F472B6] flex items-center gap-2 transition-colors"
                           >
                             <Play className="w-3.5 h-3.5" />
                             <span>Play in Room</span>
@@ -347,7 +347,7 @@ export default function PlaylistsGrid({
         {playlists.length === 0 && (
           <div className="col-span-full py-20 text-center flex flex-col items-center justify-center space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-[#141622] border border-white/10 flex items-center justify-center text-zinc-500">
-              <ListMusic className="w-8 h-8 text-[#FF4FA3]" />
+              <ListMusic className="w-8 h-8 text-[#F472B6]" />
             </div>
             <div>
               <h3 className="text-base font-bold text-white">No playlists found</h3>
@@ -357,7 +357,7 @@ export default function PlaylistsGrid({
             </div>
             <button
               onClick={onCreateNew}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#FF4FA3] hover:bg-[#E0378B] text-white rounded-full text-xs font-semibold shadow-md shadow-[#FF4FA3]/20 transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#F472B6] hover:bg-[#e0378b] text-white rounded-full text-xs font-semibold shadow-md shadow-[#F472B6]/20 transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Create First Playlist</span>

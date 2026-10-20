@@ -240,7 +240,7 @@ export default function PlaylistDetailView({
       <div className="flex flex-col md:flex-row items-center md:items-start gap-8 bg-[#141622] p-8 rounded-3xl border border-white/5 shadow-2xl relative overflow-hidden">
         {/* Cover with hover change overlay if canEdit */}
         <div className="relative group shrink-0">
-          <div className="w-44 h-44 rounded-2xl bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center border border-white/10 shadow-xl shadow-[#FF4FA3]/10 overflow-hidden">
+          <div className="w-44 h-44 rounded-2xl bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center border border-white/10 shadow-xl shadow-[#F472B6]/10 overflow-hidden">
             {playlist.coverPath || playlist.coverImageUrl ? (
               <img
                 src={playlist.coverImageUrl || `/api/playlists/${playlist.id}/cover`}
@@ -251,7 +251,7 @@ export default function PlaylistDetailView({
                 }}
               />
             ) : (
-              <Music className="w-16 h-16 text-[#FF4FA3]" />
+              <Music className="w-16 h-16 text-[#F472B6]" />
             )}
           </div>
 
@@ -260,7 +260,7 @@ export default function PlaylistDetailView({
               onClick={() => fileInputRef.current?.click()}
               className="absolute inset-0 bg-black/60 backdrop-blur-xs opacity-0 group-hover:opacity-100 rounded-2xl flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-opacity text-white text-xs font-semibold"
             >
-              <Upload className="w-6 h-6 text-[#FF4FA3]" />
+              <Upload className="w-6 h-6 text-[#F472B6]" />
               <span>Change Cover</span>
             </div>
           )}
@@ -269,7 +269,7 @@ export default function PlaylistDetailView({
         {/* Details & Actions */}
         <div className="flex-1 text-center md:text-left min-w-0 space-y-4">
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-            <span className="text-xs uppercase tracking-widest text-[#FF4FA3] font-bold">
+            <span className="text-xs uppercase tracking-widest text-[#F472B6] font-bold">
               Playlist
             </span>
 
@@ -294,7 +294,7 @@ export default function PlaylistDetailView({
                 Owner
               </span>
             ) : playlist.permission === 'edit' ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FF4FA3]/15 text-[#FF4FA3] border border-[#FF4FA3]/25">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">
                 Editor
               </span>
             ) : (
@@ -335,7 +335,7 @@ export default function PlaylistDetailView({
               type="button"
               onClick={handlePlayAllInJukebox}
               disabled={songs.length === 0}
-              className="px-5 py-2.5 bg-[#FF4FA3] hover:bg-[#ff68b1] text-white rounded-xl text-xs font-bold shadow-lg shadow-[#FF4FA3]/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-2 active:scale-95"
+              className="px-5 py-2.5 bg-[#F472B6] hover:bg-[#ff68b1] text-white rounded-xl text-xs font-bold shadow-lg shadow-[#F472B6]/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-2 active:scale-95"
             >
               <Play className="w-4 h-4 fill-white" />
               <span>Play in Jukebox</span>
@@ -350,7 +350,7 @@ export default function PlaylistDetailView({
               {playingAll ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Radio className="w-4 h-4 text-[#FF4FA3]" />
+                <Radio className="w-4 h-4 text-[#F472B6]" />
               )}
               <span>{playingAll ? 'Adding to Room...' : 'Play in Room'}</span>
             </button>
@@ -359,9 +359,9 @@ export default function PlaylistDetailView({
               <button
                 type="button"
                 onClick={onOpenAddSongs}
-                className="px-4 py-2.5 bg-[#1C1E2D] hover:bg-[#25283C] text-white rounded-xl text-xs font-semibold border border-white/10 hover:border-[#FF4FA3]/40 transition-colors inline-flex items-center gap-1.5"
+                className="px-4 py-2.5 bg-[#1C1E2D] hover:bg-[#25283C] text-white rounded-xl text-xs font-semibold border border-white/10 hover:border-[#F472B6]/40 transition-colors inline-flex items-center gap-1.5"
               >
-                <Plus className="w-4 h-4 text-[#FF4FA3]" />
+                <Plus className="w-4 h-4 text-[#F472B6]" />
                 <span>Add Songs</span>
               </button>
             )}
@@ -383,7 +383,7 @@ export default function PlaylistDetailView({
                 onClick={onOpenShare}
                 className="px-4 py-2.5 bg-[#1C1E2D] hover:bg-[#25283C] text-zinc-200 hover:text-white rounded-xl text-xs font-semibold border border-white/10 transition-colors inline-flex items-center gap-1.5"
               >
-                <Share2 className="w-3.5 h-3.5 text-[#FF4FA3]" />
+                <Share2 className="w-3.5 h-3.5 text-[#F472B6]" />
                 <span>Share</span>
               </button>
             )}
@@ -528,7 +528,7 @@ export default function PlaylistDetailView({
                       <button
                         type="button"
                         onClick={() => handlePlaySongInJukebox(song, idx)}
-                        className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden relative group/play cursor-pointer border border-white/5 hover:border-[#FF4FA3]/40 transition-colors"
+                        className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden relative group/play cursor-pointer border border-white/5 hover:border-[#F472B6]/40 transition-colors"
                         title={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'Pause' : 'Play in Jukebox'}
                       >
                         {song.hasArtwork ? (
@@ -541,11 +541,11 @@ export default function PlaylistDetailView({
                             }}
                           />
                         ) : (
-                          <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#FF4FA3] transition-colors" />
+                          <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
                         )}
                         <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'opacity-100' : 'opacity-0 group-hover/play:opacity-100'}`}>
                           {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? (
-                            <Pause className="w-4 h-4 text-[#FF4FA3] fill-current" />
+                            <Pause className="w-4 h-4 text-[#F472B6] fill-current" />
                           ) : (
                             <Play className="w-4 h-4 text-white fill-current ml-0.5" />
                           )}
@@ -553,7 +553,7 @@ export default function PlaylistDetailView({
                       </button>
 
                       <div className="min-w-0 flex items-center gap-2">
-                        <span className={`truncate block ${jukeboxCurrentSong?.id === song.id ? 'text-[#FF4FA3] font-semibold' : ''}`}>{song.title}</span>
+                        <span className={`truncate block ${jukeboxCurrentSong?.id === song.id ? 'text-[#F472B6] font-semibold' : ''}`}>{song.title}</span>
                         <LyricBadges
                           hasLrc={song.hasLrc}
                           hasElrc={song.hasElrc}
@@ -571,7 +571,7 @@ export default function PlaylistDetailView({
                               <button
                                 type="button"
                                 onClick={() => onOpenArtist(a.id!)}
-                                className="hover:text-[#FF4FA3] hover:underline"
+                                className="hover:text-[#F472B6] hover:underline"
                               >
                                 {a.name}
                               </button>
@@ -614,7 +614,7 @@ export default function PlaylistDetailView({
                           onClick={() => handlePlaySongInJukebox(song, idx)}
                           className={`p-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
                             jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying
-                              ? 'bg-[#FF4FA3] text-white shadow-sm'
+                              ? 'bg-[#F472B6] text-white shadow-sm'
                               : 'bg-white/5 hover:bg-white/15 text-zinc-300 hover:text-white border border-white/5'
                           }`}
                           title="Play in Jukebox"
@@ -631,8 +631,8 @@ export default function PlaylistDetailView({
                           onClick={() => onAddToQueue(song.id)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
                             isQueued
-                              ? 'bg-[#FF4FA3] text-white'
-                              : 'bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white border border-[#FF4FA3]/30'
+                              ? 'bg-[#F472B6] text-white'
+                              : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
                           }`}
                           title="Add song to active karaoke room queue"
                         >
@@ -665,7 +665,7 @@ export default function PlaylistDetailView({
                       <button
                         type="button"
                         onClick={onOpenAddSongs}
-                        className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white rounded-lg text-xs font-semibold border border-[#FF4FA3]/30 transition-all"
+                        className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white rounded-lg text-xs font-semibold border border-[#F472B6]/30 transition-all"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add First Song</span>
@@ -695,7 +695,7 @@ export default function PlaylistDetailView({
               placeholder="Search available songs to recommend and add..."
               value={recSearch}
               onChange={(e) => setRecSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-[#141622] border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#141622] border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all"
             />
           </div>
 
@@ -744,7 +744,7 @@ export default function PlaylistDetailView({
                         type="button"
                         disabled={addingSongId === song.id}
                         onClick={() => handleAddRecommended(song)}
-                        className="px-3.5 py-1.5 bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white rounded-lg text-xs font-semibold border border-[#FF4FA3]/30 transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
+                        className="px-3.5 py-1.5 bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white rounded-lg text-xs font-semibold border border-[#F472B6]/30 transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
                       >
                         {addingSongId === song.id ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />

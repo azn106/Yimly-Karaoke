@@ -73,8 +73,8 @@
 }
 
 :root {
-  --accent: #FA243C;
-  --accent-hover: #ff6eb3;
+  --accent: #F472B6;
+  --accent-hover: #DB2777;
   --accent-glow: rgba(250, 36, 60, 0.25);
   --bg-main: #0a0b10;
   --bg-surface: #12131c;

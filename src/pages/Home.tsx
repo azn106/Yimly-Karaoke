@@ -189,10 +189,10 @@ export default function Home() {
     return (
       <div className="min-h-[85vh] flex flex-col items-center justify-center p-6 md:p-12 text-center">
         <div className="relative max-w-lg w-full overflow-hidden rounded-3xl bg-gradient-to-br from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 p-8 md:p-14 shadow-2xl">
-          <div className="absolute top-0 right-0 w-72 h-72 bg-[#FA243C]/15 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+          <div className="absolute top-0 right-0 w-72 h-72 bg-[#F472B6]/15 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
           
           <div className="relative z-10 flex flex-col items-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FA243C] to-[#d91e36] flex items-center justify-center shadow-xl shadow-[#FA243C]/25 mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#F472B6] to-[#d91e36] flex items-center justify-center shadow-xl shadow-[#F472B6]/25 mb-6">
               <Mic className="w-8 h-8 text-white" />
             </div>
 
@@ -207,7 +207,7 @@ export default function Home() {
             <button
               ref={hostButtonRef}
               onClick={createRoom}
-              className="w-full sm:w-auto px-8 py-4 bg-[#FA243C] hover:bg-[#ff4054] text-white font-bold text-base rounded-2xl transition-all shadow-xl shadow-[#FA243C]/30 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-[#FA243C] focus:ring-offset-2 focus:ring-offset-[#171827] focus:scale-105"
+              className="w-full sm:w-auto px-8 py-4 bg-[#F472B6] hover:bg-[#ff4054] text-white font-bold text-base rounded-2xl transition-all shadow-xl shadow-[#F472B6]/30 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#171827] focus:scale-105"
             >
               <Mic className="w-5 h-5" />
               <span>Host Karaoke</span>
@@ -221,17 +221,17 @@ export default function Home() {
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-10">
       {/* Hero / Welcome Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 p-8 md:p-12 shadow-2xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#FA243C]/15 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#F472B6]/15 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
         
         <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FA243C]/15 border border-[#FA243C]/30 text-[#FA243C] text-xs font-semibold uppercase tracking-wider mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] text-xs font-semibold uppercase tracking-wider mb-4">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Dedicated Karaoke System</span>
           </div>
 
           <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-tight mb-4">
             Sing, Queue & Stream <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-[#FA243C]">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-[#F472B6]">
               Your Media Library
             </span>
           </h1>
@@ -243,7 +243,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-4">
             <button
               onClick={createRoom}
-              className="px-6 py-3.5 bg-[#FA243C] hover:bg-[#ff4054] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#FA243C]/25 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+              className="px-6 py-3.5 bg-[#F472B6] hover:bg-[#ff4054] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
             >
               <Mic className="w-5 h-5" />
               <span>Host Karaoke Room</span>
@@ -251,7 +251,7 @@ export default function Home() {
 
             <Link
               to="/download"
-              className="px-6 py-3.5 bg-[#FA243C]/15 hover:bg-[#FA243C]/25 text-[#FA243C] font-semibold rounded-xl border border-[#FA243C]/30 transition-all flex items-center gap-2"
+              className="px-6 py-3.5 bg-[#F472B6]/15 hover:bg-[#F472B6]/25 text-[#F472B6] font-semibold rounded-xl border border-[#F472B6]/30 transition-all flex items-center gap-2"
             >
               <Download className="w-5 h-5" />
               <span>Download Music</span>
@@ -271,25 +271,25 @@ export default function Home() {
       {/* Stats Overview Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         <StatCard
-          icon={<Music className="w-5 h-5 text-[#FA243C]" />}
+          icon={<Music className="w-5 h-5 text-[#F472B6]" />}
           title="Total Songs"
           value={stats.songs}
           link="/library"
         />
         <StatCard
-          icon={<Mic className="w-5 h-5 text-[#FA243C]" />}
+          icon={<Mic className="w-5 h-5 text-[#F472B6]" />}
           title="Artists"
           value={stats.artists}
           link="/library"
         />
         <StatCard
-          icon={<Disc className="w-5 h-5 text-[#FA243C]" />}
+          icon={<Disc className="w-5 h-5 text-[#F472B6]" />}
           title="Albums"
           value={stats.albums}
           link="/library"
         />
         <StatCard
-          icon={<Radio className="w-5 h-5 text-[#FA243C]" />}
+          icon={<Radio className="w-5 h-5 text-[#F472B6]" />}
           title="Active Rooms"
           value={activeSessions.length}
           link="/rooms"
@@ -301,12 +301,12 @@ export default function Home() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#FA243C] animate-pulse" />
+            <div className="w-2.5 h-2.5 rounded-full bg-[#F472B6] animate-pulse" />
             <h2 className="text-xl font-bold text-white tracking-tight">Active Karaoke Rooms</h2>
           </div>
           <Link
             to="/rooms"
-            className="text-xs font-semibold text-[#FA243C] hover:text-[#ff4054] flex items-center gap-1 transition-colors"
+            className="text-xs font-semibold text-[#F472B6] hover:text-[#ff4054] flex items-center gap-1 transition-colors"
           >
             <span>View All Rooms</span>
             <ChevronRight className="w-4 h-4" />
@@ -319,22 +319,22 @@ export default function Home() {
               <div
                 key={s.id}
                 onClick={() => handleJoinSession(s)}
-                className="bg-[#141622] hover:bg-[#1A1C2C] border border-white/5 hover:border-[#FA243C]/40 rounded-2xl p-5 cursor-pointer transition-all group relative overflow-hidden"
+                className="bg-[#141622] hover:bg-[#1A1C2C] border border-white/5 hover:border-[#F472B6]/40 rounded-2xl p-5 cursor-pointer transition-all group relative overflow-hidden"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#FA243C]/15 text-[#FA243C] border border-[#FA243C]/25 flex items-center gap-1.5">
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25 flex items-center gap-1.5">
                     <Radio className="w-3 h-3 animate-pulse" /> Live Now
                   </span>
                   <span className="text-xs text-zinc-500 font-mono">ID: {s.id.slice(0, 6)}</span>
                 </div>
 
-                <div className="font-mono text-2xl font-black tracking-widest text-white mb-2 group-hover:text-[#FA243C] transition-colors">
+                <div className="font-mono text-2xl font-black tracking-widest text-white mb-2 group-hover:text-[#F472B6] transition-colors">
                   {s.roomCode}
                 </div>
 
                 <p className="text-xs text-zinc-400 flex items-center justify-between">
                   <span>Host: {s.hostId}</span>
-                  <span className="text-[#FA243C] font-semibold flex items-center gap-1">
+                  <span className="text-[#F472B6] font-semibold flex items-center gap-1">
                     Join <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </p>
@@ -350,7 +350,7 @@ export default function Home() {
             </p>
             <button
               onClick={createRoom}
-              className="px-4 py-2 bg-[#FA243C]/15 hover:bg-[#FA243C] text-[#FA243C] hover:text-white border border-[#FA243C]/30 text-xs font-semibold rounded-xl transition-colors inline-flex items-center gap-2"
+              className="px-4 py-2 bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30 text-xs font-semibold rounded-xl transition-colors inline-flex items-center gap-2"
             >
               <Mic className="w-3.5 h-3.5" />
               <span>Create First Room</span>
@@ -382,14 +382,14 @@ export default function Home() {
                   key={song.id}
                   className={`border rounded-2xl p-4 transition-all group flex flex-col justify-between ${
                     isCurrent 
-                      ? 'bg-[#181524] border-[#FA243C]/30 shadow-lg shadow-[#FA243C]/10' 
+                      ? 'bg-[#181524] border-[#F472B6]/30 shadow-lg shadow-[#F472B6]/10' 
                       : 'bg-[#141622] hover:bg-[#1A1C2C] border-white/5 hover:border-white/15'
                   }`}
                 >
                   <button
                     type="button"
                     onClick={() => handlePlayInJukebox(song)}
-                    className="w-full aspect-square rounded-xl bg-[#1C1E2D] border border-white/5 mb-3 flex items-center justify-center relative overflow-hidden group-hover:border-[#FA243C]/30 transition-colors cursor-pointer group/art"
+                    className="w-full aspect-square rounded-xl bg-[#1C1E2D] border border-white/5 mb-3 flex items-center justify-center relative overflow-hidden group-hover:border-[#F472B6]/30 transition-colors cursor-pointer group/art"
                     title={isThisPlaying ? 'Pause song' : 'Play in Jukebox'}
                   >
                     {song.hasArtwork ? (
@@ -399,17 +399,17 @@ export default function Home() {
                         className={`w-full h-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300 ${index === 0 || isThisPlaying ? 'yk-heartbeat-artwork' : ''}`}
                       />
                     ) : (
-                      <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#FA243C] transition-colors" />
+                      <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
                     )}
                     <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity ${isThisPlaying ? 'opacity-100' : 'opacity-0 group-hover/art:opacity-100'}`}>
                       {isThisPlaying ? (
-                        <Pause className="w-8 h-8 text-[#FA243C] fill-current" />
+                        <Pause className="w-8 h-8 text-[#F472B6] fill-current" />
                       ) : (
                         <Play className="w-8 h-8 text-white fill-current ml-1" />
                       )}
                     </div>
                   </button>
-                  <h3 className={`font-semibold text-sm truncate group-hover:text-[#FA243C] transition-colors ${isCurrent ? 'text-[#FA243C]' : 'text-white'}`}>
+                  <h3 className={`font-semibold text-sm truncate group-hover:text-[#F472B6] transition-colors ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`}>
                     {song.title}
                   </h3>
                   <p className="text-xs text-zinc-400 truncate mt-0.5">{song.artist || 'Unknown Artist'}</p>
@@ -441,7 +441,7 @@ function StatCard({
       to={link}
       className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
         highlight
-          ? 'bg-[#181524] border-[#FA243C]/30 shadow-lg shadow-[#FA243C]/10'
+          ? 'bg-[#181524] border-[#F472B6]/30 shadow-lg shadow-[#F472B6]/10'
           : 'bg-[#141622] hover:bg-[#1A1C2C] border-white/5 hover:border-white/10'
       }`}
     >

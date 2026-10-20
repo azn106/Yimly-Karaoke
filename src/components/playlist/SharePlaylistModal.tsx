@@ -150,7 +150,7 @@ export default function SharePlaylistModal({
         {/* Header */}
         <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#FF4FA3]/15 text-[#FF4FA3] flex items-center justify-center border border-[#FF4FA3]/25">
+            <div className="w-9 h-9 rounded-xl bg-[#F472B6]/15 text-[#F472B6] flex items-center justify-center border border-[#F472B6]/25">
               <Users className="w-5 h-5" />
             </div>
             <div>
@@ -213,7 +213,7 @@ export default function SharePlaylistModal({
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                   isPublic
                     ? 'bg-zinc-800 text-zinc-300 border-white/10 hover:bg-zinc-700'
-                    : 'bg-[#FF4FA3]/15 text-[#FF4FA3] border-[#FF4FA3]/30 hover:bg-[#FF4FA3] hover:text-white'
+                    : 'bg-[#F472B6]/15 text-[#F472B6] border-[#F472B6]/30 hover:bg-[#F472B6] hover:text-white'
                 }`}
               >
                 {isPublic ? 'Make Private' : 'Make Public'}
@@ -233,14 +233,14 @@ export default function SharePlaylistModal({
                   placeholder="Enter username (e.g. test2)"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-[#0D0E15] border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all"
+                  className="w-full px-3.5 py-2 bg-[#0D0E15] border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all"
                 />
               </div>
 
               <select
                 value={permission}
                 onChange={(e) => setPermission(e.target.value as 'view' | 'edit')}
-                className="px-3 py-2 bg-[#0D0E15] border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-[#FF4FA3] transition-all shrink-0"
+                className="px-3 py-2 bg-[#0D0E15] border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-[#F472B6] transition-all shrink-0"
               >
                 <option value="view">Can View</option>
                 <option value="edit">Can Edit</option>
@@ -249,7 +249,7 @@ export default function SharePlaylistModal({
               <button
                 type="submit"
                 disabled={submitting || !username.trim()}
-                className="px-4 py-2 bg-[#FF4FA3] hover:bg-[#e0378b] disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-[#FF4FA3]/20 transition-all inline-flex items-center gap-1.5 shrink-0"
+                className="px-4 py-2 bg-[#F472B6] hover:bg-[#e0378b] disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-[#F472B6]/20 transition-all inline-flex items-center gap-1.5 shrink-0"
               >
                 {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
                 <span>Add</span>
@@ -305,7 +305,7 @@ export default function SharePlaylistModal({
                   <div className="flex items-center gap-2">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
                       collab.permission === 'edit'
-                        ? 'bg-[#FF4FA3]/15 text-[#FF4FA3] border-[#FF4FA3]/30'
+                        ? 'bg-[#F472B6]/15 text-[#F472B6] border-[#F472B6]/30'
                         : 'bg-zinc-800/80 text-zinc-300 border-white/10'
                     }`}>
                       {collab.permission === 'edit' ? 'Editor' : 'Viewer'}

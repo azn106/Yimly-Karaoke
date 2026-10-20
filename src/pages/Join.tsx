@@ -78,18 +78,18 @@ export default function Join() {
     <div className="min-h-screen bg-[#08090E] text-white flex items-center justify-center p-4 font-sans select-none">
       <div className="w-full max-w-sm bg-[#12131D] border border-white/10 rounded-3xl p-8 shadow-2xl text-center relative overflow-hidden">
         {/* Ambient Top Glow */}
-        <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-48 bg-[#FF4FA3]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-48 bg-[#F472B6]/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Brand Logo */}
         <div className="flex items-center justify-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-xl bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 flex items-center justify-center text-[#FF4FA3]">
+          <div className="w-8 h-8 rounded-xl bg-[#F472B6]/15 border border-[#F472B6]/30 flex items-center justify-center text-[#F472B6]">
             <Music className="w-4 h-4" />
           </div>
           <span className="text-xl font-black tracking-widest text-white">YIMLY</span>
         </div>
 
         {/* Section Heading */}
-        <div className="text-[11px] font-extrabold uppercase tracking-widest text-[#FF4FA3] mb-1">
+        <div className="text-[11px] font-extrabold uppercase tracking-widest text-[#F472B6] mb-1">
           JOIN ROOM
         </div>
 
@@ -123,14 +123,14 @@ export default function Join() {
                 maxLength={30}
                 required
                 autoFocus
-                className="w-full px-4 py-3.5 bg-[#08090E] border border-white/15 rounded-xl text-center text-base font-semibold text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-2 focus:ring-[#FF4FA3]/40 transition-all"
+                className="w-full px-4 py-3.5 bg-[#08090E] border border-white/15 rounded-xl text-center text-base font-semibold text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-2 focus:ring-[#F472B6]/40 transition-all"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading || !username.trim() || !rawCode}
-              className="w-full py-4 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-base rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40"
+              className="w-full py-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-base rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40"
             >
               {loading ? (
                 <span>Joining...</span>

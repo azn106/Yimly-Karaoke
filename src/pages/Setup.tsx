@@ -49,12 +49,12 @@ export default function Setup({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0A0B10] text-zinc-100 p-6 relative overflow-hidden font-sans">
       {/* Background ambient bloom */}
-      <div className="absolute w-[600px] h-[600px] bg-[#FF4FA3]/10 rounded-full blur-3xl pointer-events-none -top-40 -right-40" />
-      <div className="absolute w-[400px] h-[400px] bg-[#FF4FA3]/5 rounded-full blur-3xl pointer-events-none -bottom-20 -left-20" />
+      <div className="absolute w-[600px] h-[600px] bg-[#F472B6]/10 rounded-full blur-3xl pointer-events-none -top-40 -right-40" />
+      <div className="absolute w-[400px] h-[400px] bg-[#F472B6]/5 rounded-full blur-3xl pointer-events-none -bottom-20 -left-20" />
 
       <div className="w-full max-w-md p-8 md:p-10 bg-[#141622] rounded-3xl shadow-2xl border border-white/10 relative z-10">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#FF4FA3] to-[#e0378b] flex items-center justify-center text-white shadow-xl shadow-[#FF4FA3]/25 mb-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#F472B6] to-[#e0378b] flex items-center justify-center text-white shadow-xl shadow-[#F472B6]/25 mb-4">
             <ShieldCheck className="w-7 h-7" />
           </div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Welcome to Yimly</h1>
@@ -78,7 +78,7 @@ export default function Setup({ onComplete }: { onComplete: () => void }) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="e.g. admin"
-                className="w-full pl-10 pr-4 py-2.5 bg-[#0A0B10] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] text-sm"
+                className="w-full pl-10 pr-4 py-2.5 bg-[#0A0B10] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] text-sm"
                 required
                 minLength={3}
               />
@@ -94,7 +94,7 @@ export default function Setup({ onComplete }: { onComplete: () => void }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
-                className="w-full pl-10 pr-4 py-2.5 bg-[#0A0B10] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] text-sm"
+                className="w-full pl-10 pr-4 py-2.5 bg-[#0A0B10] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] text-sm"
                 required
               />
             </div>
@@ -103,7 +103,7 @@ export default function Setup({ onComplete }: { onComplete: () => void }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-3 px-4 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25 flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full mt-2 py-3 px-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <span>{loading ? 'Creating Account...' : 'Create Administrator'}</span>
             <ArrowRight className="w-4 h-4" />

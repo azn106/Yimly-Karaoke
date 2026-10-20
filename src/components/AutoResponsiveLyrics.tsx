@@ -341,15 +341,15 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             className="absolute bottom-2 right-2 z-50 text-[10px] font-mono bg-black/70 hover:bg-black/90 text-zinc-300 border border-white/20 px-2 py-1 rounded-md opacity-60 hover:opacity-100 transition-opacity flex items-center gap-1 cursor-pointer"
             title="Toggle TV Diagnostics HUD"
           >
-            <Bug className="w-3 h-3 text-[#FF4FA3]" />
+            <Bug className="w-3 h-3 text-[#F472B6]" />
             <span>TV DEBUG</span>
           </button>
 
           {/* TV Diagnostic Readout HUD */}
           {showDebug && (
-            <div className="absolute top-2 right-2 z-50 bg-black/90 border border-[#FF4FA3]/40 text-emerald-400 font-mono text-[11px] p-3 rounded-xl shadow-2xl max-w-xs space-y-1 pointer-events-auto leading-tight text-left backdrop-blur-md">
+            <div className="absolute top-2 right-2 z-50 bg-black/90 border border-[#F472B6]/40 text-emerald-400 font-mono text-[11px] p-3 rounded-xl shadow-2xl max-w-xs space-y-1 pointer-events-auto leading-tight text-left backdrop-blur-md">
               <div className="text-white font-bold border-b border-white/20 pb-1 mb-1.5 flex justify-between items-center">
-                <span className="flex items-center gap-1 text-[#FF4FA3]">
+                <span className="flex items-center gap-1 text-[#F472B6]">
                   <Tv className="w-3.5 h-3.5" />
                   TV Diagnostics
                 </span>
@@ -499,7 +499,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
                     ? lyricsSettings.highlighted.weight
                     : lyricsSettings.unhighlighted.weight,
                   color: isHighlighted
-                    ? lyricsSettings.highlighted.color || '#FF4FA3'
+                    ? lyricsSettings.highlighted.color || '#F472B6'
                     : lyricsSettings.unhighlighted.color || '#d4d4d8',
                   letterSpacing: `${
                     isHighlighted
@@ -512,7 +512,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
                   textAlign: 'center',
                   textShadow: isHighlighted
                     ? `0 0 35px ${
-                        lyricsSettings.highlighted.color || '#FF4FA3'
+                        lyricsSettings.highlighted.color || '#F472B6'
                       }75`
                     : 'none',
                 }}
@@ -535,7 +535,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
                       const isWordPast = isHighlighted && (isPreview ? wIdx === 0 : (adjustedTime >= nextWordStartTime));
                       const isWordCurrent = isHighlighted && (isPreview ? wIdx === 1 : (adjustedTime >= wordStartTime && adjustedTime < nextWordStartTime));
 
-                      const highColor = lyricsSettings.highlighted.color || '#FF4FA3';
+                      const highColor = lyricsSettings.highlighted.color || '#F472B6';
                       const unhighColor = lyricsSettings.unhighlighted.color || '#d4d4d8';
                       const highOpacity = lyricsSettings.highlighted.opacity ?? 1.0;
                       const unhighOpacity = lyricsSettings.unhighlighted.opacity ?? 0.45;

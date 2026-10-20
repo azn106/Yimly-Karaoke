@@ -295,7 +295,7 @@ export default function Settings() {
       <section className="space-y-6">
         <div className="flex items-center justify-between border-b border-white/5 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] rounded-xl">
+            <div className="p-2 bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] rounded-xl">
               <Type className="w-5 h-5" />
             </div>
             <div>
@@ -316,7 +316,7 @@ export default function Settings() {
 
         {/* Live Preview Box */}
         <div className="bg-[#08090E] border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center min-h-[220px] shadow-2xl relative overflow-hidden">
-          <div className="absolute top-3 left-4 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[#FF4FA3]">
+          <div className="absolute top-3 left-4 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[#F472B6]">
             <Sparkles className="w-3 h-3" />
             <span>LIVE PREVIEW</span>
           </div>
@@ -369,7 +369,7 @@ export default function Settings() {
             onClick={() => setActiveTab('highlighted')}
             className={`px-4 py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all whitespace-nowrap ${
               activeTab === 'highlighted'
-                ? 'bg-[#FF4FA3] text-white shadow-lg shadow-[#FF4FA3]/25'
+                ? 'bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/25'
                 : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
             }`}
           >
@@ -379,7 +379,7 @@ export default function Settings() {
             onClick={() => setActiveTab('unhighlighted')}
             className={`px-4 py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all whitespace-nowrap ${
               activeTab === 'unhighlighted'
-                ? 'bg-[#FF4FA3] text-white shadow-lg shadow-[#FF4FA3]/25'
+                ? 'bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/25'
                 : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
             }`}
           >
@@ -389,7 +389,7 @@ export default function Settings() {
             onClick={() => setActiveTab('layout')}
             className={`px-4 py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all whitespace-nowrap ${
               activeTab === 'layout'
-                ? 'bg-[#FF4FA3] text-white shadow-lg shadow-[#FF4FA3]/25'
+                ? 'bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/25'
                 : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
             }`}
           >
@@ -418,7 +418,7 @@ export default function Settings() {
                         }))
                       }
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                        lyricsSettings.highlightCurrentLine !== false ? 'bg-[#FF4FA3]' : 'bg-white/20'
+                        lyricsSettings.highlightCurrentLine !== false ? 'bg-[#F472B6]' : 'bg-white/20'
                       }`}
                     >
                       <span
@@ -440,7 +440,7 @@ export default function Settings() {
                   </label>
                   <div className="flex items-center gap-2 flex-wrap">
                     {[
-                      { name: 'Neon Pink', hex: '#FF4FA3' },
+                      { name: 'Neon Pink', hex: '#F472B6' },
                       { name: 'Cyber Cyan', hex: '#00F5D4' },
                       { name: 'Gold Yellow', hex: '#FFD166' },
                       { name: 'Electric Purple', hex: '#A78BFA' },
@@ -457,7 +457,7 @@ export default function Settings() {
                           }))
                         }
                         className={`w-7 h-7 rounded-full border-2 transition-transform ${
-                          (lyricsSettings.highlighted.color || '#FF4FA3').toLowerCase() === col.hex.toLowerCase()
+                          (lyricsSettings.highlighted.color || '#F472B6').toLowerCase() === col.hex.toLowerCase()
                             ? 'border-white scale-110 shadow-lg shadow-white/20'
                             : 'border-transparent hover:scale-105 opacity-80 hover:opacity-100'
                         }`}
@@ -467,7 +467,7 @@ export default function Settings() {
                     ))}
                     <input
                       type="color"
-                      value={lyricsSettings.highlighted.color || '#FF4FA3'}
+                      value={lyricsSettings.highlighted.color || '#F472B6'}
                       onChange={(e) =>
                         updateSetting((prev) => ({
                           ...prev,
@@ -497,7 +497,7 @@ export default function Settings() {
                         unhighlighted: { ...prev.unhighlighted, font: val }
                       }));
                     }}
-                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#FF4FA3]"
+                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F472B6]"
                   >
                     {LYRICS_FONT_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -576,7 +576,7 @@ export default function Settings() {
                             alert(err.message || 'Failed to upload custom font file. Please ensure it is a valid TTF, OTF, WOFF, or WOFF2 file.');
                           }
                         }}
-                        className="block w-full text-xs text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#FF4FA3] file:text-white hover:file:bg-[#e03d90] cursor-pointer"
+                        className="block w-full text-xs text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#F472B6] file:text-white hover:file:bg-[#e03d90] cursor-pointer"
                       />
                     </div>
                   )}
@@ -595,7 +595,7 @@ export default function Settings() {
                         highlighted: { ...prev.highlighted, weight: e.target.value }
                       }))
                     }
-                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#FF4FA3]"
+                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F472B6]"
                   >
                     <option value="100">Thin (100)</option>
                     <option value="300">Light (300)</option>
@@ -614,7 +614,7 @@ export default function Settings() {
                     <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                       Font Size
                     </label>
-                    <span className="text-xs font-mono text-[#FF4FA3] font-bold">
+                    <span className="text-xs font-mono text-[#F472B6] font-bold">
                       {lyricsSettings.highlighted.size}px
                     </span>
                   </div>
@@ -629,7 +629,7 @@ export default function Settings() {
                         highlighted: { ...prev.highlighted, size: Number(e.target.value) }
                       }))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3]"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                   />
                 </div>
 
@@ -639,7 +639,7 @@ export default function Settings() {
                     <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                       Opacity
                     </label>
-                    <span className="text-xs font-mono text-[#FF4FA3] font-bold">
+                    <span className="text-xs font-mono text-[#F472B6] font-bold">
                       {Math.round((lyricsSettings.highlighted.opacity ?? 1.0) * 100)}%
                     </span>
                   </div>
@@ -655,7 +655,7 @@ export default function Settings() {
                         highlighted: { ...prev.highlighted, opacity: Number(e.target.value) }
                       }))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3]"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                   />
                 </div>
 
@@ -675,7 +675,7 @@ export default function Settings() {
                         }
                       }))
                     }
-                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#FF4FA3]"
+                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F472B6]"
                   >
                     <option value="original">Original</option>
                     <option value="lowercase">lowercase</option>
@@ -690,7 +690,7 @@ export default function Settings() {
                     <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                       Letter Spacing
                     </label>
-                    <span className="text-xs font-mono text-[#FF4FA3] font-bold">
+                    <span className="text-xs font-mono text-[#F472B6] font-bold">
                       {lyricsSettings.highlighted.letterSpacing}px
                     </span>
                   </div>
@@ -705,7 +705,7 @@ export default function Settings() {
                         highlighted: { ...prev.highlighted, letterSpacing: Number(e.target.value) }
                       }))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3]"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                   />
                 </div>
 
@@ -715,7 +715,7 @@ export default function Settings() {
                     <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                       Line Spacing (Height)
                     </label>
-                    <span className="text-xs font-mono text-[#FF4FA3] font-bold">
+                    <span className="text-xs font-mono text-[#F472B6] font-bold">
                       {lyricsSettings.highlighted.lineSpacing}x
                     </span>
                   </div>
@@ -731,7 +731,7 @@ export default function Settings() {
                         highlighted: { ...prev.highlighted, lineSpacing: Number(e.target.value) }
                       }))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3]"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                   />
                 </div>
               </div>
@@ -801,7 +801,7 @@ export default function Settings() {
                         unhighlighted: { ...prev.unhighlighted, font: e.target.value }
                       }))
                     }
-                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#FF4FA3]"
+                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F472B6]"
                   >
                     {LYRICS_FONT_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -824,7 +824,7 @@ export default function Settings() {
                         unhighlighted: { ...prev.unhighlighted, weight: e.target.value }
                       }))
                     }
-                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#FF4FA3]"
+                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F472B6]"
                   >
                     <option value="100">Thin (100)</option>
                     <option value="300">Light (300)</option>
@@ -843,7 +843,7 @@ export default function Settings() {
                     <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                       Font Size
                     </label>
-                    <span className="text-xs font-mono text-[#FF4FA3] font-bold">
+                    <span className="text-xs font-mono text-[#F472B6] font-bold">
                       {lyricsSettings.unhighlighted.size}px
                     </span>
                   </div>
@@ -858,7 +858,7 @@ export default function Settings() {
                         unhighlighted: { ...prev.unhighlighted, size: Number(e.target.value) }
                       }))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3]"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                   />
                 </div>
 
@@ -868,7 +868,7 @@ export default function Settings() {
                     <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                       Opacity
                     </label>
-                    <span className="text-xs font-mono text-[#FF4FA3] font-bold">
+                    <span className="text-xs font-mono text-[#F472B6] font-bold">
                       {Math.round((lyricsSettings.unhighlighted.opacity ?? 0.45) * 100)}%
                     </span>
                   </div>
@@ -884,7 +884,7 @@ export default function Settings() {
                         unhighlighted: { ...prev.unhighlighted, opacity: Number(e.target.value) }
                       }))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3]"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                   />
                 </div>
 
@@ -904,7 +904,7 @@ export default function Settings() {
                         }
                       }))
                     }
-                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#FF4FA3]"
+                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F472B6]"
                   >
                     <option value="original">Original</option>
                     <option value="lowercase">lowercase</option>
@@ -919,7 +919,7 @@ export default function Settings() {
                     <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                       Letter Spacing
                     </label>
-                    <span className="text-xs font-mono text-[#FF4FA3] font-bold">
+                    <span className="text-xs font-mono text-[#F472B6] font-bold">
                       {lyricsSettings.unhighlighted.letterSpacing}px
                     </span>
                   </div>
@@ -934,7 +934,7 @@ export default function Settings() {
                         unhighlighted: { ...prev.unhighlighted, letterSpacing: Number(e.target.value) }
                       }))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3]"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                   />
                 </div>
 
@@ -944,7 +944,7 @@ export default function Settings() {
                     <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                       Line Spacing (Height)
                     </label>
-                    <span className="text-xs font-mono text-[#FF4FA3] font-bold">
+                    <span className="text-xs font-mono text-[#F472B6] font-bold">
                       {lyricsSettings.unhighlighted.lineSpacing}x
                     </span>
                   </div>
@@ -960,7 +960,7 @@ export default function Settings() {
                         unhighlighted: { ...prev.unhighlighted, lineSpacing: Number(e.target.value) }
                       }))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3]"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                   />
                 </div>
               </div>
@@ -983,7 +983,7 @@ export default function Settings() {
                     }
                     className={`py-3.5 px-4 rounded-2xl border font-bold text-xs flex flex-col items-center gap-2 transition-all ${
                       lyricsSettings.alignment === 'left'
-                        ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                        ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                         : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
                     }`}
                   >
@@ -998,7 +998,7 @@ export default function Settings() {
                     }
                     className={`py-3.5 px-4 rounded-2xl border font-bold text-xs flex flex-col items-center gap-2 transition-all ${
                       lyricsSettings.alignment === 'center'
-                        ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                        ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                         : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
                     }`}
                   >
@@ -1013,7 +1013,7 @@ export default function Settings() {
                     }
                     className={`py-3.5 px-4 rounded-2xl border font-bold text-xs flex flex-col items-center gap-2 transition-all ${
                       lyricsSettings.alignment === 'right'
-                        ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                        ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                         : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
                     }`}
                   >
@@ -1045,7 +1045,7 @@ export default function Settings() {
                       }
                       className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1 transition-all ${
                         (lyricsSettings.visibleLines ?? 3) === item.count
-                          ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                          ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                           : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
                       }`}
                     >
@@ -1065,7 +1065,7 @@ export default function Settings() {
                   <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                     Lyric Transition Speed
                   </label>
-                  <span className="text-xs font-mono text-[#FF4FA3] font-bold">
+                  <span className="text-xs font-mono text-[#F472B6] font-bold">
                     {lyricsSettings.animationDuration ?? 0.25}s
                   </span>
                 </div>
@@ -1082,7 +1082,7 @@ export default function Settings() {
                         animationDuration: Number(e.target.value)
                       }))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3]"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                   />
                   <div className="flex justify-between text-[10px] text-zinc-500 mt-1 font-mono">
                     <span>Fast (0.05s)</span>
@@ -1117,7 +1117,7 @@ export default function Settings() {
                           elrcDisplayLeadInMs: Number.isFinite(value) ? Math.max(0, Math.min(5000, value)) : 0,
                         }));
                       }}
-                      className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#FF4FA3]"
+                      className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#F472B6]"
                     />
                     <span className="text-xs text-zinc-400 font-mono font-medium">ms</span>
                   </div>
@@ -1168,7 +1168,7 @@ export default function Settings() {
                         }
                         className={`py-3.5 px-4 rounded-2xl border font-bold text-xs flex flex-col items-start gap-1.5 transition-all text-left ${
                           isSelected
-                            ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25 ring-2 ring-[#FF4FA3]/30'
+                            ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25 ring-2 ring-[#F472B6]/30'
                             : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
                         }`}
                       >
@@ -1210,7 +1210,7 @@ export default function Settings() {
                       }
                       className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1 transition-all ${
                         (lyricsSettings.wordHighlightAnimation || 'smooth') === item.id
-                          ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                          ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                           : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
                       }`}
                     >
@@ -1234,7 +1234,7 @@ export default function Settings() {
       <section className="space-y-6 pt-6 border-t border-white/10">
         <div className="flex items-center justify-between border-b border-white/5 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] rounded-xl">
+            <div className="p-2 bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] rounded-xl">
               <Download className="w-5 h-5" />
             </div>
             <div>
@@ -1254,7 +1254,7 @@ export default function Settings() {
               <select
                 value={dlSettings.libraryId}
                 onChange={(e) => setDlSettings({ ...dlSettings, libraryId: e.target.value })}
-                className="w-full bg-[#08090E] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#FF4FA3]"
+                className="w-full bg-[#08090E] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#F472B6]"
               >
                 {libraries.map((lib) => (
                   <option key={lib.id} value={lib.id}>
@@ -1276,7 +1276,7 @@ export default function Settings() {
               <select
                 value={dlSettings.format}
                 onChange={(e) => setDlSettings({ ...dlSettings, format: e.target.value })}
-                className="w-full bg-[#08090E] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#FF4FA3] font-mono"
+                className="w-full bg-[#08090E] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#F472B6] font-mono"
               >
                 <option value="mp3">MP3 (Recommended for maximum compatibility)</option>
                 <option value="m4a">M4A (AAC Audio)</option>
@@ -1294,7 +1294,7 @@ export default function Settings() {
               <select
                 value={dlSettings.quality}
                 onChange={(e) => setDlSettings({ ...dlSettings, quality: e.target.value })}
-                className="w-full bg-[#08090E] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#FF4FA3] font-mono"
+                className="w-full bg-[#08090E] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#F472B6] font-mono"
               >
                 <option value="320k">320 kbps (High Quality Constant Bitrate)</option>
                 <option value="256k">256 kbps (Standard High Quality)</option>
@@ -1313,10 +1313,10 @@ export default function Settings() {
                 value={dlSettings.folderStructure}
                 onChange={(e) => setDlSettings({ ...dlSettings, folderStructure: e.target.value })}
                 placeholder="{artist}/{artist} - {title}"
-                className="w-full bg-[#08090E] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#FF4FA3] font-mono"
+                className="w-full bg-[#08090E] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#F472B6] font-mono"
               />
               <p className="text-[11px] text-zinc-500">
-                Standard format: <code className="text-[#FF4FA3]">/media/&lt;Artist&gt;/&lt;Artist&gt; - &lt;Title&gt;.mp3</code> + matching <code className="text-[#FF4FA3]">.lrc</code> sidecar
+                Standard format: <code className="text-[#F472B6]">/media/&lt;Artist&gt;/&lt;Artist&gt; - &lt;Title&gt;.mp3</code> + matching <code className="text-[#F472B6]">.lrc</code> sidecar
               </p>
             </div>
           </div>
@@ -1329,7 +1329,7 @@ export default function Settings() {
                 type="checkbox"
                 checked={dlSettings.embedMetadata}
                 onChange={(e) => setDlSettings({ ...dlSettings, embedMetadata: e.target.checked })}
-                className="w-4 h-4 rounded text-[#FF4FA3] focus:ring-[#FF4FA3] accent-[#FF4FA3]"
+                className="w-4 h-4 rounded text-[#F472B6] focus:ring-[#F472B6] accent-[#F472B6]"
               />
             </label>
 
@@ -1339,7 +1339,7 @@ export default function Settings() {
                 type="checkbox"
                 checked={dlSettings.embedArtwork}
                 onChange={(e) => setDlSettings({ ...dlSettings, embedArtwork: e.target.checked })}
-                className="w-4 h-4 rounded text-[#FF4FA3] focus:ring-[#FF4FA3] accent-[#FF4FA3]"
+                className="w-4 h-4 rounded text-[#F472B6] focus:ring-[#F472B6] accent-[#F472B6]"
               />
             </label>
 
@@ -1352,7 +1352,7 @@ export default function Settings() {
                 type="checkbox"
                 checked={dlSettings.downloadLyrics}
                 onChange={(e) => setDlSettings({ ...dlSettings, downloadLyrics: e.target.checked })}
-                className="w-4 h-4 rounded text-[#FF4FA3] focus:ring-[#FF4FA3] accent-[#FF4FA3]"
+                className="w-4 h-4 rounded text-[#F472B6] focus:ring-[#F472B6] accent-[#F472B6]"
               />
             </label>
 
@@ -1365,7 +1365,7 @@ export default function Settings() {
                 disabled={!dlSettings.downloadLyrics}
                 value={dlSettings.lyricsProviders?.[0] || 'lrclib'}
                 onChange={(e) => setDlSettings({ ...dlSettings, lyricsProviders: [e.target.value] })}
-                className="w-full bg-[#141622] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF4FA3] font-mono"
+                className="w-full bg-[#141622] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#F472B6] font-mono"
               >
                 <option value="lrclib">lrclib (Active - https://lrclib.net)</option>
                 <option value="genius">genius (Legacy)</option>
@@ -1397,7 +1397,7 @@ export default function Settings() {
                         elrcLineLeadInMs: isNaN(val) ? 500 : Math.max(0, Math.min(5000, val)),
                       });
                     }}
-                    className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#FF4FA3]"
+                    className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#F472B6]"
                   />
                   <span className="text-xs text-zinc-400 font-mono font-medium">ms</span>
                 </div>
@@ -1406,7 +1406,7 @@ export default function Settings() {
                 <span className="text-zinc-500">Preview (First word at 01:24.00):</span>
                 <span>
                   Line appears at:{' '}
-                  <strong className="text-[#FF4FA3] font-semibold">
+                  <strong className="text-[#F472B6] font-semibold">
                     {(() => {
                       const leadMs = dlSettings.elrcLineLeadInMs ?? 500;
                       const wordSec = 84.0; // 01:24.00
@@ -1433,7 +1433,7 @@ export default function Settings() {
             <button
               type="submit"
               disabled={savingDlSettings}
-              className="ml-auto px-6 py-2.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#FF4FA3]/20 flex items-center gap-2 transition-all"
+              className="ml-auto px-6 py-2.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#F472B6]/20 flex items-center gap-2 transition-all"
             >
               <Save className="w-4 h-4" />
               <span>{savingDlSettings ? 'Saving...' : 'Save Downloader Settings'}</span>
@@ -1448,7 +1448,7 @@ export default function Settings() {
       <section className="space-y-6 pt-6 border-t border-white/10" id="section-background-music">
         <div className="flex items-center justify-between border-b border-white/5 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] rounded-xl">
+            <div className="p-2 bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] rounded-xl">
               <Music className="w-5 h-5" />
             </div>
             <div>
@@ -1475,7 +1475,7 @@ export default function Settings() {
                   onChange={(e) => saveBgm({ ...bgmSettings, enabled: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FF4FA3]"></div>
+                <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F472B6]"></div>
               </label>
             </div>
 
@@ -1483,7 +1483,7 @@ export default function Settings() {
             <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <ListMusic className="w-4 h-4 text-[#FF4FA3]" />
+                  <ListMusic className="w-4 h-4 text-[#F472B6]" />
                   <div>
                     <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Music Source</span>
                     <span className="text-xs text-zinc-400">
@@ -1504,7 +1504,7 @@ export default function Settings() {
                   setBgmSettings(updated);
                   saveBgm(updated);
                 }}
-                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3] cursor-pointer"
+                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F472B6] cursor-pointer"
               >
                 <option value="">All Local Music</option>
                 {playlists.map((pl) => (
@@ -1519,7 +1519,7 @@ export default function Settings() {
             <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-3" id="bgm-audio-mode-setting">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Music className="w-4 h-4 text-[#FF4FA3]" />
+                  <Music className="w-4 h-4 text-[#F472B6]" />
                   <div>
                     <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Background Music Audio Mode</span>
                     <span className="text-xs text-zinc-400">
@@ -1545,7 +1545,7 @@ export default function Settings() {
                   }}
                   className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
                     bgmSettings.audioMode === 'instrumental'
-                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                      ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                       : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
                   }`}
                 >
@@ -1562,7 +1562,7 @@ export default function Settings() {
                   }}
                   className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
                     bgmSettings.audioMode === 'original'
-                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                      ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                       : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
                   }`}
                 >
@@ -1581,7 +1581,7 @@ export default function Settings() {
                   setBgmSettings(updated);
                   saveBgm(updated);
                 }}
-                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3] cursor-pointer"
+                className="w-full bg-[#141622] text-white text-xs font-medium border border-white/10 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#F472B6] cursor-pointer"
               >
                 <option value="instrumental">Instrumental Only</option>
                 <option value="original">Original Only</option>
@@ -1593,7 +1593,7 @@ export default function Settings() {
               {/* Shuffle Mode */}
               <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Shuffle className="w-4 h-4 text-[#FF4FA3]" />
+                  <Shuffle className="w-4 h-4 text-[#F472B6]" />
                   <div>
                     <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Playback Mode</span>
                     <span className="text-xs text-zinc-400">Continuous shuffle without repeats until all eligible library tracks have played</span>
@@ -1606,10 +1606,10 @@ export default function Settings() {
               <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Volume2 className="w-4 h-4 text-[#FF4FA3]" />
+                    <Volume2 className="w-4 h-4 text-[#F472B6]" />
                     <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Background Music Volume</span>
                   </div>
-                  <span className="text-xs font-mono font-bold text-[#FF4FA3]">{bgmSettings.volume}%</span>
+                  <span className="text-xs font-mono font-bold text-[#F472B6]">{bgmSettings.volume}%</span>
                 </div>
                 <input
                   type="range"
@@ -1629,7 +1629,7 @@ export default function Settings() {
                     const val = parseInt((e.target as HTMLInputElement).value, 10);
                     saveBgm({ ...bgmSettings, volume: val });
                   }}
-                  className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3] focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                  className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6] focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
                 />
                 <p className="text-[11px] text-zinc-500">
                   Independent volume control for ambient background music. Does not affect host karaoke volume. Default is 25%.
@@ -1640,7 +1640,7 @@ export default function Settings() {
               <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Shuffle className="w-4 h-4 text-[#FF4FA3]" />
+                    <Shuffle className="w-4 h-4 text-[#F472B6]" />
                     <div>
                       <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Enable Crossfade</span>
                       <span className="text-xs text-zinc-400">Smoothly transition between ambient tracks.</span>
@@ -1657,7 +1657,7 @@ export default function Settings() {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FF4FA3]"></div>
+                    <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F472B6]"></div>
                   </label>
                 </div>
                 {bgmSettings.crossfadeEnabled && (
@@ -1683,7 +1683,7 @@ export default function Settings() {
                         const val = parseInt((e.target as HTMLInputElement).value, 10);
                         saveBgm({ ...bgmSettings, crossfadeDuration: val });
                       }}
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3] focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6] focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
                     />
                   </div>
                 )}
@@ -1693,7 +1693,7 @@ export default function Settings() {
               <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Music className="w-4 h-4 text-[#FF4FA3]" />
+                    <Music className="w-4 h-4 text-[#F472B6]" />
                     <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Audio Mode</span>
                   </div>
                 </div>
@@ -1702,7 +1702,7 @@ export default function Settings() {
                   onChange={(e) => {
                     setBgmSettings({ ...bgmSettings, audioMode: e.target.value as BackgroundMusicAudioMode });
                   }}
-                  className="w-full bg-[#1A1C24] text-white text-xs p-2 rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                  className="w-full bg-[#1A1C24] text-white text-xs p-2 rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
                 >
                   <option value="instrumental">Instrumental Only</option>
                   <option value="original">Original Only</option>
@@ -1724,7 +1724,7 @@ export default function Settings() {
                 type="button"
                 onClick={() => saveBgm(bgmSettings)}
                 disabled={savingBgmSettings}
-                className="ml-auto px-6 py-2.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#FF4FA3]/20 flex items-center gap-2 transition-all disabled:opacity-50"
+                className="ml-auto px-6 py-2.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#F472B6]/20 flex items-center gap-2 transition-all disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 <span>{savingBgmSettings ? 'Saving...' : 'Save Background Music Settings'}</span>
@@ -1740,7 +1740,7 @@ export default function Settings() {
       <section className="space-y-6 pt-6 border-t border-white/10" id="section-karaoke-defaults">
         <div className="flex items-center justify-between border-b border-white/5 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] rounded-xl">
+            <div className="p-2 bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] rounded-xl">
               <Zap className="w-5 h-5" />
             </div>
             <div>
@@ -1756,7 +1756,7 @@ export default function Settings() {
             <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Music className="w-4 h-4 text-[#FF4FA3]" />
+                  <Music className="w-4 h-4 text-[#F472B6]" />
                   <div>
                     <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Default Audio Mode</span>
                     <span className="text-xs text-zinc-400">
@@ -1782,7 +1782,7 @@ export default function Settings() {
                   }}
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
                     karaokeDefaults.audioMode === 'instrumental'
-                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                      ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                       : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
                   }`}
                 >
@@ -1799,7 +1799,7 @@ export default function Settings() {
                   }}
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-2 cursor-pointer ${
                     karaokeDefaults.audioMode === 'original'
-                      ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25'
+                      ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                       : 'bg-[#141622] text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
                   }`}
                 >
@@ -1814,7 +1814,7 @@ export default function Settings() {
             <div className="p-4 bg-[#08090E] border border-white/5 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Sliders className="w-4 h-4 text-[#FF4FA3]" />
+                  <Sliders className="w-4 h-4 text-[#F472B6]" />
                   <div>
                     <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">Default Lyrics Mode</span>
                     <span className="text-xs text-zinc-400">
@@ -1880,7 +1880,7 @@ export default function Settings() {
               type="button"
               onClick={() => saveKaraokeDefaults(karaokeDefaults)}
               disabled={savingDefaults}
-              className="ml-auto px-6 py-2.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#FF4FA3]/20 flex items-center gap-2 transition-all disabled:opacity-50"
+              className="ml-auto px-6 py-2.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#F472B6]/20 flex items-center gap-2 transition-all disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               <span>{savingDefaults ? 'Saving...' : 'Save Karaoke Defaults'}</span>
@@ -1895,14 +1895,14 @@ export default function Settings() {
       {user?.role === 'administrator' && (
         <section className="space-y-4 pt-6 border-t border-white/10">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#FF4FA3]" />
-            <h2 className="text-sm font-bold text-[#FF4FA3] uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-[#F472B6]" />
+            <h2 className="text-sm font-bold text-[#F472B6] uppercase tracking-wider">
               System Administration
             </h2>
           </div>
 
           <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-            <HardDrive className="w-5 h-5 text-[#FF4FA3]" />
+            <HardDrive className="w-5 h-5 text-[#F472B6]" />
             <h3 className="text-lg font-bold text-white">Media Library Directories</h3>
           </div>
           
@@ -1920,7 +1920,7 @@ export default function Settings() {
                 {libraries.map(lib => (
                   <tr key={lib.id} className="hover:bg-[#1A1C2C]/60 transition-colors">
                     <td className="px-5 py-3.5 font-medium text-white flex items-center gap-2.5">
-                      <Folder className="w-4 h-4 text-[#FF4FA3]" />
+                      <Folder className="w-4 h-4 text-[#F472B6]" />
                       <span>{lib.name}</span>
                     </td>
                     <td className="px-5 py-3.5 text-zinc-400 font-mono text-xs">{lib.path}</td>
@@ -1934,7 +1934,7 @@ export default function Settings() {
                           disabled={scanningId === lib.id}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1C1E2D] hover:bg-[#25283C] text-white rounded-lg text-xs font-medium border border-white/5 transition-colors disabled:opacity-50"
                         >
-                          <RefreshCw className={`w-3.5 h-3.5 ${scanningId === lib.id ? 'animate-spin text-[#FF4FA3]' : ''}`} />
+                          <RefreshCw className={`w-3.5 h-3.5 ${scanningId === lib.id ? 'animate-spin text-[#F472B6]' : ''}`} />
                           <span>{scanningId === lib.id ? 'Scanning' : 'Scan'}</span>
                         </button>
                         <button 
@@ -1966,7 +1966,7 @@ export default function Settings() {
               <input 
                 value={newLibName} onChange={e => setNewLibName(e.target.value)}
                 placeholder="e.g. Main Karaoke Collection"
-                className="w-full px-3.5 py-2.5 bg-[#0A0B10] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] text-sm"
+                className="w-full px-3.5 py-2.5 bg-[#0A0B10] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] text-sm"
                 required
               />
             </div>
@@ -1975,13 +1975,13 @@ export default function Settings() {
               <input 
                 value={newLibPath} onChange={e => setNewLibPath(e.target.value)}
                 placeholder="e.g. /media"
-                className="w-full px-3.5 py-2.5 bg-[#0A0B10] border border-white/10 rounded-xl text-white placeholder-zinc-600 font-mono text-sm focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3]"
+                className="w-full px-3.5 py-2.5 bg-[#0A0B10] border border-white/10 rounded-xl text-white placeholder-zinc-600 font-mono text-sm focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6]"
                 required
               />
             </div>
             <button 
               type="submit" 
-              className="w-full md:w-auto px-5 py-2.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25 flex items-center justify-center gap-2 h-[42px] shrink-0"
+              className="w-full md:w-auto px-5 py-2.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 h-[42px] shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Add Library</span>
@@ -2006,7 +2006,7 @@ export default function Settings() {
             </p>
             <div className="bg-[#0A0B10] border border-white/10 rounded-xl p-3.5 mb-4">
               <div className="text-[11px] text-zinc-500 mb-1">Path:</div>
-              <code className="text-[#FF4FA3] font-mono text-xs">{libToRemove.path}</code>
+              <code className="text-[#F472B6] font-mono text-xs">{libToRemove.path}</code>
             </div>
             <p className="text-zinc-400 text-xs mb-6">
               Your audio and video files will <strong className="text-white">NOT</strong> be deleted.

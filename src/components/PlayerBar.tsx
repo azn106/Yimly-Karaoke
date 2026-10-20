@@ -113,7 +113,7 @@ export default function PlayerBar() {
           <div className="relative w-full max-w-md bg-[#12141F] border-l border-white/10 h-full flex flex-col z-10 shadow-2xl p-6">
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <div className="flex items-center gap-2.5">
-                <ListMusic className="w-5 h-5 text-[#FA243C]" />
+                <ListMusic className="w-5 h-5 text-[#F472B6]" />
                 <h2 className="text-base font-bold text-white tracking-tight">Jukebox Play Queue</h2>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-zinc-300 font-mono">
                   {queue.length}
@@ -154,7 +154,7 @@ export default function PlayerBar() {
                       key={`${song.id}-${idx}`}
                       className={`flex items-center justify-between p-3 rounded-xl transition-all group ${
                         isCurrent 
-                          ? 'bg-[#FA243C]/15 border border-[#FA243C]/30 text-white' 
+                          ? 'bg-[#F472B6]/15 border border-[#F472B6]/30 text-white' 
                           : 'bg-[#181A28]/60 hover:bg-[#1E2133] border border-white/5 text-zinc-300'
                       }`}
                     >
@@ -177,12 +177,12 @@ export default function PlayerBar() {
                           )}
                           {isCurrent && isPlaying && (
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                              <span className="w-2 h-2 rounded-full bg-[#FA243C] animate-ping" />
+                              <span className="w-2 h-2 rounded-full bg-[#F472B6] animate-ping" />
                             </div>
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className={`text-sm font-semibold truncate ${isCurrent ? 'text-[#FA243C]' : 'text-white'}`}>
+                          <p className={`text-sm font-semibold truncate ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`}>
                             {song.title}
                           </p>
                           <p className="text-xs text-zinc-400 truncate">
@@ -267,7 +267,7 @@ export default function PlayerBar() {
               <button
                 onClick={toggleShuffle}
                 className={`p-1.5 rounded-lg transition-colors ${
-                  isShuffle ? 'text-[#FA243C]' : 'text-zinc-400 hover:text-white'
+                  isShuffle ? 'text-[#F472B6]' : 'text-zinc-400 hover:text-white'
                 }`}
                 title={isShuffle ? 'Shuffle On' : 'Shuffle Off'}
               >
@@ -284,7 +284,7 @@ export default function PlayerBar() {
 
               <button
                 onClick={togglePlay}
-                className="w-10 h-10 rounded-full bg-[#FA243C] hover:bg-[#ff68b1] text-white flex items-center justify-center shadow-lg shadow-[#FA243C]/30 hover:scale-105 active:scale-95 transition-all"
+                className="w-10 h-10 rounded-full bg-[#F472B6] hover:bg-[#ff68b1] text-white flex items-center justify-center shadow-lg shadow-[#F472B6]/30 hover:scale-105 active:scale-95 transition-all"
                 title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
               >
                 {isPlaying ? (
@@ -305,7 +305,7 @@ export default function PlayerBar() {
               <button
                 onClick={cycleRepeat}
                 className={`p-1.5 rounded-lg transition-colors ${
-                  repeatMode !== 'off' ? 'text-[#FA243C]' : 'text-zinc-400 hover:text-white'
+                  repeatMode !== 'off' ? 'text-[#F472B6]' : 'text-zinc-400 hover:text-white'
                 }`}
                 title={`Repeat: ${repeatMode}`}
               >
@@ -335,9 +335,9 @@ export default function PlayerBar() {
                   onMouseUp={handleSeekMouseUp}
                   onTouchStart={handleSeekMouseDown}
                   onTouchEnd={handleSeekMouseUp}
-                  className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FA243C] group-hover:h-2 transition-all"
+                  className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6] group-hover:h-2 transition-all"
                   style={{
-                    background: `linear-gradient(to right, #FA243C 0%, #FA243C ${currentProgressPercent}%, rgba(255,255,255,0.1) ${currentProgressPercent}%, rgba(255,255,255,0.1) 100%)`
+                    background: `linear-gradient(to right, #F472B6 0%, #F472B6 ${currentProgressPercent}%, rgba(255,255,255,0.1) ${currentProgressPercent}%, rgba(255,255,255,0.1) 100%)`
                   }}
                 />
               </div>
@@ -353,7 +353,7 @@ export default function PlayerBar() {
             {/* Multi-tab status indicator */}
             {!isLeader && (
               <span className="hidden lg:inline-flex items-center gap-1.5 text-[10px] text-zinc-400 px-2 py-1 rounded bg-white/5 border border-white/5">
-                <Radio className="w-3 h-3 text-[#FA243C] animate-pulse" />
+                <Radio className="w-3 h-3 text-[#F472B6] animate-pulse" />
                 <span>Remote tab</span>
               </span>
             )}
@@ -380,9 +380,9 @@ export default function PlayerBar() {
                 step="0.01"
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeChange}
-                className="w-16 md:w-20 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FA243C]"
+                className="w-16 md:w-20 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
                 style={{
-                  background: `linear-gradient(to right, #FA243C 0%, #FA243C ${(isMuted ? 0 : volume) * 100}%, rgba(255,255,255,0.1) ${(isMuted ? 0 : volume) * 100}%, rgba(255,255,255,0.1) 100%)`
+                  background: `linear-gradient(to right, #F472B6 0%, #F472B6 ${(isMuted ? 0 : volume) * 100}%, rgba(255,255,255,0.1) ${(isMuted ? 0 : volume) * 100}%, rgba(255,255,255,0.1) 100%)`
                 }}
               />
             </div>
@@ -399,7 +399,7 @@ export default function PlayerBar() {
             >
               <ListMusic className="w-4 h-4" />
               {queue.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#FA243C] text-[9px] font-bold text-white flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#F472B6] text-[9px] font-bold text-white flex items-center justify-center">
                   {queue.length}
                 </span>
               )}

@@ -276,7 +276,7 @@ export default function DownloadMusic() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-6">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] text-xs font-semibold uppercase tracking-wider mb-2">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Integrated Music Downloader</span>
           </div>
@@ -290,7 +290,7 @@ export default function DownloadMusic() {
           to="/settings"
           className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-semibold rounded-xl border border-white/10 transition-colors flex items-center gap-2 shrink-0 self-start md:self-auto"
         >
-          <SettingsIcon className="w-4 h-4 text-[#FF4FA3]" />
+          <SettingsIcon className="w-4 h-4 text-[#F472B6]" />
           <span>Downloader Settings</span>
         </Link>
       </div>
@@ -310,14 +310,14 @@ export default function DownloadMusic() {
                 value={inputVal}
                 onChange={(e) => setInputVal(e.target.value)}
                 placeholder="Paste Spotify track/album/playlist URL, YouTube URL, or type song name..."
-                className="w-full bg-[#08090E] border border-white/10 focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] rounded-2xl pl-12 pr-4 py-3.5 text-sm text-white placeholder-zinc-600 focus:outline-none transition-all font-mono"
+                className="w-full bg-[#08090E] border border-white/10 focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] rounded-2xl pl-12 pr-4 py-3.5 text-sm text-white placeholder-zinc-600 focus:outline-none transition-all font-mono"
               />
             </div>
 
             <button
               type="submit"
               disabled={resolving || !inputVal.trim()}
-              className="px-6 py-3.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-[#FF4FA3]/25 flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
+              className="px-6 py-3.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
             >
               {resolving ? (
                 <>
@@ -378,12 +378,12 @@ export default function DownloadMusic() {
               {result.artworkUrl ? (
                 <img src={result.artworkUrl} alt={result.title || 'Cover'} className="w-full h-full object-cover" />
               ) : (
-                <Disc className="w-10 h-10 text-[#FF4FA3]" />
+                <Disc className="w-10 h-10 text-[#F472B6]" />
               )}
             </div>
 
             <div className="flex-1 min-w-0">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#FF4FA3]/20 text-[#FF4FA3] border border-[#FF4FA3]/30 inline-block mb-1.5">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#F472B6]/20 text-[#F472B6] border border-[#F472B6]/30 inline-block mb-1.5">
                 {result.type}
               </span>
               <h2 className="text-xl font-bold text-white truncate">{result.title || result.query || 'Music Result'}</h2>
@@ -411,7 +411,7 @@ export default function DownloadMusic() {
                 <select
                   value={selectedLibraryId}
                   onChange={(e) => setSelectedLibraryId(e.target.value)}
-                  className="bg-[#141622] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF4FA3]"
+                  className="bg-[#141622] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#F472B6]"
                 >
                   {libraries.map((lib) => (
                     <option key={lib.id} value={lib.id}>
@@ -428,7 +428,7 @@ export default function DownloadMusic() {
                 <select
                   value={format}
                   onChange={(e) => setFormat(e.target.value)}
-                  className="bg-[#141622] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF4FA3] font-mono"
+                  className="bg-[#141622] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#F472B6] font-mono"
                 >
                   <option value="mp3">MP3</option>
                   <option value="m4a">M4A</option>
@@ -444,7 +444,7 @@ export default function DownloadMusic() {
                 <select
                   value={quality}
                   onChange={(e) => setQuality(e.target.value)}
-                  className="bg-[#141622] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF4FA3] font-mono"
+                  className="bg-[#141622] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#F472B6] font-mono"
                 >
                   <option value="320k">320kbps (Best)</option>
                   <option value="256k">256kbps</option>
@@ -460,7 +460,7 @@ export default function DownloadMusic() {
                     type="checkbox"
                     checked={downloadLyrics}
                     onChange={(e) => setDownloadLyrics(e.target.checked)}
-                    className="w-4 h-4 rounded bg-[#08090E] border-white/20 text-[#FF4FA3] focus:ring-[#FF4FA3] accent-[#FF4FA3]"
+                    className="w-4 h-4 rounded bg-[#08090E] border-white/20 text-[#F472B6] focus:ring-[#F472B6] accent-[#F472B6]"
                   />
                   <span className="text-xs font-semibold text-zinc-200">.lrc Lyrics</span>
                 </label>
@@ -472,7 +472,7 @@ export default function DownloadMusic() {
               type="button"
               onClick={handleStartDownload}
               disabled={selectedIndices.size === 0 || startingDownload || libraries.length === 0}
-              className="px-6 py-3 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25 flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-3 bg-[#F472B6] hover:bg-[#ff69b2] text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center gap-2 disabled:opacity-50"
             >
               {startingDownload ? (
                 <>
@@ -494,7 +494,7 @@ export default function DownloadMusic() {
               <button
                 type="button"
                 onClick={toggleSelectAll}
-                className="text-[#FF4FA3] font-bold hover:underline flex items-center gap-1.5"
+                className="text-[#F472B6] font-bold hover:underline flex items-center gap-1.5"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>
@@ -514,7 +514,7 @@ export default function DownloadMusic() {
                     key={idx}
                     onClick={() => toggleSelectIndex(idx)}
                     className={`p-3.5 flex items-center gap-3 transition-colors cursor-pointer ${
-                      isSelected ? 'bg-[#FF4FA3]/10 hover:bg-[#FF4FA3]/15' : 'hover:bg-white/5 opacity-60'
+                      isSelected ? 'bg-[#F472B6]/10 hover:bg-[#F472B6]/15' : 'hover:bg-white/5 opacity-60'
                     }`}
                   >
                     <input
@@ -522,7 +522,7 @@ export default function DownloadMusic() {
                       checked={isSelected}
                       onChange={() => toggleSelectIndex(idx)}
                       onClick={(e) => e.stopPropagation()}
-                      className="w-4 h-4 rounded bg-[#141622] border-white/20 text-[#FF4FA3] focus:ring-[#FF4FA3] accent-[#FF4FA3]"
+                      className="w-4 h-4 rounded bg-[#141622] border-white/20 text-[#F472B6] focus:ring-[#F472B6] accent-[#F472B6]"
                     />
 
                     <span className="w-6 text-center text-xs font-mono text-zinc-500">{idx + 1}</span>
@@ -557,11 +557,11 @@ export default function DownloadMusic() {
 
       {/* Active Download Progress Monitor */}
       {activeJob && (
-        <div className="bg-[#141622] border border-[#FF4FA3]/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+        <div className="bg-[#141622] border border-[#F472B6]/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
             <div>
               <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-[#FF4FA3] animate-pulse" />
+                <Radio className="w-4 h-4 text-[#F472B6] animate-pulse" />
                 <h3 className="text-lg font-extrabold text-white">Active Download Progress</h3>
               </div>
               <p className="text-xs text-zinc-400 mt-1 font-mono">
@@ -590,7 +590,7 @@ export default function DownloadMusic() {
                   Cancel Job
                 </button>
               ) : (
-                <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#FF4FA3]/20 text-[#FF4FA3] border border-[#FF4FA3]/30">
+                <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#F472B6]/20 text-[#F472B6] border border-[#F472B6]/30">
                   {activeJob.status}
                 </span>
               )}
@@ -607,9 +607,9 @@ export default function DownloadMusic() {
               <span className="text-[10px] uppercase font-bold text-emerald-400 block">Completed</span>
               <span className="text-base font-extrabold text-emerald-400 font-mono">{activeJob.completedCount}</span>
             </div>
-            <div className="bg-[#08090E] border border-[#FF4FA3]/10 rounded-xl p-2.5 text-center">
-              <span className="text-[10px] uppercase font-bold text-[#FF4FA3] block">In Progress / Queued</span>
-              <span className="text-base font-extrabold text-[#FF4FA3] font-mono">
+            <div className="bg-[#08090E] border border-[#F472B6]/10 rounded-xl p-2.5 text-center">
+              <span className="text-[10px] uppercase font-bold text-[#F472B6] block">In Progress / Queued</span>
+              <span className="text-base font-extrabold text-[#F472B6] font-mono">
                 {activeJob.tracks.filter(t => t.status === 'queued' || t.status === 'searching' || t.status === 'downloading' || t.status === 'tagging').length}
               </span>
             </div>
@@ -625,7 +625,7 @@ export default function DownloadMusic() {
           <div className="space-y-2">
             <div className="flex justify-between items-center text-xs">
               <span className="font-bold text-white">Overall Completion</span>
-              <span className="font-mono text-[#FF4FA3] font-bold">
+              <span className="font-mono text-[#F472B6] font-bold">
                 {activeJob.completedCount} of {activeJob.totalCount} tracks finished (
                 {Math.round((activeJob.completedCount / (activeJob.totalCount || 1)) * 100)}%)
               </span>
@@ -634,7 +634,7 @@ export default function DownloadMusic() {
             <div className="w-full h-3 bg-[#08090E] rounded-full overflow-hidden p-0.5 border border-white/10">
               <div
                 style={{ width: `${(activeJob.completedCount / (activeJob.totalCount || 1)) * 100}%` }}
-                className="h-full bg-gradient-to-r from-[#FF4FA3] to-[#ff7ebd] rounded-full transition-all duration-300 shadow-md shadow-[#FF4FA3]/30"
+                className="h-full bg-gradient-to-r from-[#F472B6] to-[#ff7ebd] rounded-full transition-all duration-300 shadow-md shadow-[#F472B6]/30"
               />
             </div>
           </div>
@@ -665,7 +665,7 @@ export default function DownloadMusic() {
                             ? 'bg-emerald-400'
                             : tr.status === 'failed'
                             ? 'bg-red-500'
-                            : 'bg-[#FF4FA3]'
+                            : 'bg-[#F472B6]'
                         }`}
                       />
                     </div>
@@ -710,7 +710,7 @@ function StatusIcon({ status }: { status: ActiveTrackJob['status'] }) {
     case 'downloading':
     case 'searching':
     case 'tagging':
-      return <RefreshCw className="w-4 h-4 text-[#FF4FA3] animate-spin shrink-0" />;
+      return <RefreshCw className="w-4 h-4 text-[#F472B6] animate-spin shrink-0" />;
     default:
       return <Music className="w-4 h-4 text-zinc-500 shrink-0" />;
   }

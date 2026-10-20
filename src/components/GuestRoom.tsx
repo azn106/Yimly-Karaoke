@@ -204,7 +204,7 @@ export default function GuestRoom({
       <header className="sticky top-0 z-30 px-4 py-3 bg-[#0D0E17]/95 backdrop-blur-md border-b border-white/10 flex items-center justify-between shrink-0">
         {/* Left: YIMLY Brand */}
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 flex items-center justify-center text-[#FF4FA3]">
+          <div className="w-7 h-7 rounded-lg bg-[#F472B6]/15 border border-[#F472B6]/30 flex items-center justify-center text-[#F472B6]">
             <Music className="w-4 h-4" />
           </div>
           <span className="font-black tracking-widest text-sm text-white">YIMLY</span>
@@ -219,7 +219,7 @@ export default function GuestRoom({
 
         {/* Right: Guest Username */}
         <div className="flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-zinc-200">
-          <User className="w-3.5 h-3.5 text-[#FF4FA3]" />
+          <User className="w-3.5 h-3.5 text-[#F472B6]" />
           <span className="truncate max-w-[90px]">{guestUsername || 'Guest'}</span>
         </div>
       </header>
@@ -229,13 +229,13 @@ export default function GuestRoom({
         {/* Queue Section Title */}
         <div className="flex items-center justify-between mb-4 px-1">
           <div className="flex items-center gap-2">
-            <ListMusic className="w-4 h-4 text-[#FF4FA3]" />
+            <ListMusic className="w-4 h-4 text-[#F472B6]" />
             <h2 className="text-xs font-black uppercase tracking-widest text-zinc-300">
               ♫ UP NEXT
             </h2>
           </div>
           {queue.length > 0 && (
-            <span className="px-2.5 py-0.5 bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] rounded-full text-[10px] font-bold">
+            <span className="px-2.5 py-0.5 bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] rounded-full text-[10px] font-bold">
               {queue.length} {queue.length === 1 ? 'song' : 'songs'}
             </span>
           )}
@@ -245,8 +245,8 @@ export default function GuestRoom({
         {queue.length === 0 ? (
           /* Empty Queue View */
           <div className="flex-1 flex flex-col items-center justify-center text-center py-16 px-4 my-auto">
-            <div className="w-20 h-20 rounded-3xl bg-[#12131D] border border-white/10 flex items-center justify-center text-[#FF4FA3] mb-5 shadow-2xl shadow-[#FF4FA3]/10 relative">
-              <div className="absolute inset-0 bg-[#FF4FA3]/10 rounded-3xl blur-xl" />
+            <div className="w-20 h-20 rounded-3xl bg-[#12131D] border border-white/10 flex items-center justify-center text-[#F472B6] mb-5 shadow-2xl shadow-[#F472B6]/10 relative">
+              <div className="absolute inset-0 bg-[#F472B6]/10 rounded-3xl blur-xl" />
               <Music className="w-10 h-10 relative z-10" />
             </div>
 
@@ -259,7 +259,7 @@ export default function GuestRoom({
 
             <button
               onClick={() => setShowAddSong(true)}
-              className="px-6 py-3.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-sm rounded-2xl transition-all shadow-lg shadow-[#FF4FA3]/25 flex items-center justify-center gap-2 active:scale-95"
+              className="px-6 py-3.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-sm rounded-2xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>ADD SONG</span>
@@ -280,7 +280,7 @@ export default function GuestRoom({
                   key={item.id}
                   className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all ${
                     isPlaying
-                      ? 'bg-[#151726] border-[#FF4FA3]/40 shadow-lg shadow-[#FF4FA3]/10'
+                      ? 'bg-[#151726] border-[#F472B6]/40 shadow-lg shadow-[#F472B6]/10'
                       : 'bg-[#12131D] border-white/5 hover:border-white/10'
                   }`}
                 >
@@ -288,7 +288,7 @@ export default function GuestRoom({
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
                       isPlaying
-                        ? 'bg-[#FF4FA3] text-white shadow-md shadow-[#FF4FA3]/30'
+                        ? 'bg-[#F472B6] text-white shadow-md shadow-[#F472B6]/30'
                         : 'bg-white/5 text-zinc-400 border border-white/10'
                     }`}
                   >
@@ -303,13 +303,13 @@ export default function GuestRoom({
                     <div className="flex items-center gap-1.5 text-xs text-zinc-400 truncate mt-0.5">
                       <span className="truncate">{item.artistName}</span>
                       <span className="text-zinc-600">•</span>
-                      <span className="text-[#FF4FA3] font-semibold truncate">{addedBy}</span>
+                      <span className="text-[#F472B6] font-semibold truncate">{addedBy}</span>
                     </div>
                   </div>
 
                   {/* Status Badge */}
                   {isPlaying && (
-                    <span className="px-2 py-0.5 bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0">
+                    <span className="px-2 py-0.5 bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0">
                       NOW PLAYING
                     </span>
                   )}
@@ -339,7 +339,7 @@ export default function GuestRoom({
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#08090E] via-[#08090E]/90 to-transparent backdrop-blur-sm z-20 flex justify-center">
         <button
           onClick={() => setShowAddSong(true)}
-          className="w-full max-w-md py-4 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-extrabold text-base rounded-2xl transition-all shadow-xl shadow-[#FF4FA3]/30 flex items-center justify-center gap-2 active:scale-95 border border-white/10"
+          className="w-full max-w-md py-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-extrabold text-base rounded-2xl transition-all shadow-xl shadow-[#F472B6]/30 flex items-center justify-center gap-2 active:scale-95 border border-white/10"
         >
           <Plus className="w-5 h-5 stroke-[2.5]" />
           <span className="tracking-wide">ADD SONG</span>
@@ -394,7 +394,7 @@ export default function GuestRoom({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   autoFocus
-                  className="w-full bg-[#08090E] border border-white/15 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-2 focus:ring-[#FF4FA3]/30 transition-all"
+                  className="w-full bg-[#08090E] border border-white/15 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-2 focus:ring-[#F472B6]/30 transition-all"
                 />
                 {searchQuery && (
                   <button
@@ -411,7 +411,7 @@ export default function GuestRoom({
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5 max-w-md mx-auto w-full">
               {loadingSongs ? (
                 <div className="py-20 text-center text-zinc-400">
-                  <div className="w-8 h-8 border-2 border-[#FF4FA3] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  <div className="w-8 h-8 border-2 border-[#F472B6] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                   <p className="text-xs font-semibold">Loading song catalog...</p>
                 </div>
               ) : !searchQuery.trim() ? (
@@ -425,7 +425,7 @@ export default function GuestRoom({
                       className="p-3.5 bg-[#12131D] hover:bg-[#1A1C2C] border border-white/5 rounded-2xl flex items-center justify-between gap-3 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0 text-[#FF4FA3]">
+                        <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0 text-[#F472B6]">
                           <Music className="w-5 h-5" />
                         </div>
                         <div className="min-w-0">
@@ -443,8 +443,8 @@ export default function GuestRoom({
                         disabled={isAdding || isAdded}
                         className={`w-10 h-10 rounded-xl font-bold flex items-center justify-center transition-all shrink-0 active:scale-95 ${
                           isAdded
-                            ? 'bg-[#FF4FA3] text-white shadow-lg shadow-[#FF4FA3]/30'
-                            : 'bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white border border-[#FF4FA3]/30'
+                            ? 'bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/30'
+                            : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
                         }`}
                         title="Add to queue"
                       >
@@ -460,7 +460,7 @@ export default function GuestRoom({
               ) : (
                 <>
                   {librarySearchResults.length > 0 && (
-                    <div className="text-xs font-bold text-[#FF4FA3] uppercase tracking-wider mb-2 mt-2 px-1">
+                    <div className="text-xs font-bold text-[#F472B6] uppercase tracking-wider mb-2 mt-2 px-1">
                       In Library ({librarySearchResults.length})
                     </div>
                   )}
@@ -474,7 +474,7 @@ export default function GuestRoom({
                         className="p-3.5 bg-[#12131D] hover:bg-[#1A1C2C] border border-white/5 rounded-2xl flex items-center justify-between gap-3 transition-colors"
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0 text-[#FF4FA3]">
+                          <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0 text-[#F472B6]">
                             <Music className="w-5 h-5" />
                           </div>
                           <div className="min-w-0">
@@ -492,8 +492,8 @@ export default function GuestRoom({
                           disabled={isAdding || isAdded}
                           className={`w-10 h-10 rounded-xl font-bold flex items-center justify-center transition-all shrink-0 active:scale-95 ${
                             isAdded
-                              ? 'bg-[#FF4FA3] text-white shadow-lg shadow-[#FF4FA3]/30'
-                              : 'bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white border border-[#FF4FA3]/30'
+                              ? 'bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/30'
+                              : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
                           }`}
                           title="Add to queue"
                         >
@@ -508,7 +508,7 @@ export default function GuestRoom({
                   })}
 
                   {externalSearchResults.length > 0 && (
-                    <div className="text-xs font-bold text-[#FF4FA3] uppercase tracking-wider mb-2 mt-4 px-1">
+                    <div className="text-xs font-bold text-[#F472B6] uppercase tracking-wider mb-2 mt-4 px-1">
                       Available for Download ({externalSearchResults.length})
                     </div>
                   )}
@@ -545,8 +545,8 @@ export default function GuestRoom({
                           disabled={isAdding || isAdded}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center transition-all shrink-0 active:scale-95 ${
                             isAdded
-                              ? 'bg-[#FF4FA3] text-white shadow-lg shadow-[#FF4FA3]/30'
-                              : 'bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white border border-[#FF4FA3]/30'
+                              ? 'bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/30'
+                              : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
                           }`}
                           title="Download and queue"
                         >
@@ -564,14 +564,14 @@ export default function GuestRoom({
 
                   {isSearching && (
                     <div className="py-8 text-center text-zinc-400">
-                      <div className="w-6 h-6 border-2 border-[#FF4FA3] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <div className="w-6 h-6 border-2 border-[#F472B6] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                       <p className="text-xs">Searching...</p>
                     </div>
                   )}
 
                   {!isSearching && librarySearchResults.length === 0 && externalSearchResults.length === 0 && (
                     <div className="py-20 text-center text-zinc-500">
-                      <Music className="w-10 h-10 mx-auto mb-3 opacity-30 text-[#FF4FA3]" />
+                      <Music className="w-10 h-10 mx-auto mb-3 opacity-30 text-[#F472B6]" />
                       <p className="text-sm font-bold text-zinc-300">No songs found</p>
                       <p className="text-xs text-zinc-500 mt-1">Try a different search term</p>
                     </div>

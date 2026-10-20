@@ -153,7 +153,7 @@ export default function Rooms() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] text-xs font-semibold uppercase tracking-wider mb-2">
             <Radio className="w-3.5 h-3.5 animate-pulse" />
             <span>Live Session Hub</span>
           </div>
@@ -182,11 +182,11 @@ export default function Rooms() {
       {/* Action Cards Grid */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Host a Session Card */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#1A1828] to-[#12131F] border border-[#FF4FA3]/25 p-8 flex flex-col items-center text-center shadow-xl group">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4FA3]/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#1A1828] to-[#12131F] border border-[#F472B6]/25 p-8 flex flex-col items-center text-center shadow-xl group">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-[#F472B6]/10 rounded-full blur-2xl pointer-events-none" />
 
-          <div className="w-16 h-16 rounded-2xl bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 flex items-center justify-center mb-5 shadow-lg shadow-[#FF4FA3]/10">
-            <Mic className="w-8 h-8 text-[#FF4FA3]" />
+          <div className="w-16 h-16 rounded-2xl bg-[#F472B6]/15 border border-[#F472B6]/30 flex items-center justify-center mb-5 shadow-lg shadow-[#F472B6]/10">
+            <Mic className="w-8 h-8 text-[#F472B6]" />
           </div>
 
           <h2 className="text-2xl font-bold text-white mb-2">Host a Session</h2>
@@ -197,7 +197,7 @@ export default function Rooms() {
           <button
             onClick={createRoom}
             disabled={loading}
-            className="w-full max-w-xs py-3.5 px-6 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            className="w-full max-w-xs py-3.5 px-6 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
           >
             <Play className="w-4 h-4 fill-white" />
             <span>{loading ? 'Creating Room...' : 'Start Hosting'}</span>
@@ -223,7 +223,7 @@ export default function Rooms() {
                 placeholder="e.g. 435 288"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#0A0B10] border border-white/15 rounded-xl text-center text-lg font-mono tracking-widest text-white placeholder-zinc-600 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all uppercase"
+                className="w-full px-4 py-2.5 bg-[#0A0B10] border border-white/15 rounded-xl text-center text-lg font-mono tracking-widest text-white placeholder-zinc-600 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all uppercase"
                 maxLength={7}
                 required
               />
@@ -236,7 +236,7 @@ export default function Rooms() {
                 placeholder="e.g. Robin, Sarah"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#0A0B10] border border-white/15 rounded-xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all"
+                className="w-full px-4 py-2.5 bg-[#0A0B10] border border-white/15 rounded-xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all"
                 maxLength={30}
               />
             </div>
@@ -257,7 +257,7 @@ export default function Rooms() {
       <div className="space-y-4 pt-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-[#FF4FA3]" />
+            <Users className="w-5 h-5 text-[#F472B6]" />
             <span>Active Karaoke Rooms ({sessions.length})</span>
           </h3>
         </div>
@@ -266,15 +266,15 @@ export default function Rooms() {
           {sessions.map((s) => (
             <div
               key={s.id}
-              className="bg-[#141622] border border-white/5 hover:border-[#FF4FA3]/40 rounded-2xl p-5 flex flex-col justify-between hover:bg-[#1A1C2C] transition-all group"
+              className="bg-[#141622] border border-white/5 hover:border-[#F472B6]/40 rounded-2xl p-5 flex flex-col justify-between hover:bg-[#1A1C2C] transition-all group"
             >
               <div 
                 onClick={() => setJoinCode(s.roomCode)}
                 className="cursor-pointer mb-4"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-[#FF4FA3] animate-pulse" />
-                  <span className="font-mono text-xl font-extrabold text-white tracking-widest group-hover:text-[#FF4FA3] transition-colors">
+                  <span className="w-2 h-2 rounded-full bg-[#F472B6] animate-pulse" />
+                  <span className="font-mono text-xl font-extrabold text-white tracking-widest group-hover:text-[#F472B6] transition-colors">
                     {s.roomCode}
                   </span>
                 </div>
@@ -285,7 +285,7 @@ export default function Rooms() {
                 <button
                   type="button"
                   onClick={() => setJoinCode(s.roomCode)}
-                  className="px-3 py-1.5 rounded-lg bg-[#FF4FA3]/15 text-[#FF4FA3] text-xs font-semibold border border-[#FF4FA3]/25 hover:bg-[#FF4FA3] hover:text-white transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-[#F472B6]/15 text-[#F472B6] text-xs font-semibold border border-[#F472B6]/25 hover:bg-[#F472B6] hover:text-white transition-colors"
                 >
                   Select Code
                 </button>

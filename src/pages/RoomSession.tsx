@@ -2064,8 +2064,8 @@ export default function RoomSession() {
     return (
       <div className="min-h-screen bg-[#08090E] text-white flex flex-col items-center justify-center p-6 font-sans">
         <div className="flex flex-col items-center gap-4 text-center max-w-sm">
-          <div className="w-16 h-16 rounded-2xl bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 flex items-center justify-center shadow-lg shadow-[#FF4FA3]/20">
-            <Music className="w-8 h-8 text-[#FF4FA3] animate-pulse" />
+          <div className="w-16 h-16 rounded-2xl bg-[#F472B6]/15 border border-[#F472B6]/30 flex items-center justify-center shadow-lg shadow-[#F472B6]/20">
+            <Music className="w-8 h-8 text-[#F472B6] animate-pulse" />
           </div>
           <h2 className="text-xl font-bold tracking-tight text-white">Connecting to Karaoke Room</h2>
           <p className="text-xs text-zinc-400">Synchronizing live lyrics and room session...</p>
@@ -2098,14 +2098,14 @@ export default function RoomSession() {
     return (
       <div className="min-h-screen bg-[#08090E] text-white flex flex-col items-center justify-center p-6 font-sans select-none relative overflow-hidden">
         {/* Ambient Top Glow */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#FF4FA3]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#F472B6]/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="w-full max-w-md bg-[#12131D] border border-white/10 rounded-3xl p-8 shadow-2xl text-center relative z-10">
-          <div className="w-16 h-16 rounded-2xl bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 flex items-center justify-center mx-auto mb-5 text-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/20">
+          <div className="w-16 h-16 rounded-2xl bg-[#F472B6]/15 border border-[#F472B6]/30 flex items-center justify-center mx-auto mb-5 text-[#F472B6] shadow-lg shadow-[#F472B6]/20">
             <Mic className="w-8 h-8" />
           </div>
 
-          <div className="text-[11px] font-extrabold uppercase tracking-widest text-[#FF4FA3] mb-1">
+          <div className="text-[11px] font-extrabold uppercase tracking-widest text-[#F472B6] mb-1">
             HOST ROOM
           </div>
 
@@ -2121,7 +2121,7 @@ export default function RoomSession() {
             data-tv-id="start-session-button"
             onClick={handleStartNewSession}
             disabled={isRestartingSession}
-            className="w-full py-4 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-base rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-[#FF4FA3] focus:ring-offset-2 focus:ring-offset-[#08090E]"
+            className="w-full py-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-base rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
           >
             <RefreshCw className={`w-5 h-5 ${isRestartingSession ? 'animate-spin' : ''}`} />
             <span>{isRestartingSession ? 'Creating Session...' : 'Start New Session'}</span>
@@ -2153,7 +2153,7 @@ export default function RoomSession() {
           <div className="flex flex-col gap-3">
             <button
               onClick={() => navigate('/join')}
-              className="w-full py-3.5 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25 flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2"
             >
               <Mic className="w-4 h-4" />
               <span>Join A Room</span>
@@ -2176,7 +2176,7 @@ export default function RoomSession() {
             {/* Modal Header */}
             <div className="p-5 border-b border-white/5 bg-[#0D0E17] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 rounded-xl text-[#FF4FA3]">
+                <div className="p-2.5 bg-[#F472B6]/15 border border-[#F472B6]/30 rounded-xl text-[#F472B6]">
                   <LibraryIcon className="w-5 h-5" />
                 </div>
                 <div>
@@ -2187,7 +2187,7 @@ export default function RoomSession() {
               <button 
                 data-tv-id="library-close"
                 onClick={() => setShowLibrary(false)}
-                className="p-2 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors focus:outline-none focus:ring-4 focus:ring-[#FF4FA3]"
+                className="p-2 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
                 title="Close"
               >
                 <X className="w-5 h-5" />
@@ -2204,7 +2204,7 @@ export default function RoomSession() {
                   placeholder="Search song title, artist, or album..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[#08090E] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-2 focus:ring-[#FF4FA3]"
+                  className="w-full bg-[#08090E] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-2 focus:ring-[#F472B6]"
                 />
               </div>
             </div>
@@ -2226,7 +2226,7 @@ export default function RoomSession() {
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0">
-                          <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#FF4FA3] transition-colors" />
+                          <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-medium text-sm text-white truncate">{song.title}</h4>
@@ -2240,7 +2240,7 @@ export default function RoomSession() {
 
                       <div className="flex items-center gap-2 shrink-0">
                         {song.hasLrc && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#FF4FA3]/15 text-[#FF4FA3] border border-[#FF4FA3]/25">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">
                             LRC
                           </span>
                         )}
@@ -2249,8 +2249,8 @@ export default function RoomSession() {
                           disabled={isAdding || isAdded}
                           className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
                             isAdded 
-                              ? 'bg-[#FF4FA3] text-white' 
-                              : 'bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white border border-[#FF4FA3]/30'
+                              ? 'bg-[#F472B6] text-white' 
+                              : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
                           }`}
                         >
                           {isAdded ? (
@@ -2270,7 +2270,7 @@ export default function RoomSession() {
               ) : (
                 <>
                   {librarySearchResults.length > 0 && (
-                    <div className="text-xs font-bold text-[#FF4FA3] uppercase tracking-wider mb-2 mt-4 px-1">
+                    <div className="text-xs font-bold text-[#F472B6] uppercase tracking-wider mb-2 mt-4 px-1">
                       In Library ({librarySearchResults.length})
                     </div>
                   )}
@@ -2288,7 +2288,7 @@ export default function RoomSession() {
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0">
-                            <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#FF4FA3] transition-colors" />
+                            <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
                           </div>
                           <div className="min-w-0">
                             <h4 className="font-medium text-sm text-white truncate">{song.title}</h4>
@@ -2302,7 +2302,7 @@ export default function RoomSession() {
 
                         <div className="flex items-center gap-2 shrink-0">
                           {song.hasLrc && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#FF4FA3]/15 text-[#FF4FA3] border border-[#FF4FA3]/25">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">
                               LRC
                             </span>
                           )}
@@ -2311,8 +2311,8 @@ export default function RoomSession() {
                             disabled={isAdding || isAdded}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
                               isAdded 
-                                ? 'bg-[#FF4FA3] text-white' 
-                                : 'bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white border border-[#FF4FA3]/30'
+                                ? 'bg-[#F472B6] text-white' 
+                                : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
                             }`}
                           >
                             {isAdded ? (
@@ -2331,7 +2331,7 @@ export default function RoomSession() {
                   })}
 
                   {externalSearchResults.length > 0 && (
-                    <div className="text-xs font-bold text-[#FF4FA3] uppercase tracking-wider mb-2 mt-6 px-1">
+                    <div className="text-xs font-bold text-[#F472B6] uppercase tracking-wider mb-2 mt-6 px-1">
                       Available for Download ({externalSearchResults.length})
                     </div>
                   )}
@@ -2353,7 +2353,7 @@ export default function RoomSession() {
                             {track.artworkUrl ? (
                               <img src={track.artworkUrl} className="w-full h-full object-cover" alt="" />
                             ) : (
-                              <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#FF4FA3] transition-colors" />
+                              <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
                             )}
                           </div>
                           <div className="min-w-0">
@@ -2372,8 +2372,8 @@ export default function RoomSession() {
                             disabled={isAdding || isAdded}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
                               isAdded 
-                                ? 'bg-[#FF4FA3] text-white' 
-                                : 'bg-[#FF4FA3]/15 hover:bg-[#FF4FA3] text-[#FF4FA3] hover:text-white border border-[#FF4FA3]/30'
+                                ? 'bg-[#F472B6] text-white' 
+                                : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
                             }`}
                           >
                             {isAdded ? (
@@ -2397,7 +2397,7 @@ export default function RoomSession() {
 
                   {isSearching && (
                     <div className="py-8 text-center text-zinc-400">
-                      <div className="w-6 h-6 border-2 border-[#FF4FA3] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <div className="w-6 h-6 border-2 border-[#F472B6] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                       <p className="text-xs">Searching library and web...</p>
                     </div>
                   )}
@@ -2426,10 +2426,10 @@ export default function RoomSession() {
               data-tv-id="header-start-session-button"
               onClick={handleStartNewSession}
               disabled={isRestartingSession}
-              className="p-2 bg-white/5 hover:bg-[#FF4FA3]/20 hover:text-[#FF4FA3] text-zinc-300 rounded-xl transition-all border border-white/10 flex items-center justify-center shrink-0 focus:outline-none focus:ring-4 focus:ring-[#FF4FA3] focus:ring-offset-2 focus:ring-offset-[#08090E]"
+              className="p-2 bg-white/5 hover:bg-[#F472B6]/20 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-all border border-white/10 flex items-center justify-center shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
               title="Start New Session"
             >
-              <RefreshCw className={`w-4 h-4 ${isRestartingSession ? 'animate-spin text-[#FF4FA3]' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isRestartingSession ? 'animate-spin text-[#F472B6]' : ''}`} />
             </button>
           ) : (
             <button 
@@ -2447,7 +2447,7 @@ export default function RoomSession() {
           </span>
 
           {/* [ LIVE ] Badge */}
-          <span className="px-2.5 py-0.5 rounded-full bg-[#FF4FA3]/15 text-[#FF4FA3] text-[11px] font-bold border border-[#FF4FA3]/30 flex items-center gap-1.5 shrink-0 uppercase tracking-wider">
+          <span className="px-2.5 py-0.5 rounded-full bg-[#F472B6]/15 text-[#F472B6] text-[11px] font-bold border border-[#F472B6]/30 flex items-center gap-1.5 shrink-0 uppercase tracking-wider">
             <Radio className="w-2.5 h-2.5 animate-pulse" /> LIVE
           </span>
         </div>
@@ -2460,9 +2460,9 @@ export default function RoomSession() {
               <button 
                 data-tv-id="inst-toggle-button"
                 onClick={handleToggleInstrumental}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#FF4FA3] focus:ring-offset-2 focus:ring-offset-[#08090E] ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E] ${
                   variant === 'instrumental' 
-                    ? 'bg-[#FF4FA3] text-white border-[#FF4FA3] shadow-lg shadow-[#FF4FA3]/25' 
+                    ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25' 
                     : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'
                 }`}
                 title="Switch between Original Vocal and Instrumental backing track"
@@ -2476,7 +2476,7 @@ export default function RoomSession() {
                 data-tv-id="lyrics-format-toggle"
                 onClick={handleToggleLyricsFormat}
                 disabled={!currentSongDetails?.hasElrc}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#FF4FA3] focus:ring-offset-2 focus:ring-offset-[#08090E] ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E] ${
                   !currentSongDetails?.hasElrc 
                     ? 'opacity-50 cursor-not-allowed bg-white/5 text-zinc-500 border-white/5'
                     : lyricsFormat === 'elrc'
@@ -2501,7 +2501,7 @@ export default function RoomSession() {
                 <button 
                   data-tv-id="offset-minus-button"
                   onClick={() => handleOffsetChange(-250)}
-                  className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                  className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
                   title="-250ms"
                 >
                   -250ms
@@ -2509,7 +2509,7 @@ export default function RoomSession() {
                 <button
                   data-tv-id="offset-sync-button"
                   onClick={handleSyncReset}
-                  className="px-1.5 py-0.5 font-mono text-[#FF4FA3] hover:text-[#ff7ab8] font-bold text-[11px] rounded hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                  className="px-1.5 py-0.5 font-mono text-[#F472B6] hover:text-[#ff7ab8] font-bold text-[11px] rounded hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
                   title={`Reset ${lyricsFormat.toUpperCase()} offset to 0ms`}
                 >
                   {activeOffset > 0 ? `+${activeOffset}` : activeOffset}ms
@@ -2517,7 +2517,7 @@ export default function RoomSession() {
                 <button 
                   data-tv-id="offset-plus-button"
                   onClick={() => handleOffsetChange(250)}
-                  className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                  className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
                   title="+250ms"
                 >
                   +250ms
@@ -2530,7 +2530,7 @@ export default function RoomSession() {
           <button
             data-tv-id="fullscreen-toggle-button"
             onClick={toggleFullscreen}
-            className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#FF4FA3] focus:ring-offset-2 focus:ring-offset-[#08090E]"
+            className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
             title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -2541,7 +2541,7 @@ export default function RoomSession() {
             <button
               data-tv-id="session-info-button"
               onClick={() => setShowSessionInfoModal(true)}
-              className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#FF4FA3] focus:ring-offset-2 focus:ring-offset-[#08090E]"
+              className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
               title="Session Info"
             >
               <Info className="w-4 h-4" />
@@ -2573,13 +2573,13 @@ export default function RoomSession() {
           className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 shadow-xl flex-1 flex flex-col justify-between h-full min-h-0 min-w-0 transition-all select-none"
         >
           {/* Ambient Glow matching Homepage & Sidebar Feature Cards */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#FF4FA3]/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#FF4FA3]/5 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16" />
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[#F472B6]/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#F472B6]/5 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16" />
 
           {/* Card Top Header */}
           <div className="relative z-10 flex items-center justify-between p-3.5 sm:p-4 lg:p-5 pb-0 shrink-0">
             <div className="flex items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] text-[10px] font-bold uppercase tracking-wider">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] text-[10px] font-bold uppercase tracking-wider">
                 <Mic className="w-3 h-3" />
                 <span>Live Lyrics</span>
               </div>
@@ -2590,7 +2590,7 @@ export default function RoomSession() {
                   <button
                     type="button"
                     onClick={handleSkip}
-                    className="ml-1 text-white underline hover:text-[#FF4FA3] transition-colors"
+                    className="ml-1 text-white underline hover:text-[#F472B6] transition-colors"
                   >
                     Skip
                   </button>
@@ -2600,7 +2600,7 @@ export default function RoomSession() {
                 <button
                   type="button"
                   onClick={handleEnableAudio}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF4FA3] text-white text-[10px] font-bold uppercase tracking-wider animate-pulse hover:bg-[#ff6eb3] transition-colors shadow-lg shadow-[#FF4FA3]/40"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F472B6] text-white text-[10px] font-bold uppercase tracking-wider animate-pulse hover:bg-[#DB2777] transition-colors shadow-lg shadow-[#F472B6]/40"
                   title="Tap to enable sound"
                 >
                   <Volume2 className="w-3 h-3" />
@@ -2643,7 +2643,7 @@ export default function RoomSession() {
                 /* Fallback when no synced LRC is available */
                 <div className="text-center z-10 py-8 px-6 flex flex-col items-center max-w-2xl mx-auto">
                   <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-5 shadow-xl">
-                    <Mic className="w-7 h-7 text-[#FF4FA3] animate-pulse" />
+                    <Mic className="w-7 h-7 text-[#F472B6] animate-pulse" />
                   </div>
                   <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">
                     {currentSong.songTitle}
@@ -2661,7 +2661,7 @@ export default function RoomSession() {
               /* Queue is Empty State (Clean & Centered) */
               <div className="text-center z-10 py-12 px-6 max-w-md mx-auto flex flex-col items-center justify-center">
                 <div className="w-16 h-16 rounded-3xl bg-[#12131D] border border-white/10 flex items-center justify-center mx-auto mb-5 shadow-xl">
-                  <Music className="w-8 h-8 text-[#FF4FA3]" />
+                  <Music className="w-8 h-8 text-[#F472B6]" />
                 </div>
                 <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-2">Queue is Empty</h2>
                 <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">
@@ -2670,7 +2670,7 @@ export default function RoomSession() {
 
                 {bgmSettings.enabled && bgmCurrentSong && (
                   <div className="mt-6 px-4 py-2 rounded-2xl bg-[#141622]/80 border border-white/10 flex items-center gap-3 text-xs text-zinc-300 shadow-lg">
-                    <Disc3 className={`w-4 h-4 text-[#FF4FA3] ${bgmIsActive ? 'animate-spin' : ''}`} />
+                    <Disc3 className={`w-4 h-4 text-[#F472B6] ${bgmIsActive ? 'animate-spin' : ''}`} />
                     <div className="text-left">
                       <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">Background Music</span>
                       <span className="font-semibold text-white truncate max-w-[200px] sm:max-w-[260px] inline-block align-bottom">{bgmCurrentSong.title}</span>
@@ -2700,7 +2700,7 @@ export default function RoomSession() {
                       step="0.1"
                       value={currentTime}
                       onChange={handleSeek}
-                      className="flex-1 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#FF4FA3] focus:outline-none focus:ring-2 focus:ring-[#FF4FA3]"
+                      className="flex-1 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6] focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
                     />
                     <span className="text-[11px] font-mono text-zinc-500 w-10">
                       {formatTime(duration)}
@@ -2714,7 +2714,7 @@ export default function RoomSession() {
                     data-tv-id="restart-button"
                     onClick={handleRestart}
                     disabled={!currentSong}
-                    className="p-3 bg-[#181926] hover:bg-[#222436] text-white rounded-full transition-all disabled:opacity-30 border border-white/10 hover:scale-105 active:scale-95 shadow-md focus:outline-none focus:ring-4 focus:ring-[#FF4FA3] focus:ring-offset-2 focus:ring-offset-[#08090E]"
+                    className="p-3 bg-[#181926] hover:bg-[#222436] text-white rounded-full transition-all disabled:opacity-30 border border-white/10 hover:scale-105 active:scale-95 shadow-md focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
                     title="Restart Track"
                   >
                     <RotateCcw className="w-5 h-5" />
@@ -2725,7 +2725,7 @@ export default function RoomSession() {
                     data-tv-id="play-button"
                     onClick={togglePlay}
                     disabled={!currentSong}
-                    className="w-14 h-14 bg-white hover:bg-zinc-200 text-black rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-xl disabled:opacity-30 focus:outline-none focus:ring-4 focus:ring-[#FF4FA3] focus:ring-offset-2 focus:ring-offset-[#08090E] focus:scale-110 focus:shadow-[0_0_35px_rgba(255,79,163,0.9)]"
+                    className="w-14 h-14 bg-white hover:bg-zinc-200 text-black rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-xl disabled:opacity-30 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E] focus:scale-110 focus:shadow-[0_0_35px_rgba(255,79,163,0.9)]"
                     title={playing ? 'Pause' : 'Play'}
                   >
                     {playing ? <Pause className="w-6 h-6 fill-black" /> : <Play className="w-6 h-6 fill-black ml-0.5" />}
@@ -2735,7 +2735,7 @@ export default function RoomSession() {
                     data-tv-id="skip-button"
                     onClick={handleSkip}
                     disabled={!currentSong}
-                    className="p-3 bg-[#181926] hover:bg-[#222436] text-white rounded-full transition-all disabled:opacity-30 border border-white/10 hover:scale-105 active:scale-95 shadow-md focus:outline-none focus:ring-4 focus:ring-[#FF4FA3] focus:ring-offset-2 focus:ring-offset-[#08090E]"
+                    className="p-3 bg-[#181926] hover:bg-[#222436] text-white rounded-full transition-all disabled:opacity-30 border border-white/10 hover:scale-105 active:scale-95 shadow-md focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
                     title="Skip Track"
                   >
                     <SkipForward className="w-5 h-5" />
@@ -2748,7 +2748,7 @@ export default function RoomSession() {
             <div className="p-4 bg-[#0D0E17] border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 z-20">
               <button
                 onClick={() => setShowLibrary(true)}
-                className="w-full sm:w-auto px-6 py-3 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#FF4FA3]/25"
+                className="w-full sm:w-auto px-6 py-3 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#F472B6]/25"
               >
                 <LibraryIcon className="w-5 h-5" />
                 <span>Browse & Queue Songs</span>
@@ -2855,11 +2855,11 @@ export default function RoomSession() {
             {/* Card 1: Join Session / QR Code Card */}
             <div id="room-session-qr-card" className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 p-3.5 lg:p-4 shadow-xl flex flex-col items-center shrink-0">
               {/* Ambient Glow matching Homepage Feature Card */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF4FA3]/15 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10" />
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#F472B6]/15 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10" />
 
               <div className="relative z-10 flex flex-col items-center w-full">
                 {/* Header Pill */}
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] text-[10px] font-bold uppercase tracking-wider mb-2.5">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] text-[10px] font-bold uppercase tracking-wider mb-2.5">
                   <QrCode className="w-3 h-3" />
                   <span>Join Session</span>
                 </div>
@@ -2894,12 +2894,12 @@ export default function RoomSession() {
             {/* Card 2: UP NEXT Queue Card */}
             <div className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 p-3.5 lg:p-4 shadow-xl flex-1 flex flex-col min-h-0">
               {/* Subtle Ambient Glow */}
-              <div className="absolute bottom-0 right-0 w-32 h-32 bg-[#FF4FA3]/10 rounded-full blur-2xl pointer-events-none -mr-10 -mb-10" />
+              <div className="absolute bottom-0 right-0 w-32 h-32 bg-[#F472B6]/10 rounded-full blur-2xl pointer-events-none -mr-10 -mb-10" />
 
               {/* Queue Header */}
               <div className="relative z-10 flex items-center justify-between px-0.5 mb-2.5 shrink-0">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-white tracking-wide">
-                  <Music className="w-3.5 h-3.5 text-[#FF4FA3]" />
+                  <Music className="w-3.5 h-3.5 text-[#F472B6]" />
                   <span>UP NEXT</span>
                 </div>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/10 border border-white/5 font-mono font-bold text-zinc-300">
@@ -2921,7 +2921,7 @@ export default function RoomSession() {
                       key={item.id || index}
                       className={`p-2.5 rounded-xl border transition-all ${
                         isPlaying 
-                          ? 'bg-[#1e192c] border-[#FF4FA3]/40 shadow-sm' 
+                          ? 'bg-[#1e192c] border-[#F472B6]/40 shadow-sm' 
                           : 'bg-[#10121d]/80 hover:bg-[#151726] border-white/5'
                       }`}
                     >
@@ -2930,7 +2930,7 @@ export default function RoomSession() {
                           {item.songTitle}
                         </h4>
                         {isPlaying && (
-                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-[#FF4FA3] text-white shrink-0">
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-[#F472B6] text-white shrink-0">
                             LIVE
                           </span>
                         )}
@@ -2992,7 +2992,7 @@ export default function RoomSession() {
                 <button
                   data-tv-id="end-session-cancel"
                   onClick={() => setShowEndSessionModal(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-zinc-300 font-semibold text-sm rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#FF4FA3]"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-zinc-300 font-semibold text-sm rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
                 >
                   Cancel
                 </button>
@@ -3019,7 +3019,7 @@ export default function RoomSession() {
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               className="w-full max-w-sm bg-[#12131D] border border-white/10 rounded-3xl p-6 shadow-2xl text-center relative overflow-hidden"
             >
-              <div className="w-10 h-10 rounded-2xl bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] flex items-center justify-center mx-auto mb-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] flex items-center justify-center mx-auto mb-3">
                 <Info className="w-5 h-5" />
               </div>
 
@@ -3033,7 +3033,7 @@ export default function RoomSession() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500 font-medium">Status:</span>
-                  <span className="text-[#FF4FA3] font-bold uppercase tracking-wider text-[11px]">ACTIVE</span>
+                  <span className="text-[#F472B6] font-bold uppercase tracking-wider text-[11px]">ACTIVE</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500 font-medium">Queue Length:</span>
@@ -3044,7 +3044,7 @@ export default function RoomSession() {
               <button
                 data-tv-id="session-info-close"
                 onClick={() => setShowSessionInfoModal(false)}
-                className="w-full py-3 bg-[#FF4FA3] hover:bg-[#ff69b2] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25 focus:outline-none focus:ring-4 focus:ring-[#FF4FA3]"
+                className="w-full py-3 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
               >
                 Close
               </button>

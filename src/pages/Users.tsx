@@ -234,7 +234,7 @@ export default function Users() {
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FF4FA3]/15 border border-[#FF4FA3]/30 text-[#FF4FA3] text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] text-xs font-semibold uppercase tracking-wider mb-2">
             <UsersIcon className="w-3.5 h-3.5" />
             <span>Accounts & Roles</span>
           </div>
@@ -248,7 +248,7 @@ export default function Users() {
             resetForm();
             setShowAddModal(true);
           }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FF4FA3] hover:bg-[#e0378b] text-white text-sm font-semibold shadow-lg shadow-[#FF4FA3]/20 transition-colors shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#F472B6] hover:bg-[#e0378b] text-white text-sm font-semibold shadow-lg shadow-[#F472B6]/20 transition-colors shrink-0"
         >
           <UserPlus className="w-4 h-4" />
           <span>Add New User</span>
@@ -306,7 +306,7 @@ export default function Users() {
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize inline-flex items-center gap-1.5 ${
                         u.role === 'administrator' 
-                          ? 'bg-[#FF4FA3]/15 text-[#FF4FA3] border border-[#FF4FA3]/30' 
+                          ? 'bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/30' 
                           : 'bg-white/5 text-zinc-300 border border-white/10'
                       }`}>
                         {u.role === 'administrator' && <ShieldCheck className="w-3.5 h-3.5" />}
@@ -409,7 +409,7 @@ export default function Users() {
                   value={formUsername}
                   onChange={e => setFormUsername(e.target.value)}
                   placeholder="e.g. singermike"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#FF4FA3]"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#F472B6]"
                 />
               </div>
 
@@ -424,7 +424,7 @@ export default function Users() {
                   value={formPassword}
                   onChange={e => setFormPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#FF4FA3]"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#F472B6]"
                 />
               </div>
 
@@ -436,7 +436,7 @@ export default function Users() {
                   id="select-new-role"
                   value={formRole}
                   onChange={e => setFormRole(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#FF4FA3]"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#F472B6]"
                 >
                   <option value="user">User (Standard Access)</option>
                   <option value="administrator">Administrator (Full Access)</option>
@@ -455,7 +455,7 @@ export default function Users() {
                   id="btn-submit-create-user"
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#FF4FA3] hover:bg-[#e0378b] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-[#F472B6] hover:bg-[#e0378b] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Create Account</span>
@@ -494,7 +494,7 @@ export default function Users() {
                   required
                   value={formUsername}
                   onChange={e => setFormUsername(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#FF4FA3]"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#F472B6]"
                 />
               </div>
 
@@ -507,7 +507,7 @@ export default function Users() {
                   value={formRole}
                   onChange={e => setFormRole(e.target.value as any)}
                   disabled={selectedUser.id === user.id}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#FF4FA3] disabled:opacity-50"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#F472B6] disabled:opacity-50"
                 >
                   <option value="user">User (Standard Access)</option>
                   <option value="administrator">Administrator (Full Access)</option>
@@ -529,7 +529,7 @@ export default function Users() {
                   id="btn-submit-edit-user"
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#FF4FA3] hover:bg-[#e0378b] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-[#F472B6] hover:bg-[#e0378b] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Save Changes</span>
@@ -569,7 +569,7 @@ export default function Users() {
                   value={formPassword}
                   onChange={e => setFormPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#FF4FA3]"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#0E0F17] border border-white/10 text-white text-sm focus:outline-none focus:border-[#F472B6]"
                 />
               </div>
 
@@ -585,7 +585,7 @@ export default function Users() {
                   id="btn-submit-change-password"
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#FF4FA3] hover:bg-[#e0378b] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-[#F472B6] hover:bg-[#e0378b] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Update Password</span>

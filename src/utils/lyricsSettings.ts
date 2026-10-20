@@ -8,7 +8,7 @@ export interface LyricStyleSettings {
   lineSpacing: number; // line-height multiplier, e.g. 1.2
   textCase: 'original' | 'lowercase' | 'uppercase' | 'titlecase';
   opacity?: number; // 0.1 to 1.0 (for unhighlighted / highlighted)
-  color?: string; // hex color string, e.g. '#FF4FA3'
+  color?: string; // hex color string, e.g. '#F472B6'
 }
 
 export type ElrcTransition = 'smooth_sweep' | 'karaoke' | 'current_only' | 'instant';
@@ -41,7 +41,7 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
     lineSpacing: 1.2,
     textCase: 'original',
     opacity: 1.0,
-    color: '#FF4FA3'
+    color: '#F472B6'
   },
   unhighlighted: {
     font: 'manrope',
