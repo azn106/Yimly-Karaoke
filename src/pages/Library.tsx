@@ -42,6 +42,18 @@ export default function Library() {
   const [selectedAlbum, setSelectedAlbum] = useState<any | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
 
+  // Sidebar Jukebox navigation must exit detail views even if the target URL is unchanged.
+  useEffect(() => {
+    const clearLibraryDetail = () => {
+      setSelectedArtist(null);
+      setSelectedAlbum(null);
+      setSelectedPlaylist(null);
+    };
+
+    window.addEventListener('yimly:navigate-library-section', clearLibraryDetail);
+    return () => window.removeEventListener('yimly:navigate-library-section', clearLibraryDetail);
+  }, []);
+
   // Modals state
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [isEditPlaylistOpen, setIsEditPlaylistOpen] = useState(false);
