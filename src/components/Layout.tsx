@@ -76,7 +76,7 @@ export default function Layout() {
           {/* Brand Header */}
           <div className="p-6 pb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F472B6] to-[#d91e36] flex items-center justify-center shadow-lg shadow-[#F472B6]/20">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F472B6] to-[#DB2777] flex items-center justify-center shadow-lg shadow-[#F472B6]/20">
                 <Mic className="w-5 h-5 text-white" />
               </div>
               <div>
