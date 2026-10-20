@@ -167,7 +167,7 @@ export default function PlayerBar() {
                             <img
                               src={`/api/songs/${song.id}/artwork`}
                               alt={song.title}
-                              className="w-full h-full object-cover yk-artwork-image"
+                              className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
                               onError={(e) => {
                                 (e.target as HTMLElement).style.display = 'none';
                               }}
@@ -241,7 +241,7 @@ export default function PlayerBar() {
                 <img
                   src={`/api/songs/${currentSong.id}/artwork`}
                   alt={currentSong.title}
-                  className={`w-full h-full object-cover yk-artwork-image yk-artwork-motion ${isPlaying ? 'yk-heartbeat-artwork' : ''}`}
+                  className={`w-full h-full object-cover yk-artwork-image yk-artwork-image yk-artwork-motion ${isPlaying ? 'yk-heartbeat-artwork' : ''}`}
                   onError={(e) => {
                     (e.target as HTMLElement).style.display = 'none';
                   }}
