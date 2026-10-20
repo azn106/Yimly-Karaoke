@@ -2121,7 +2121,7 @@ export default function RoomSession() {
             data-tv-id="start-session-button"
             onClick={handleStartNewSession}
             disabled={isRestartingSession}
-            className="w-full py-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-base rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
+            className="w-full py-4 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-base rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
           >
             <RefreshCw className={`w-5 h-5 ${isRestartingSession ? 'animate-spin' : ''}`} />
             <span>{isRestartingSession ? 'Creating Session...' : 'Start New Session'}</span>
@@ -2153,7 +2153,7 @@ export default function RoomSession() {
           <div className="flex flex-col gap-3">
             <button
               onClick={() => navigate('/join')}
-              className="w-full py-3.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2"
             >
               <Mic className="w-4 h-4" />
               <span>Join A Room</span>
@@ -2351,7 +2351,7 @@ export default function RoomSession() {
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 overflow-hidden flex items-center justify-center shrink-0">
                             {track.artworkUrl ? (
-                              <img src={track.artworkUrl} className="w-full h-full object-cover" alt="" />
+                              <img src={track.artworkUrl} className="w-full h-full object-cover yk-artwork-image" alt="" />
                             ) : (
                               <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
                             )}
@@ -2748,7 +2748,7 @@ export default function RoomSession() {
             <div className="p-4 bg-[#0D0E17] border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 z-20">
               <button
                 onClick={() => setShowLibrary(true)}
-                className="w-full sm:w-auto px-6 py-3 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#F472B6]/25"
+                className="w-full sm:w-auto px-6 py-3 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#F472B6]/25"
               >
                 <LibraryIcon className="w-5 h-5" />
                 <span>Browse & Queue Songs</span>
@@ -3044,7 +3044,7 @@ export default function RoomSession() {
               <button
                 data-tv-id="session-info-close"
                 onClick={() => setShowSessionInfoModal(false)}
-                className="w-full py-3 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+                className="w-full py-3 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
               >
                 Close
               </button>
