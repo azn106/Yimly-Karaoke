@@ -32,6 +32,51 @@ export default function Layout() {
       });
   }, [navigate]);
 
+  // Fallback for mobile browsers/WebViews without CSS view-timeline support.
+  // Updates only artwork positions inside the main scroll container and respects reduced motion.
+  useEffect(() => {
+    const main = document.querySelector<HTMLElement>('main');
+    if (!main || CSS.supports('animation-timeline: view()') ||
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let frame = 0;
+    let observed: HTMLElement[] = [];
+
+    const updateArtwork = () => {
+      frame = 0;
+      const viewport = main.getBoundingClientRect();
+      observed.forEach((element) => {
+        const rect = element.getBoundingClientRect();
+        const progress = (rect.top + rect.height / 2 - viewport.top) / Math.max(viewport.height, 1);
+        const offset = Math.max(-8, Math.min(8, (0.5 - progress) * 16));
+        element.style.setProperty('--yk-scroll-translate', `${offset.toFixed(2)}px`);
+      });
+    };
+
+    const scheduleUpdate = () => {
+      if (!frame) frame = window.requestAnimationFrame(updateArtwork);
+    };
+
+    const refreshArtwork = () => {
+      observed = Array.from(main.querySelectorAll<HTMLElement>('.yk-artwork-motion'));
+      scheduleUpdate();
+    };
+
+    const mutationObserver = new MutationObserver(refreshArtwork);
+    mutationObserver.observe(main, { childList: true, subtree: true });
+    main.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate, { passive: true });
+    refreshArtwork();
+
+    return () => {
+      mutationObserver.disconnect();
+      main.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
+      observed.forEach((element) => element.style.removeProperty('--yk-scroll-translate'));
+    };
+  }, []);
+
   // Close the drawer when the destination changes, including Jukebox tab changes.
   useEffect(() => {
     setMobileMenuOpen(false);
