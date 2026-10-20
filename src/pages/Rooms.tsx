@@ -197,7 +197,7 @@ export default function Rooms() {
           <button
             onClick={createRoom}
             disabled={loading}
-            className="w-full max-w-xs py-3.5 px-6 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            className="w-full max-w-xs py-3.5 px-6 bg-[#F472B6] hover:bg-[#DB2777] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
           >
             <Play className="w-4 h-4 fill-white" />
             <span>{loading ? 'Creating Room...' : 'Start Hosting'}</span>
