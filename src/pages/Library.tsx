@@ -1690,11 +1690,7 @@ export default function Library() {
                   </div>
                   {playlists.length ? (
                     <div ref={playlistRailRef} className="yk-horizontal-rail flex items-stretch gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
-                      {playlists.map((playlist, idx) => {
-                        const isCurrentPlaylistPlaying = !!(
-                          jukeboxIsPlaying &&
-                          (jukeboxCurrentSong?.albumId === playlist.id || playlist.songs?.some(s => s.id === jukeboxCurrentSong?.id))
-                        );
+                      {playlists.map((playlist) => {
                         return (
                           <button
                             key={playlist.id}
@@ -1724,7 +1720,7 @@ export default function Library() {
                                 <p className="mt-1 text-xs text-white/70">{playlist.songCount || playlist.songs?.length || 0} songs</p>
                               </div>
                               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FA243C] text-white shadow-lg shadow-[#FA243C]/25 transition-transform group-hover:scale-105">
-                                {isCurrentPlaylistPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
+                                <ChevronRight className="h-5 w-5" />
                               </span>
                             </div>
                           </button>
