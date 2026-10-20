@@ -167,7 +167,7 @@ export default function PlayerBar() {
                             <img
                               src={`/api/songs/${song.id}/artwork`}
                               alt={song.title}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover yk-artwork-image"
                               onError={(e) => {
                                 (e.target as HTMLElement).style.display = 'none';
                               }}
@@ -241,7 +241,7 @@ export default function PlayerBar() {
                 <img
                   src={`/api/songs/${currentSong.id}/artwork`}
                   alt={currentSong.title}
-                  className={`w-full h-full object-cover yk-artwork-motion ${isPlaying ? 'yk-heartbeat-artwork' : ''}`}
+                  className={`w-full h-full object-cover yk-artwork-image yk-artwork-motion ${isPlaying ? 'yk-heartbeat-artwork' : ''}`}
                   onError={(e) => {
                     (e.target as HTMLElement).style.display = 'none';
                   }}
@@ -284,7 +284,7 @@ export default function PlayerBar() {
 
               <button
                 onClick={togglePlay}
-                className="w-10 h-10 rounded-full bg-[#F472B6] hover:bg-[#ff68b1] text-white flex items-center justify-center shadow-lg shadow-[#F472B6]/30 hover:scale-105 active:scale-95 transition-all"
+                className="w-10 h-10 rounded-full bg-[#F472B6] hover:bg-[#DB2777] text-white flex items-center justify-center shadow-lg shadow-[#F472B6]/30 hover:scale-105 active:scale-95 transition-all"
                 title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
               >
                 {isPlaying ? (
