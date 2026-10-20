@@ -32,24 +32,37 @@ export default function Layout() {
       });
   }, [navigate]);
 
-  // Fallback for mobile browsers/WebViews without CSS view-timeline support.
-  // Updates only artwork positions inside the main scroll container and respects reduced motion.
+  // Scroll-reactive artwork is driven by a tiny rAF-throttled fallback.
+  // Depend on loading so the effect attaches after the authenticated layout mounts <main>.
+  // This behaves consistently in mobile browsers/WebViews regardless of partial CSS timeline support.
   useEffect(() => {
+    if (loading) return;
     const main = document.querySelector<HTMLElement>('main');
-    if (!main || CSS.supports('animation-timeline: view()') ||
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!main) return;
 
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0;
     let observed: HTMLElement[] = [];
 
     const updateArtwork = () => {
       frame = 0;
+      if (reducedMotion.matches) {
+        observed.forEach((element) => {
+          element.style.setProperty('--yk-scroll-translate', '0px');
+          element.style.setProperty('--yk-artwork-opacity', '1');
+        });
+        return;
+      }
+
       const viewport = main.getBoundingClientRect();
       observed.forEach((element) => {
         const rect = element.getBoundingClientRect();
-        const progress = (rect.top + rect.height / 2 - viewport.top) / Math.max(viewport.height, 1);
+        const height = Math.max(viewport.height, 1);
+        const progress = (rect.top + rect.height / 2 - viewport.top) / height;
         const offset = Math.max(-8, Math.min(8, (0.5 - progress) * 16));
+        const visibility = Math.max(0, Math.min(1, 1 - Math.abs(progress - 0.5) * 0.45));
         element.style.setProperty('--yk-scroll-translate', `${offset.toFixed(2)}px`);
+        element.style.setProperty('--yk-artwork-opacity', visibility.toFixed(3));
       });
     };
 
@@ -65,17 +78,24 @@ export default function Layout() {
     const mutationObserver = new MutationObserver(refreshArtwork);
     mutationObserver.observe(main, { childList: true, subtree: true });
     main.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('scroll', scheduleUpdate, { passive: true, capture: true });
     window.addEventListener('resize', scheduleUpdate, { passive: true });
+    reducedMotion.addEventListener('change', scheduleUpdate);
     refreshArtwork();
 
     return () => {
       mutationObserver.disconnect();
       main.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('scroll', scheduleUpdate, true);
       window.removeEventListener('resize', scheduleUpdate);
+      reducedMotion.removeEventListener('change', scheduleUpdate);
       if (frame) window.cancelAnimationFrame(frame);
-      observed.forEach((element) => element.style.removeProperty('--yk-scroll-translate'));
+      observed.forEach((element) => {
+        element.style.removeProperty('--yk-scroll-translate');
+        element.style.removeProperty('--yk-artwork-opacity');
+      });
     };
-  }, []);
+  }, [loading]);
 
   // Close the drawer when the destination changes, including Jukebox tab changes.
   useEffect(() => {
