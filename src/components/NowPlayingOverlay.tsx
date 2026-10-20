@@ -11,7 +11,7 @@ export default function NowPlayingOverlay() {
     <div className="fixed bottom-0 left-0 right-0 xl:hidden bg-[#11121A] border-t border-white/10 p-3 flex items-center gap-3 z-40">
       <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0 overflow-hidden">
         {currentSong.hasArtwork ? (
-          <img src={`/api/songs/${currentSong.id}/artwork`} alt={currentSong.title} className={`w-full h-full object-cover yk-artwork-image yk-artwork-motion ${isPlaying ? 'yk-heartbeat-artwork' : ''}`} />
+          <img src={`/api/songs/${currentSong.id}/artwork`} alt={currentSong.title} className={`w-full h-full object-cover yk-artwork-image yk-artwork-image yk-artwork-motion ${isPlaying ? 'yk-heartbeat-artwork' : ''}`} />
         ) : (
           <Music className="w-5 h-5 text-zinc-500" />
         )}
