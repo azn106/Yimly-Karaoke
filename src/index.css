@@ -75,7 +75,7 @@
 :root {
   --accent: #F472B6;
   --accent-hover: #DB2777;
-  --accent-glow: rgba(250, 36, 60, 0.25);
+  --accent-glow: rgba(244, 114, 182, 0.25);
   --bg-main: #0a0b10;
   --bg-surface: #12131c;
   --bg-card: #181926;
@@ -156,7 +156,7 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(250, 36, 60, 0.4);
+  background: rgba(244, 114, 182, 0.4);
 }
 
 /* Fallback immersive view for legacy browsers (iOS 10 Safari) lacking native Element Fullscreen API */
@@ -172,6 +172,32 @@ html, body {
   overflow: hidden !important;
 }
 
+
+
+/* Shared artwork and surface rules keep the Jukebox, player and catalog views cohesive. */
+.yk-artwork-image {
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  background-color: var(--bg-elevated);
+}
+
+.yk-surface {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+}
+
+.yk-section-heading {
+  color: #f3f4f6;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* Horizontal Library rails: static artwork with native swipe/scroll. */
 .yk-horizontal-rail {
