@@ -1433,7 +1433,7 @@ export default function Settings() {
             <button
               type="submit"
               disabled={savingDlSettings}
-              className="ml-auto px-6 py-2.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#F472B6]/20 flex items-center gap-2 transition-all"
+              className="ml-auto px-6 py-2.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#F472B6]/20 flex items-center gap-2 transition-all"
             >
               <Save className="w-4 h-4" />
               <span>{savingDlSettings ? 'Saving...' : 'Save Downloader Settings'}</span>
@@ -1724,7 +1724,7 @@ export default function Settings() {
                 type="button"
                 onClick={() => saveBgm(bgmSettings)}
                 disabled={savingBgmSettings}
-                className="ml-auto px-6 py-2.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#F472B6]/20 flex items-center gap-2 transition-all disabled:opacity-50"
+                className="ml-auto px-6 py-2.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#F472B6]/20 flex items-center gap-2 transition-all disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 <span>{savingBgmSettings ? 'Saving...' : 'Save Background Music Settings'}</span>
@@ -1880,7 +1880,7 @@ export default function Settings() {
               type="button"
               onClick={() => saveKaraokeDefaults(karaokeDefaults)}
               disabled={savingDefaults}
-              className="ml-auto px-6 py-2.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#F472B6]/20 flex items-center gap-2 transition-all disabled:opacity-50"
+              className="ml-auto px-6 py-2.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#F472B6]/20 flex items-center gap-2 transition-all disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               <span>{savingDefaults ? 'Saving...' : 'Save Karaoke Defaults'}</span>
@@ -1981,7 +1981,7 @@ export default function Settings() {
             </div>
             <button 
               type="submit" 
-              className="w-full md:w-auto px-5 py-2.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 h-[42px] shrink-0"
+              className="w-full md:w-auto px-5 py-2.5 bg-[#F472B6] hover:bg-[#DB2777] text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 h-[42px] shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Add Library</span>
