@@ -59,95 +59,18 @@ export default function Library() {
   const [refreshingArtistId, setRefreshingArtistId] = useState<number | null>(null);
   const [refreshSummary, setRefreshSummary] = useState<any | null>(null);
 
-  // Featured Playlist Carousel state & touch tracking
-  const [carouselIndex, setCarouselIndex] = useState(0);
-  const carouselTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const touchStartXRef = useRef<number | null>(null);
-  const touchEndXRef = useRef<number | null>(null);
+  // Horizontal featured-playlist rail. Cards are sized to roughly twice an album card.
+  const playlistRailRef = useRef<HTMLDivElement | null>(null);
+  const scrollPlaylistRail = (direction: -1 | 1) => {
+    playlistRailRef.current?.scrollBy({
+      left: direction * Math.max(320, Math.round((playlistRailRef.current?.clientWidth || 360) * 0.75)),
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  };
 
   // Favourites tracking state
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [favoritingSongIds, setFavoritingSongIds] = useState<Set<number>>(new Set());
-
-  // Carousel timer logic: auto-advances every 5 seconds, resets on manual interaction, pauses on document hidden
-  const resetCarouselTimer = useCallback(() => {
-    if (carouselTimerRef.current) {
-      clearTimeout(carouselTimerRef.current);
-      carouselTimerRef.current = null;
-    }
-    if (playlists.length < 2 || (typeof document !== 'undefined' && document.hidden)) return;
-
-    carouselTimerRef.current = setTimeout(() => {
-      setCarouselIndex(prev => (prev + 1) % playlists.length);
-    }, 5000);
-  }, [playlists.length]);
-
-  useEffect(() => {
-    resetCarouselTimer();
-    return () => {
-      if (carouselTimerRef.current) {
-        clearTimeout(carouselTimerRef.current);
-        carouselTimerRef.current = null;
-      }
-    };
-  }, [carouselIndex, resetCarouselTimer]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        if (carouselTimerRef.current) {
-          clearTimeout(carouselTimerRef.current);
-          carouselTimerRef.current = null;
-        }
-      } else {
-        resetCarouselTimer();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [resetCarouselTimer]);
-
-  const handleNextPlaylist = useCallback(() => {
-    if (playlists.length < 2) return;
-    setCarouselIndex(prev => (prev + 1) % playlists.length);
-    resetCarouselTimer();
-  }, [playlists.length, resetCarouselTimer]);
-
-  const handlePrevPlaylist = useCallback(() => {
-    if (playlists.length < 2) return;
-    setCarouselIndex(prev => (prev - 1 + playlists.length) % playlists.length);
-    resetCarouselTimer();
-  }, [playlists.length, resetCarouselTimer]);
-
-  const handleSelectPlaylistIndex = useCallback((idx: number) => {
-    setCarouselIndex(idx);
-    resetCarouselTimer();
-  }, [resetCarouselTimer]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartXRef.current = e.targetTouches[0].clientX;
-    touchEndXRef.current = null;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndXRef.current = e.targetTouches[0].clientX;
-  };
-
-  const handleTouchEnd = () => {
-    if (touchStartXRef.current === null || touchEndXRef.current === null) return;
-    const diff = touchStartXRef.current - touchEndXRef.current;
-    const minSwipeDistance = 45;
-    if (diff > minSwipeDistance) {
-      handleNextPlaylist();
-    } else if (diff < -minSwipeDistance) {
-      handlePrevPlaylist();
-    }
-    touchStartXRef.current = null;
-    touchEndXRef.current = null;
-  };
 
   const handleToggleFavorite = async (songId: number) => {
     if (favoritingSongIds.has(songId)) return;
@@ -1708,133 +1631,74 @@ export default function Library() {
 
             return (
               <div className="space-y-10">
-                {/* 1. Featured Playlist Carousel Banner */}
-                {featuredPlaylist ? (
-                  <section className="space-y-4">
-                    <div
-                      className="relative w-full aspect-[21/9] sm:aspect-[2.4/1] md:aspect-[2.8/1] max-h-[460px] rounded-2xl sm:rounded-3xl overflow-hidden group select-none cursor-pointer"
-                      onTouchStart={handleTouchStart}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={handleTouchEnd}
-                      onClick={() => openPlaylist(featuredPlaylist.id)}
-                    >
-                      {featuredPlaylist.coverImageUrl || featuredPlaylist.coverPath ? (
-                        <img
-                          key={featuredPlaylist.id}
-                          src={featuredPlaylist.coverImageUrl || `/api/playlists/${featuredPlaylist.id}/cover`}
-                          alt={featuredPlaylist.name}
-                          className="w-full h-full object-cover yk-artwork-motion yk-heartbeat-artwork transition-all duration-500 ease-out"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-[#24242B] to-[#111114] flex items-center justify-center">
-                          <Disc className="h-20 w-20 text-white/20" strokeWidth={1} />
-                        </div>
-                      )}
-
-                      {/* Manual Desktop Navigation Arrows */}
-                      {playlists.length > 1 && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePrevPlaylist();
-                            }}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/70 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 shadow-lg"
-                            aria-label="Previous playlist"
-                            title="Previous playlist"
-                          >
-                            <ChevronLeft className="w-5 h-5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleNextPlaylist();
-                            }}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/70 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 shadow-lg"
-                            aria-label="Next playlist"
-                            title="Next playlist"
-                          >
-                            <ChevronRight className="w-5 h-5" />
-                          </button>
-                        </>
-                      )}
+                {/* 1. Featured Playlists: one horizontal row, swipe/scroll to browse. */}
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Featured Playlists</h2>
+                      <p className="mt-1 text-xs text-zinc-500">Swipe or scroll to discover a playlist.</p>
                     </div>
-
-                    {/* Directly below the cover: Playlist title & count on left, circular pink Play button on right */}
-                    <div className="flex items-center justify-between gap-4 px-1">
-                      <div className="min-w-0 flex-1">
-                        <h2
-                          onClick={() => openPlaylist(featuredPlaylist.id)}
-                          className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight truncate cursor-pointer hover:text-[#FA243C] transition-colors"
-                        >
-                          {featuredPlaylist.name}
-                        </h2>
-                        <p className="text-sm text-zinc-400 mt-0.5">
-                          {featuredPlaylist.songCount || featuredPlaylist.songs?.length || 0} songs
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isCurrentPlaylistPlaying) {
-                            toggleJukeboxPlay();
-                          } else {
-                            handlePlayPlaylistInJukebox(featuredPlaylist);
-                          }
-                        }}
-                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#FA243C] hover:bg-[#ff4054] text-white flex items-center justify-center shadow-lg shadow-[#FA243C]/25 transition-all active:scale-95 shrink-0"
-                        aria-label={isCurrentPlaylistPlaying ? 'Pause ' + featuredPlaylist.name : 'Play ' + featuredPlaylist.name}
-                        title={isCurrentPlaylistPlaying ? 'Pause' : 'Play ' + featuredPlaylist.name}
-                      >
-                        {isCurrentPlaylistPlaying ? (
-                          <Pause className="w-6 h-6 fill-current" />
-                        ) : (
-                          <Play className="w-6 h-6 fill-current ml-0.5" />
-                        )}
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => scrollPlaylistRail(-1)} disabled={playlists.length < 2} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10 disabled:opacity-30" aria-label="Previous featured playlists">
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button type="button" onClick={() => scrollPlaylistRail(1)} disabled={playlists.length < 2} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10 disabled:opacity-30" aria-label="Next featured playlists">
+                        <ChevronRight className="h-4 w-4" />
                       </button>
                     </div>
-
-                    {/* Small, subtle carousel dots below details */}
-                    {playlists.length > 1 && (
-                      <div className="flex items-center justify-center gap-1.5 pt-1">
-                        {playlists.map((pl, idx) => (
-                          <button
-                            key={pl.id}
-                            type="button"
-                            onClick={() => handleSelectPlaylistIndex(idx)}
-                            className={`h-1.5 rounded-full transition-all duration-300 ${
-                              idx === (carouselIndex % playlists.length)
-                                ? 'w-6 bg-[#FA243C]'
-                                : 'w-1.5 bg-white/20 hover:bg-white/40'
-                            }`}
-                            aria-label={`Go to playlist ${pl.name}`}
-                            title={pl.name}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                ) : (
-                  <div className="w-full aspect-[2.4/1] rounded-2xl sm:rounded-3xl bg-[#141416] flex flex-col items-center justify-center text-center p-6 border border-dashed border-white/10">
-                    <ListMusic className="w-12 h-12 text-zinc-600 mb-3" />
-                    <h3 className="text-lg font-bold text-white">No playlists yet</h3>
-                    <p className="text-xs text-zinc-400 mt-1 mb-4">Create your first playlist to feature it here.</p>
-                    <button
-                      type="button"
-                      onClick={() => setIsCreatePlaylistOpen(true)}
-                      className="px-5 py-2.5 rounded-full bg-[#FA243C] hover:bg-[#ff4054] text-white text-xs font-bold transition shadow-lg shadow-[#FA243C]/20"
-                    >
-                      Create Playlist
-                    </button>
                   </div>
-                )}
+                  {playlists.length ? (
+                    <div ref={playlistRailRef} className="yk-horizontal-rail flex items-stretch gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
+                      {playlists.map((playlist, idx) => {
+                        const isCurrentPlaylistPlaying = !!(
+                          jukeboxIsPlaying &&
+                          (jukeboxCurrentSong?.albumId === playlist.id || playlist.songs?.some(s => s.id === jukeboxCurrentSong?.id))
+                        );
+                        return (
+                          <button
+                            key={playlist.id}
+                            type="button"
+                            onClick={() => openPlaylist(playlist.id)}
+                            className="yk-featured-playlist-card group relative h-60 w-[min(88vw,23rem)] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/10 bg-[#141416] text-left shadow-lg shadow-black/20 sm:h-64"
+                            aria-label={`Open playlist ${playlist.name}`}
+                          >
+                            {playlist.coverImageUrl || playlist.coverPath ? (
+                              <img
+                                key={playlist.id}
+                                src={playlist.coverImageUrl || `/api/playlists/${playlist.id}/cover`}
+                                alt=""
+                                className="yk-featured-playlist-artwork absolute inset-0 h-full w-full object-cover"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#24242B] to-[#111114]">
+                                <ListMusic className="h-16 w-16 text-white/20" strokeWidth={1} />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+                            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 sm:p-5">
+                              <div className="min-w-0">
+                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-[#ff6b7a]">Featured playlist</span>
+                                <h3 className="truncate text-lg font-bold text-white sm:text-xl">{playlist.name}</h3>
+                                <p className="mt-1 text-xs text-white/70">{playlist.songCount || playlist.songs?.length || 0} songs</p>
+                              </div>
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FA243C] text-white shadow-lg shadow-[#FA243C]/25 transition-transform group-hover:scale-105">
+                                {isCurrentPlaylistPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex h-60 w-full max-w-3xl flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#141416] p-6 text-center">
+                      <ListMusic className="mb-3 h-12 w-12 text-zinc-600" />
+                      <h3 className="text-lg font-bold text-white">No playlists yet</h3>
+                      <p className="mb-4 mt-1 text-xs text-zinc-400">Create your first playlist to feature it here.</p>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setIsCreatePlaylistOpen(true); }} className="rounded-full bg-[#FA243C] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#ff4054]">Create Playlist</button>
+                    </div>
+                  )}
+                </section>
 
                 {/* 2. Artists Row (immediately below featured playlist) */}
                 <section className="space-y-4">
@@ -1861,7 +1725,7 @@ export default function Library() {
                               <img
                                 src={'/api/artists/' + artist.id + '/artwork'}
                                 alt={artist.name}
-                                className="h-full w-full object-cover yk-artwork-motion"
+                                className="h-full w-full object-cover yk-artwork-motion yk-artwork-circle-reveal"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
