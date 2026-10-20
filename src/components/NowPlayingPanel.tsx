@@ -70,7 +70,7 @@ export default function NowPlayingPanel() {
                   <img
                     src={`/api/songs/${currentSong.id}/artwork`}
                     alt={`Artwork for ${currentSong.title}`}
-                    className="absolute inset-0 h-full w-full object-cover"
+                    className="absolute inset-0 h-full w-full object-cover yk-artwork-image"
                     onError={event => { event.currentTarget.style.display = 'none'; }}
                   />
                 )}
@@ -146,7 +146,7 @@ export default function NowPlayingPanel() {
                   onClick={togglePlay}
                   aria-label={isPlaying ? 'Pause current song' : 'Play current song'}
                   title={isPlaying ? 'Pause' : 'Play'}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/20 transition hover:scale-[1.04] hover:bg-[#ff68b1] active:scale-95"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/20 transition hover:scale-[1.04] hover:bg-[#DB2777] active:scale-95"
                 >
                   {isPlaying
                     ? <Pause className="h-5 w-5 fill-current" />
@@ -202,7 +202,7 @@ export default function NowPlayingPanel() {
                             <img
                               src={`/api/songs/${song.id}/artwork`}
                               alt=""
-                              className="absolute inset-0 h-full w-full object-cover"
+                              className="absolute inset-0 h-full w-full object-cover yk-artwork-image"
                               onError={event => { event.currentTarget.style.display = 'none'; }}
                             />
                           )}
