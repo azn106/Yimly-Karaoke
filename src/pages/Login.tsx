@@ -55,7 +55,7 @@ export default function Login() {
       <div className="w-full max-w-md p-8 md:p-10 bg-[#141622] rounded-3xl shadow-2xl border border-white/10 relative z-10">
         {/* Brand Icon */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#F472B6] to-[#e0378b] flex items-center justify-center text-white shadow-xl shadow-[#F472B6]/25 mb-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#F472B6] to-[#DB2777] flex items-center justify-center text-white shadow-xl shadow-[#F472B6]/25 mb-4">
             <Mic className="w-7 h-7" />
           </div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Sign in to Yimly</h1>
@@ -103,7 +103,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-3 px-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full mt-2 py-3 px-4 bg-[#F472B6] hover:bg-[#DB2777] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <span>{loading ? 'Signing In...' : 'Sign In'}</span>
             <ArrowRight className="w-4 h-4" />
