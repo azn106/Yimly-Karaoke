@@ -184,6 +184,8 @@ html, body {
 
 .yk-artwork-motion {
   transform-origin: center;
+  clip-path: inset(var(--yk-scroll-clip, 0%) 0);
+  will-change: transform, translate, scale, clip-path;
   transform: perspective(900px)
     rotateX(var(--yk-scroll-rotate-x, 0deg))
     rotateY(var(--yk-scroll-rotate-y, 0deg));
@@ -196,7 +198,8 @@ html, body {
     transform 110ms cubic-bezier(0.2, 0.7, 0.25, 1),
     translate 110ms cubic-bezier(0.2, 0.7, 0.25, 1),
     scale 110ms cubic-bezier(0.2, 0.7, 0.25, 1),
-    opacity 140ms linear;
+    opacity 140ms linear,
+    clip-path 110ms cubic-bezier(0.2, 0.7, 0.25, 1);
 }
 
 .yk-heartbeat-artwork {
@@ -204,14 +207,33 @@ html, body {
   transform-origin: center;
 }
 
+/* Text reveal follows the same scroll progress as its card artwork; no hover trigger. */
+.yk-scroll-card > h3,
+.yk-scroll-card > p,
+.yk-scroll-card > span,
+.yk-scroll-card > div + h3,
+.yk-scroll-card > div + p,
+.yk-scroll-card > div + span {
+  translate: 0 var(--yk-scroll-title-y, 0px);
+  opacity: var(--yk-scroll-title-opacity, 1);
+  transition: translate 140ms cubic-bezier(0.2, 0.7, 0.25, 1), opacity 140ms linear;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .yk-artwork-motion,
-  .yk-heartbeat-artwork {
+  .yk-heartbeat-artwork,
+  .yk-scroll-card > h3,
+  .yk-scroll-card > p,
+  .yk-scroll-card > span,
+  .yk-scroll-card > div + h3,
+  .yk-scroll-card > div + p,
+  .yk-scroll-card > div + span {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
     translate: none !important;
     scale: 1 !important;
+    clip-path: none !important;
     transition: none !important;
     will-change: auto !important;
     filter: none !important;
