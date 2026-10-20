@@ -1181,7 +1181,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover yk-artwork-motion"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -1861,7 +1861,7 @@ export default function Library() {
                               <img
                                 src={'/api/artists/' + artist.id + '/artwork'}
                                 alt={artist.name}
-                                className="h-full w-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300"
+                                className="h-full w-full object-cover yk-artwork-motion"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1902,7 +1902,7 @@ export default function Library() {
                               <img
                                 src={'/api/songs/' + song.id + '/artwork'}
                                 alt=""
-                                className="h-full w-full object-cover yk-artwork-motion transition group-hover:scale-105"
+                                className="h-full w-full object-cover yk-artwork-motion transition"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -2045,7 +2045,7 @@ export default function Library() {
                       <img
                         src={`/api/artists/${artist.id}/artwork`}
                         alt={artist.name}
-                        className="w-full h-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300 relative z-10"
+                        className="w-full h-full object-cover yk-artwork-motion relative z-10"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -2078,7 +2078,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover yk-artwork-motion"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
