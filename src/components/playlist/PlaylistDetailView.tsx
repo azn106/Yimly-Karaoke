@@ -245,7 +245,7 @@ export default function PlaylistDetailView({
               <img
                 src={playlist.coverImageUrl || `/api/playlists/${playlist.id}/cover`}
                 alt={playlist.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover yk-artwork-image"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                 }}
@@ -335,7 +335,7 @@ export default function PlaylistDetailView({
               type="button"
               onClick={handlePlayAllInJukebox}
               disabled={songs.length === 0}
-              className="px-5 py-2.5 bg-[#F472B6] hover:bg-[#ff68b1] text-white rounded-xl text-xs font-bold shadow-lg shadow-[#F472B6]/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-2 active:scale-95"
+              className="px-5 py-2.5 bg-[#F472B6] hover:bg-[#DB2777] text-white rounded-xl text-xs font-bold shadow-lg shadow-[#F472B6]/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center gap-2 active:scale-95"
             >
               <Play className="w-4 h-4 fill-white" />
               <span>Play in Jukebox</span>
@@ -535,7 +535,7 @@ export default function PlaylistDetailView({
                           <img
                             src={`/api/songs/${song.id}/artwork`}
                             alt={song.title}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover yk-artwork-image"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = 'none';
                             }}
@@ -719,7 +719,7 @@ export default function PlaylistDetailView({
                           <img
                             src={`/api/songs/${song.id}/artwork`}
                             alt={song.title}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover yk-artwork-image"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = 'none';
                             }}
