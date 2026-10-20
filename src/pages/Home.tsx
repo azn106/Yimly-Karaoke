@@ -192,7 +192,7 @@ export default function Home() {
           <div className="absolute top-0 right-0 w-72 h-72 bg-[#F472B6]/15 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
           
           <div className="relative z-10 flex flex-col items-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#F472B6] to-[#d91e36] flex items-center justify-center shadow-xl shadow-[#F472B6]/25 mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#F472B6] to-[#DB2777] flex items-center justify-center shadow-xl shadow-[#F472B6]/25 mb-6">
               <Mic className="w-8 h-8 text-white" />
             </div>
 
@@ -207,7 +207,7 @@ export default function Home() {
             <button
               ref={hostButtonRef}
               onClick={createRoom}
-              className="w-full sm:w-auto px-8 py-4 bg-[#F472B6] hover:bg-[#ff4054] text-white font-bold text-base rounded-2xl transition-all shadow-xl shadow-[#F472B6]/30 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#171827] focus:scale-105"
+              className="w-full sm:w-auto px-8 py-4 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-base rounded-2xl transition-all shadow-xl shadow-[#F472B6]/30 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#171827] focus:scale-105"
             >
               <Mic className="w-5 h-5" />
               <span>Host Karaoke</span>
@@ -243,7 +243,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-4">
             <button
               onClick={createRoom}
-              className="px-6 py-3.5 bg-[#F472B6] hover:bg-[#ff4054] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+              className="px-6 py-3.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-semibold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
             >
               <Mic className="w-5 h-5" />
               <span>Host Karaoke Room</span>
@@ -306,7 +306,7 @@ export default function Home() {
           </div>
           <Link
             to="/rooms"
-            className="text-xs font-semibold text-[#F472B6] hover:text-[#ff4054] flex items-center gap-1 transition-colors"
+            className="text-xs font-semibold text-[#F472B6] hover:text-[#DB2777] flex items-center gap-1 transition-colors"
           >
             <span>View All Rooms</span>
             <ChevronRight className="w-4 h-4" />
@@ -396,7 +396,7 @@ export default function Home() {
                       <img
                         src={`/api/songs/${song.id}/artwork`}
                         alt={song.title}
-                        className={`w-full h-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300 ${index === 0 || isThisPlaying ? 'yk-heartbeat-artwork' : ''}`}
+                        className={`w-full h-full object-cover yk-artwork-image yk-artwork-motion group-hover:scale-105 transition-transform duration-300 ${index === 0 || isThisPlaying ? 'yk-heartbeat-artwork' : ''}`}
                       />
                     ) : (
                       <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
