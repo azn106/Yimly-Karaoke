@@ -237,6 +237,7 @@ export default function NowPlayingOverlay() {
           isExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setIsExpanded(false)}
+        style={{ pointerEvents: isExpanded ? 'auto' : 'none' }}
         aria-hidden="true"
       />
 
@@ -246,9 +247,16 @@ export default function NowPlayingOverlay() {
           isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none'
         }`}
         style={{
-          transform: isExpanded && dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
+          // Keep the closed state explicit in inline styles as well as Tailwind classes.
+          // This prevents a missing/stale production utility stylesheet from leaving the
+          // fixed sheet covering the app on first render.
+          transform: isExpanded
+            ? (dragOffset > 0 ? `translateY(${dragOffset}px)` : 'translateY(0)')
+            : 'translateY(100%)',
+          pointerEvents: isExpanded ? 'auto' : 'none',
           transition: dragOffset > 0 ? 'none' : undefined
         }}
+        aria-hidden={!isExpanded}
         role="dialog"
         aria-modal="true"
         aria-label="Now playing expanded player"
