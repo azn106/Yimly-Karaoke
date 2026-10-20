@@ -259,7 +259,7 @@ export default function GuestRoom({
 
             <button
               onClick={() => setShowAddSong(true)}
-              className="px-6 py-3.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-sm rounded-2xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 active:scale-95"
+              className="px-6 py-3.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-sm rounded-2xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>ADD SONG</span>
@@ -339,7 +339,7 @@ export default function GuestRoom({
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#08090E] via-[#08090E]/90 to-transparent backdrop-blur-sm z-20 flex justify-center">
         <button
           onClick={() => setShowAddSong(true)}
-          className="w-full max-w-md py-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-extrabold text-base rounded-2xl transition-all shadow-xl shadow-[#F472B6]/30 flex items-center justify-center gap-2 active:scale-95 border border-white/10"
+          className="w-full max-w-md py-4 bg-[#F472B6] hover:bg-[#DB2777] text-white font-extrabold text-base rounded-2xl transition-all shadow-xl shadow-[#F472B6]/30 flex items-center justify-center gap-2 active:scale-95 border border-white/10"
         >
           <Plus className="w-5 h-5 stroke-[2.5]" />
           <span className="tracking-wide">ADD SONG</span>
@@ -525,7 +525,7 @@ export default function GuestRoom({
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 overflow-hidden flex items-center justify-center shrink-0">
                             {track.artworkUrl ? (
-                              <img src={track.artworkUrl} className="w-full h-full object-cover" alt="" />
+                              <img src={track.artworkUrl} className="w-full h-full object-cover yk-artwork-image" alt="" />
                             ) : (
                               <Music className="w-5 h-5 text-zinc-400" />
                             )}
