@@ -195,3 +195,57 @@ html, body {
   scrollbar-width: none;
 }
 .yk-horizontal-rail::-webkit-scrollbar { display: none; }
+
+/* Inline Equalizer indicator for current playing song */
+@keyframes yk-eq-1 {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(0.9); }
+}
+
+@keyframes yk-eq-2 {
+  0%, 100% { transform: scaleY(0.65); }
+  50% { transform: scaleY(0.2); }
+}
+
+@keyframes yk-eq-3 {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes yk-eq-4 {
+  0%, 100% { transform: scaleY(0.85); }
+  50% { transform: scaleY(0.3); }
+}
+
+@keyframes yk-eq-5 {
+  0%, 100% { transform: scaleY(0.2); }
+  50% { transform: scaleY(0.85); }
+}
+
+.yk-eq-bar {
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.yk-eq-playing .yk-eq-bar-1 { animation: yk-eq-1 0.68s ease-in-out infinite alternate; }
+.yk-eq-playing .yk-eq-bar-2 { animation: yk-eq-2 0.82s ease-in-out infinite alternate; }
+.yk-eq-playing .yk-eq-bar-3 { animation: yk-eq-3 0.54s ease-in-out infinite alternate; }
+.yk-eq-playing .yk-eq-bar-4 { animation: yk-eq-4 0.76s ease-in-out infinite alternate; }
+.yk-eq-playing .yk-eq-bar-5 { animation: yk-eq-5 0.62s ease-in-out infinite alternate; }
+
+.yk-eq-paused .yk-eq-bar {
+  animation: none !important;
+}
+
+.yk-eq-paused .yk-eq-bar-1 { transform: scaleY(0.3); }
+.yk-eq-paused .yk-eq-bar-2 { transform: scaleY(0.55); }
+.yk-eq-paused .yk-eq-bar-3 { transform: scaleY(0.75); }
+.yk-eq-paused .yk-eq-bar-4 { transform: scaleY(0.45); }
+.yk-eq-paused .yk-eq-bar-5 { transform: scaleY(0.25); }
+
+@media (prefers-reduced-motion: reduce) {
+  .yk-eq-playing .yk-eq-bar {
+    animation: none !important;
+    transform: scaleY(0.6) !important;
+  }
+}

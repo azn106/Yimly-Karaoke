@@ -10,6 +10,7 @@ import AddSongsModal from '../components/playlist/AddSongsModal';
 import PlaylistsGrid from '../components/playlist/PlaylistsGrid';
 import PlaylistDetailView from '../components/playlist/PlaylistDetailView';
 import LyricBadges from '../components/LyricBadges';
+import EqualizerIndicator from '../components/EqualizerIndicator';
 import { clearAuthToken } from '../lib/auth';
 import { usePlayback, PlaybackSong } from '../context/PlaybackContext';
 
@@ -1177,12 +1178,15 @@ export default function Library() {
                             )}
                           </div>
                         </button>
-                        <span className={`truncate ${isCurrent ? 'text-[#F472B6] font-semibold' : ''}`}>{song.title}</span>
-                        <LyricBadges
-                          hasLrc={song.hasLrc}
-                          hasElrc={song.hasElrc}
-                          onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
-                        />
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`truncate ${isCurrent ? 'text-[#F472B6] font-semibold' : ''}`} title={song.title}>{song.title}</span>
+                          {isCurrent && <EqualizerIndicator isPlaying={isThisPlaying} />}
+                          <LyricBadges
+                            hasLrc={song.hasLrc}
+                            hasElrc={song.hasElrc}
+                            onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
+                          />
+                        </div>
                       </td>
                       <td className="px-5 py-3.5 text-zinc-400 text-xs font-mono">{formatDuration(song.duration)}</td>
                       <td className="px-5 py-3.5 text-zinc-400 text-xs capitalize">{song.variant}</td>
@@ -1326,12 +1330,15 @@ export default function Library() {
                       </button>
                     </td>
                     <td className="px-5 py-3.5 font-medium text-white flex items-center gap-3">
-                      <span className={`truncate ${isCurrent ? 'text-[#F472B6] font-semibold' : ''}`}>{song.title}</span>
-                      <LyricBadges
-                        hasLrc={song.hasLrc}
-                        hasElrc={song.hasElrc}
-                        onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
-                      />
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`truncate ${isCurrent ? 'text-[#F472B6] font-semibold' : ''}`} title={song.title}>{song.title}</span>
+                        {isCurrent && <EqualizerIndicator isPlaying={isThisPlaying} />}
+                        <LyricBadges
+                          hasLrc={song.hasLrc}
+                          hasElrc={song.hasElrc}
+                          onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
+                        />
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 text-zinc-400 font-mono text-xs">{formatDuration(song.duration)}</td>
                     <td className="px-5 py-3.5 text-right">
@@ -1489,14 +1496,19 @@ export default function Library() {
                           <Music className="w-4 h-4 text-zinc-400" />
                         )}
                       </div>
-                      <span className="truncate">{item.title || item.name}</span>
-                      {item.type === 'song' && (
-                        <LyricBadges
-                          hasLrc={item.hasLrc}
-                          hasElrc={item.hasElrc}
-                          onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: item.id, title: item.title, format })}
-                        />
-                      )}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`truncate ${item.type === 'song' && jukeboxCurrentSong?.id === item.id ? 'text-[#F472B6] font-semibold' : ''}`}>{item.title || item.name}</span>
+                        {item.type === 'song' && jukeboxCurrentSong?.id === item.id && (
+                          <EqualizerIndicator isPlaying={jukeboxIsPlaying} />
+                        )}
+                        {item.type === 'song' && (
+                          <LyricBadges
+                            hasLrc={item.hasLrc}
+                            hasElrc={item.hasElrc}
+                            onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: item.id, title: item.title, format })}
+                          />
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 text-zinc-400 text-xs">
                       {item.type === 'song' ? renderArtistLinks(item) : (item.artist || item.album || '—')}
@@ -1870,9 +1882,12 @@ export default function Library() {
 
                             {/* Song title on first line, artist name underneath */}
                             <div className="min-w-0 flex-1">
-                              <p className={`truncate text-sm font-semibold ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`}>
-                                {song.title}
-                              </p>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <p className={`truncate text-sm font-semibold ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`} title={song.title}>
+                                  {song.title}
+                                </p>
+                                {isCurrent && <EqualizerIndicator isPlaying={isThisPlaying} />}
+                              </div>
                               <p className="truncate text-xs text-zinc-400">
                                 {song.artist || 'Unknown Artist'}
                               </p>
@@ -2002,39 +2017,46 @@ export default function Library() {
           {tab === 'songs' && (
             <div className="min-w-0">
               <div className="divide-y divide-white/[0.04]">
-                {songs.map((song, idx) => (
-                  <div key={song.id} className="flex items-center gap-2.5 py-2 transition-colors">
-                    {/* Artwork plays the song; Plus adds it to the existing queue. */}
-                    <button
-                      type="button"
-                      onClick={() => handlePlayInJukebox(song, songs, idx)}
-                      className="group/play relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg"
-                      title="Play in Jukebox"
-                      aria-label={`Play ${song.title} in Jukebox`}
-                    >
-                      {song.hasArtwork ? (
-                        <img
-                          src={`/api/songs/${song.id}/artwork`}
-                          alt=""
-                          className="h-full w-full object-cover yk-artwork-image"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <Music className="h-4 w-4 text-zinc-500" />
-                      )}
-                    </button>
+                {songs.map((song, idx) => {
+                  const isCurrent = jukeboxCurrentSong?.id === song.id;
+                  const isThisPlaying = isCurrent && jukeboxIsPlaying;
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-semibold text-white" title={song.title}>{song.title}</span>
-                        <LyricBadges
-                          hasLrc={song.hasLrc}
-                          hasElrc={song.hasElrc}
-                          onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
-                        />
-                      </div>
+                  return (
+                    <div key={song.id} className="flex items-center gap-2.5 py-2 transition-colors">
+                      {/* Artwork plays the song; Plus adds it to the existing queue. */}
+                      <button
+                        type="button"
+                        onClick={() => handlePlayInJukebox(song, songs, idx)}
+                        className="group/play relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+                        title={isThisPlaying ? 'Pause in Jukebox' : 'Play in Jukebox'}
+                        aria-label={`${isThisPlaying ? 'Pause' : 'Play'} ${song.title} in Jukebox`}
+                      >
+                        {song.hasArtwork ? (
+                          <img
+                            src={`/api/songs/${song.id}/artwork`}
+                            alt=""
+                            className="h-full w-full object-cover yk-artwork-image"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <Music className="h-4 w-4 text-zinc-500" />
+                        )}
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className={`truncate text-sm font-semibold ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`} title={song.title}>
+                            {song.title}
+                          </span>
+                          {isCurrent && <EqualizerIndicator isPlaying={isThisPlaying} />}
+                          <LyricBadges
+                            hasLrc={song.hasLrc}
+                            hasElrc={song.hasElrc}
+                            onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
+                          />
+                        </div>
                       <div className="truncate text-xs text-zinc-400" title={song.artist}>
                         {renderArtistLinks(song)}
                       </div>
@@ -2061,7 +2083,8 @@ export default function Library() {
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                ))}
+                );
+              })}
                 {songs.length === 0 && (
                   <div className="py-12 text-center text-sm text-zinc-500">No songs found in library.</div>
                 )}

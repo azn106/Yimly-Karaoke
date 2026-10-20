@@ -3,6 +3,7 @@ import { useOutletContext, Link, useNavigate } from 'react-router-dom';
 import { Play, Pause, Mic, Radio, Users, Music, Disc, ChevronRight, Plus, Sparkles, Folder, Download } from 'lucide-react';
 import { getAuthToken } from '../lib/auth';
 import { usePlayback, PlaybackSong } from '../context/PlaybackContext';
+import EqualizerIndicator from '../components/EqualizerIndicator';
 
 export default function Home() {
   const { user } = useOutletContext<{ user: any }>() || {};
@@ -409,9 +410,12 @@ export default function Home() {
                       )}
                     </div>
                   </button>
-                  <h3 className={`font-semibold text-sm truncate group-hover:text-[#F472B6] transition-colors ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`}>
-                    {song.title}
-                  </h3>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <h3 className={`font-semibold text-sm truncate group-hover:text-[#F472B6] transition-colors ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`} title={song.title}>
+                      {song.title}
+                    </h3>
+                    {isCurrent && <EqualizerIndicator isPlaying={isThisPlaying} />}
+                  </div>
                   <p className="text-xs text-zinc-400 truncate mt-0.5">{song.artist || 'Unknown Artist'}</p>
                 </div>
               );

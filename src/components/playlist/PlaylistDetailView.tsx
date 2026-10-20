@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../../types';
 import LyricBadges from '../LyricBadges';
+import EqualizerIndicator from '../EqualizerIndicator';
 import { usePlayback, PlaybackSong } from '../../context/PlaybackContext';
 
 interface PlaylistDetailViewProps {
@@ -553,7 +554,8 @@ export default function PlaylistDetailView({
                       </button>
 
                       <div className="min-w-0 flex items-center gap-2">
-                        <span className={`truncate block ${jukeboxCurrentSong?.id === song.id ? 'text-[#F472B6] font-semibold' : ''}`}>{song.title}</span>
+                        <span className={`truncate block ${jukeboxCurrentSong?.id === song.id ? 'text-[#F472B6] font-semibold' : ''}`} title={song.title}>{song.title}</span>
+                        {jukeboxCurrentSong?.id === song.id && <EqualizerIndicator isPlaying={jukeboxIsPlaying} />}
                         <LyricBadges
                           hasLrc={song.hasLrc}
                           hasElrc={song.hasElrc}

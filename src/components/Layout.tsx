@@ -2,11 +2,13 @@ import { useEffect, useState, ReactNode } from 'react';
 import { Outlet, useNavigate, NavLink, useLocation } from 'react-router-dom';
 import { Home, Music, Mic, Settings, Users, LogOut, Disc, Menu, X, Radio, Download, ChevronUp, ChevronDown, ListMusic } from 'lucide-react';
 import { clearAuthToken } from '../lib/auth';
-import PlayerBar from './PlayerBar';
 import NowPlayingOverlay from './NowPlayingOverlay';
 import NowPlayingPanel from './NowPlayingPanel';
+import { usePlayback } from '../context/PlaybackContext';
 
 export default function Layout() {
+  const { currentSong, queue, togglePlay } = usePlayback();
+  const hasActivePlayback = Boolean(currentSong || queue.length > 0);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -49,6 +51,61 @@ export default function Layout() {
     }
   }, [location.pathname]);
 
+  // Track xl viewport breakpoint (1280px) for responsive player presentation
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(min-width: 1280px)').matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(min-width: 1280px)');
+    const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      setIsDesktop(e.matches);
+    };
+    if (mql.addEventListener) {
+      mql.addEventListener('change', onChange as (e: MediaQueryListEvent) => void);
+    } else {
+      mql.addListener(onChange);
+    }
+    return () => {
+      if (mql.removeEventListener) {
+        mql.removeEventListener('change', onChange as (e: MediaQueryListEvent) => void);
+      } else {
+        mql.removeListener(onChange);
+      }
+    };
+  }, []);
+
+  // Desktop keyboard shortcut: Space toggles play/pause when not typing in form controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      if (
+        activeTag === 'input' || 
+        activeTag === 'textarea' || 
+        document.activeElement?.getAttribute('contenteditable') === 'true'
+      ) {
+        return;
+      }
+      if (e.code === 'Space' && currentSong) {
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentSong, togglePlay]);
+
+  // Unified player visibility conditions:
+  // Right-side player panel is shown on desktop (>= 1280px) on music/library routes (Home & Library).
+  // On other routes (e.g. /rooms, /settings, /download, /users) or below xl, it is hidden.
+  const isRightPanelRoute = location.pathname === '/' || location.pathname.startsWith('/library');
+  const isRightPanelVisible = isDesktop && isRightPanelRoute;
+
+  // The compact bottom NowPlayingOverlay is shown whenever the right-side panel is hidden
+  // AND there is active/paused playback with a current track or queue.
+  const isBottomOverlayVisible = !isRightPanelVisible && hasActivePlayback;
 
   const handleLogout = async () => {
     clearAuthToken();
@@ -70,7 +127,11 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans xl:grid xl:grid-cols-[230px_minmax(0,1fr)_346px]">
+    <div className={`flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans xl:grid ${
+      isRightPanelVisible 
+        ? 'xl:grid-cols-[230px_minmax(0,1fr)_346px]' 
+        : 'xl:grid-cols-[230px_minmax(0,1fr)]'
+    }`}>
       {/* Desktop & Tablet Sidebar */}
       <aside className="hidden xl:flex xl:col-start-1 xl:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
           {/* Brand Header */}
@@ -184,24 +245,21 @@ export default function Layout() {
             </button>
           </div>
 
-        {/* Centre content occupies the middle column; the player overlays only this area. */}
+        {/* Centre content occupies the middle column; the compact player overlays only this area when right panel is hidden. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#0A0B10]">
-          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto pb-28">
+          <main className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${isBottomOverlayVisible ? 'pb-24 sm:pb-20' : 'pb-8'}`}>
             <Outlet context={{ user }} />
           </main>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 hidden xl:block">
-            <div className="pointer-events-auto">
-              <PlayerBar />
-            </div>
-          </div>
-          <NowPlayingOverlay />
+          {isBottomOverlayVisible && <NowPlayingOverlay />}
         </div>
       </div>
 
-      {/* Right panel is a separate full-height grid column, outside the player overlay. */}
-      <aside className="hidden xl:flex xl:col-start-3 xl:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
+      {/* Right panel is a separate full-height grid column, visible only on desktop music routes */}
+      {isRightPanelVisible && (
+        <aside className="hidden xl:flex xl:col-start-3 xl:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
           <NowPlayingPanel />
-      </aside>
+        </aside>
+      )}
     </div>
   );
 }
