@@ -61,6 +61,7 @@ export default function Library() {
 
   // Horizontal featured-playlist rail. Cards are sized to roughly twice an album card.
   const playlistRailRef = useRef<HTMLDivElement | null>(null);
+  const artistRailRef = useRef<HTMLDivElement | null>(null);
   const scrollPlaylistRail = (direction: -1 | 1) => {
     playlistRailRef.current?.scrollBy({
       left: direction * Math.max(320, Math.round((playlistRailRef.current?.clientWidth || 360) * 0.75)),
@@ -249,6 +250,46 @@ export default function Library() {
     }
   };
 
+
+  useEffect(() => {
+    const rail = playlistRailRef.current;
+    if (!rail) return;
+    const cards = rail.querySelectorAll('.yk-featured-playlist-card');
+    if (!('IntersectionObserver' in window)) {
+      cards.forEach(card => card.classList.add('is-revealed'));
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-revealed');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { root: rail, threshold: 0.45 });
+    cards.forEach(card => observer.observe(card));
+    return () => observer.disconnect();
+  }, [playlists, tab]);
+
+  useEffect(() => {
+    const rail = artistRailRef.current;
+    if (!rail) return;
+    const images = rail.querySelectorAll('.yk-artwork-circle-reveal');
+    if (!('IntersectionObserver' in window)) {
+      images.forEach(image => image.classList.add('is-circle-revealed'));
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-circle-revealed');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { root: rail, threshold: 0.4 });
+    images.forEach(image => observer.observe(image));
+    return () => observer.disconnect();
+  }, [artists, tab]);
 
   useEffect(() => {
     loadAllData();
@@ -1712,13 +1753,13 @@ export default function Library() {
                     </button>
                   </div>
                   {artists.length ? (
-                    <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-none">
+                    <div ref={artistRailRef} className="yk-horizontal-rail flex items-center gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
                       {artists.map(artist => (
                         <button
                           type="button"
                           key={artist.id}
                           onClick={() => openArtist(artist.id)}
-                          className="group flex flex-col items-center shrink-0 w-28 text-center transition hover:opacity-90 cursor-pointer"
+                          className="yk-artist-carousel-card group flex flex-col items-center shrink-0 w-28 snap-start text-center transition hover:opacity-90 cursor-pointer"
                         >
                           <div className="relative mb-2.5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#FA243C]/40 transition-colors shadow-md">
                             {artist.hasArtwork ? (
