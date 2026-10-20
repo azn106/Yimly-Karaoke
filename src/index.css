@@ -251,7 +251,7 @@ html, body {
 
 /* Circular counterpart of the polygon reveal for artist portraits. */
 .yk-artwork-circle-reveal {
-  clip-path: circle(0% at 50% 50%) !important;
+  clip-path: circle(0% at 50% 50%);
 }
 .yk-artwork-circle-reveal.is-circle-revealed {
   animation: yk-circle-artwork-reveal 640ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
