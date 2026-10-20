@@ -1741,7 +1741,51 @@ export default function Library() {
                   )}
                 </section>
 
-                {/* 3. Recently Added (below Artists) */}
+                {/* 3. Albums carousel */}
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Albums</h2>
+                      <p className="mt-1 text-xs text-zinc-500">Browse albums from your collection.</p>
+                    </div>
+                    <button type="button" onClick={() => setTab('albums')} className="shrink-0 text-xs font-semibold text-[#F472B6] hover:text-white">
+                      View all <ChevronRight className="ml-1 inline h-4 w-4" />
+                    </button>
+                  </div>
+                  {albums.length ? (
+                    <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
+                      {albums.map(album => (
+                        <button
+                          type="button"
+                          key={album.id}
+                          onClick={() => openAlbum(album.id)}
+                          className="group w-36 sm:w-40 shrink-0 snap-start rounded-xl p-2 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F472B6]"
+                          aria-label={`Open album ${album.title}`}
+                        >
+                          <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
+                            {album.hasArtwork ? (
+                              <img
+                                src={`/api/albums/${album.id}/artwork`}
+                                alt={album.title}
+                                className="h-full w-full object-cover yk-artwork-image"
+                                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            ) : (
+                              <Disc className="h-10 w-10 text-zinc-500 transition-colors group-hover:text-[#F472B6]" />
+                            )}
+                          </div>
+                          <span className="block truncate text-xs font-semibold text-white transition-colors group-hover:text-[#F472B6]">{album.title}</span>
+                          <span className="mt-0.5 block truncate text-[11px] text-zinc-400">{album.artist || 'Unknown Artist'}</span>
+                          <span className="mt-1 block text-[10px] text-zinc-500">{album.songCount || 0} tracks</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No albums yet. Albums will appear after songs are scanned.</div>
+                  )}
+                </section>
+
+                {/* 4. Recently Added (below Albums) */}
                 <section className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -1787,7 +1831,7 @@ export default function Library() {
                   )}
                 </section>
 
-                {/* 4. Songs list (below Recently Added) */}
+                {/* 5. Songs list (below Recently Added) */}
                 <section className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
