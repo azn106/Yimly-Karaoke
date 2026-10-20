@@ -2004,7 +2004,7 @@ export default function Library() {
               <div className="divide-y divide-white/[0.04]">
                 {songs.map((song, idx) => (
                   <div key={song.id} className="flex items-center gap-2.5 py-2 transition-colors">
-                    {/* Artwork remains a play target; no separate Play/Heart/Plus controls on this page. */}
+                    {/* Artwork plays the song; Plus adds it to the existing queue. */}
                     <button
                       type="button"
                       onClick={() => handlePlayInJukebox(song, songs, idx)}
@@ -2042,6 +2042,15 @@ export default function Library() {
 
                     <span className="hidden shrink-0 text-xs text-zinc-500 sm:block">{song.album || '—'}</span>
                     <span className="hidden shrink-0 font-mono text-xs text-zinc-500 md:block">{formatDuration(song.duration)}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQueueInJukebox(song)}
+                      className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:text-white"
+                      title={`Add ${song.title} to queue`}
+                      aria-label={`Add ${song.title} to queue`}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteSong(song)}
