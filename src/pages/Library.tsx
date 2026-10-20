@@ -933,7 +933,7 @@ export default function Library() {
                     e.stopPropagation();
                     openArtist(art.id);
                   }}
-                  className="text-zinc-300 hover:text-[#FA243C] hover:underline transition-colors text-left"
+                  className="text-zinc-300 hover:text-[#FF4FA3] hover:underline transition-colors text-left"
                 >
                   {art.name}
                 </button>
@@ -1080,8 +1080,8 @@ export default function Library() {
 
         {/* Artist Hero */}
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-[#141622] p-8 rounded-3xl border border-white/5 shadow-xl">
-          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#FA243C]/10 overflow-hidden relative">
-            <Mic className="w-12 h-12 text-[#FA243C] absolute" />
+          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#FF4FA3]/10 overflow-hidden relative">
+            <Mic className="w-12 h-12 text-[#FF4FA3] absolute" />
             {selectedArtist.hasArtwork && (
               <img
                 src={`/api/artists/${selectedArtist.id}/artwork`}
@@ -1094,7 +1094,7 @@ export default function Library() {
             )}
           </div>
           <div className="text-center sm:text-left flex-1">
-            <span className="text-xs uppercase tracking-widest text-[#FA243C] font-bold">Artist</span>
+            <span className="text-xs uppercase tracking-widest text-[#FF4FA3] font-bold">Artist</span>
             <h1 className="text-3xl md:text-4xl font-extrabold text-white mt-1 mb-2">{selectedArtist.name}</h1>
             <p className="text-sm text-zinc-400 font-medium mb-4">
               {selectedArtist.albums?.length || 0} Albums • {selectedArtist.songs?.length || 0} Songs
@@ -1111,7 +1111,7 @@ export default function Library() {
                     hasArtwork: s.hasArtwork,
                     variant: s.variant,
                   })), 0)}
-                  className="px-4 py-2 bg-[#FA243C] hover:bg-[#ff68b1] text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-[#FA243C]/25 active:scale-95"
+                  className="px-4 py-2 bg-[#FF4FA3] hover:bg-[#ff68b1] text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-[#FF4FA3]/25 active:scale-95"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
                   <span>Play All Songs</span>
@@ -1120,7 +1120,7 @@ export default function Library() {
               <button
                 onClick={() => handleRefreshArtist(selectedArtist.id)}
                 disabled={refreshingArtistId === selectedArtist.id}
-                className="px-4 py-2 bg-[#FA243C]/15 hover:bg-[#FA243C]/25 border border-[#FA243C]/30 text-[#FA243C] text-xs font-bold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 bg-[#FF4FA3]/15 hover:bg-[#FF4FA3]/25 border border-[#FF4FA3]/30 text-[#FF4FA3] text-xs font-bold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshingArtistId === selectedArtist.id ? 'animate-spin' : ''}`} />
                 <span>{refreshingArtistId === selectedArtist.id ? 'Refreshing Image...' : 'Refresh Artist Image'}</span>
@@ -1138,9 +1138,9 @@ export default function Library() {
                 <div 
                   key={album.id}
                   onClick={() => openAlbum(album.id)}
-                  className="group cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]"
+                  className="group w-44 shrink-0 snap-start cursor-pointer rounded-2xl border border-white/5 bg-[#141622] p-3 transition hover:border-[#FF4FA3]/30 hover:bg-[#1A1C2C]"
                 >
-                  <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center relative overflow-hidden group-hover:border-[#FA243C]/20 border border-white/5">
+                  <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center relative overflow-hidden group-hover:border-[#FF4FA3]/20 border border-white/5">
                     {album.hasArtwork ? (
                       <img
                         src={`/api/albums/${album.id}/artwork`}
@@ -1151,10 +1151,10 @@ export default function Library() {
                         }}
                       />
                     ) : (
-                      <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#FA243C] transition-colors" />
+                      <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#FF4FA3] transition-colors" />
                     )}
                   </div>
-                  <h3 className="font-semibold text-sm text-white truncate group-hover:text-[#FA243C] transition-colors">{album.title}</h3>
+                  <h3 className="font-semibold text-sm text-white truncate group-hover:text-[#FF4FA3] transition-colors">{album.title}</h3>
                   <p className="text-xs text-zinc-400 mt-0.5">{album.year || 'Album'}</p>
                 </div>
               ))}
@@ -1180,12 +1180,12 @@ export default function Library() {
                   const isCurrent = jukeboxCurrentSong?.id === song.id;
                   const isThisPlaying = isCurrent && jukeboxIsPlaying;
                   return (
-                    <tr key={song.id} className={`transition-colors group ${isCurrent ? 'bg-[#FA243C]/10' : 'hover:bg-[#1A1C2C]/60'}`}>
+                    <tr key={song.id} className={`transition-colors group ${isCurrent ? 'bg-[#FF4FA3]/10' : 'hover:bg-[#1A1C2C]/60'}`}>
                       <td className="px-5 py-3.5 font-medium text-white flex items-center gap-3">
                         <button
                           type="button"
                           onClick={() => handlePlayInJukebox(song, selectedArtist.songs, idx)}
-                          className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden relative group/play cursor-pointer border border-white/5 hover:border-[#FA243C]/40 transition-colors"
+                          className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden relative group/play cursor-pointer border border-white/5 hover:border-[#FF4FA3]/40 transition-colors"
                           title={isThisPlaying ? 'Pause' : 'Play in Jukebox'}
                         >
                           {song.hasArtwork ? (
@@ -1198,17 +1198,17 @@ export default function Library() {
                               }}
                             />
                           ) : (
-                            <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#FA243C] transition-colors" />
+                            <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#FF4FA3] transition-colors" />
                           )}
                           <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${isThisPlaying ? 'opacity-100' : 'opacity-0 group-hover/play:opacity-100'}`}>
                             {isThisPlaying ? (
-                              <Pause className="w-4 h-4 text-[#FA243C] fill-current" />
+                              <Pause className="w-4 h-4 text-[#FF4FA3] fill-current" />
                             ) : (
                               <Play className="w-4 h-4 text-white fill-current ml-0.5" />
                             )}
                           </div>
                         </button>
-                        <span className={`truncate ${isCurrent ? 'text-[#FA243C] font-semibold' : ''}`}>{song.title}</span>
+                        <span className={`truncate ${isCurrent ? 'text-[#FF4FA3] font-semibold' : ''}`}>{song.title}</span>
                         <LyricBadges
                           hasLrc={song.hasLrc}
                           hasElrc={song.hasElrc}
@@ -1224,7 +1224,7 @@ export default function Library() {
                             onClick={() => handlePlayInJukebox(song, selectedArtist.songs, idx)}
                             className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
                               isThisPlaying 
-                                ? 'bg-[#FA243C] text-white shadow-sm' 
+                                ? 'bg-[#FF4FA3] text-white shadow-sm' 
                                 : 'bg-white/5 hover:bg-white/15 text-zinc-200 hover:text-white border border-white/5'
                             }`}
                             title={isThisPlaying ? 'Pause song' : 'Play song in Jukebox'}
@@ -1282,7 +1282,7 @@ export default function Library() {
         </button>
 
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-[#141622] p-8 rounded-3xl border border-white/5 shadow-xl">
-          <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#FA243C]/10 overflow-hidden">
+          <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#FF4FA3]/10 overflow-hidden">
             {selectedAlbum.hasArtwork ? (
               <img
                 src={`/api/albums/${selectedAlbum.id}/artwork`}
@@ -1293,11 +1293,11 @@ export default function Library() {
                 }}
               />
             ) : (
-              <Disc className="w-16 h-16 text-[#FA243C]" />
+              <Disc className="w-16 h-16 text-[#FF4FA3]" />
             )}
           </div>
           <div className="text-center sm:text-left flex-1">
-            <span className="text-xs uppercase tracking-widest text-[#FA243C] font-bold">Album</span>
+            <span className="text-xs uppercase tracking-widest text-[#FF4FA3] font-bold">Album</span>
             <h1 className="text-3xl md:text-4xl font-extrabold text-white mt-1 mb-1">{selectedAlbum.title}</h1>
             <p className="text-zinc-300 font-medium text-base mb-1">{selectedAlbum.artist}</p>
             <p className="text-xs text-zinc-400 mb-4">
@@ -1314,7 +1314,7 @@ export default function Library() {
                   hasArtwork: s.hasArtwork,
                   variant: s.variant,
                 })), 0)}
-                className="px-4 py-2 bg-[#FA243C] hover:bg-[#ff68b1] text-white text-xs font-bold rounded-xl transition-all inline-flex items-center gap-2 shadow-lg shadow-[#FA243C]/25 active:scale-95"
+                className="px-4 py-2 bg-[#FF4FA3] hover:bg-[#ff68b1] text-white text-xs font-bold rounded-xl transition-all inline-flex items-center gap-2 shadow-lg shadow-[#FF4FA3]/25 active:scale-95"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Play Album</span>
@@ -1338,7 +1338,7 @@ export default function Library() {
                 const isCurrent = jukeboxCurrentSong?.id === song.id;
                 const isThisPlaying = isCurrent && jukeboxIsPlaying;
                 return (
-                  <tr key={song.id} className={`transition-colors group ${isCurrent ? 'bg-[#FA243C]/10' : 'hover:bg-[#1A1C2C]/60'}`}>
+                  <tr key={song.id} className={`transition-colors group ${isCurrent ? 'bg-[#FF4FA3]/10' : 'hover:bg-[#1A1C2C]/60'}`}>
                     <td className="px-5 py-3.5 text-zinc-500 font-mono text-xs">
                       <button
                         type="button"
@@ -1347,7 +1347,7 @@ export default function Library() {
                         title={isThisPlaying ? 'Pause' : 'Play'}
                       >
                         {isThisPlaying ? (
-                          <Pause className="w-3.5 h-3.5 text-[#FA243C] fill-current" />
+                          <Pause className="w-3.5 h-3.5 text-[#FF4FA3] fill-current" />
                         ) : (
                           <span className="group-hover:hidden">{song.trackNumber || idx + 1}</span>
                         )}
@@ -1357,7 +1357,7 @@ export default function Library() {
                       </button>
                     </td>
                     <td className="px-5 py-3.5 font-medium text-white flex items-center gap-3">
-                      <span className={`truncate ${isCurrent ? 'text-[#FA243C] font-semibold' : ''}`}>{song.title}</span>
+                      <span className={`truncate ${isCurrent ? 'text-[#FF4FA3] font-semibold' : ''}`}>{song.title}</span>
                       <LyricBadges
                         hasLrc={song.hasLrc}
                         hasElrc={song.hasElrc}
@@ -1372,7 +1372,7 @@ export default function Library() {
                           onClick={() => handlePlayInJukebox(song, selectedAlbum.songs, idx)}
                           className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
                             isThisPlaying 
-                              ? 'bg-[#FA243C] text-white shadow-sm' 
+                              ? 'bg-[#FF4FA3] text-white shadow-sm' 
                               : 'bg-white/5 hover:bg-white/15 text-zinc-200 hover:text-white border border-white/5'
                           }`}
                           title={isThisPlaying ? 'Pause track' : 'Play track in Jukebox'}
@@ -1430,7 +1430,7 @@ export default function Library() {
               placeholder="Search artists, albums, or songs..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-[#141622] border border-white/10 rounded-full text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FA243C] focus:ring-1 focus:ring-[#FA243C] transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#141622] border border-white/10 rounded-full text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4FA3] focus:ring-1 focus:ring-[#FF4FA3] transition-all"
             />
           </div>
           {user?.role === 'administrator' && (
@@ -1439,7 +1439,7 @@ export default function Library() {
               disabled={scanning}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1C1E2D] hover:bg-[#25283C] text-white rounded-full text-xs font-semibold border border-white/10 transition-colors disabled:opacity-50 shrink-0"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin text-[#FA243C]' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin text-[#FF4FA3]' : ''}`} />
               <span>{scanning ? 'Scanning...' : 'Scan Media'}</span>
             </button>
           )}
@@ -1468,7 +1468,7 @@ export default function Library() {
       {/* Loading state */}
       {loading && !error && (
         <div className="py-24 text-center">
-          <RefreshCw className="w-8 h-8 text-[#FA243C] animate-spin mx-auto mb-3" />
+          <RefreshCw className="w-8 h-8 text-[#FF4FA3] animate-spin mx-auto mb-3" />
           <p className="text-zinc-400 text-sm">Loading media catalog...</p>
         </div>
       )}
@@ -1491,7 +1491,7 @@ export default function Library() {
                 {searchResults.map((item: any, idx: number) => (
                   <tr key={idx} className="hover:bg-[#1A1C2C]/60 transition-colors">
                     <td className="px-5 py-3.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#FA243C]/15 text-[#FA243C] border border-[#FA243C]/25">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#FF4FA3]/15 text-[#FF4FA3] border border-[#FF4FA3]/25">
                         {item.type}
                       </span>
                     </td>
@@ -1546,7 +1546,7 @@ export default function Library() {
                             onClick={() => handlePlayInJukebox(item)}
                             className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
                               jukeboxCurrentSong?.id === item.id && jukeboxIsPlaying
-                                ? 'bg-[#FA243C] text-white shadow-sm'
+                                ? 'bg-[#FF4FA3] text-white shadow-sm'
                                 : 'bg-white/5 hover:bg-white/15 text-zinc-200 hover:text-white border border-white/5'
                             }`}
                             title={jukeboxCurrentSong?.id === item.id && jukeboxIsPlaying ? 'Pause song' : 'Play song in Jukebox'}
@@ -1597,7 +1597,7 @@ export default function Library() {
             disabled={refreshingAll}
             className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 shrink-0"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshingAll ? 'animate-spin text-[#FA243C]' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshingAll ? 'animate-spin text-[#FF4FA3]' : ''}`} />
             <span>{refreshingAll ? 'Refreshing All Artists...' : 'Refresh All Artist Images'}</span>
           </button>
         </div>
@@ -1649,7 +1649,7 @@ export default function Library() {
             </p>
             <button
               onClick={() => setRefreshSummary(null)}
-              className="w-full py-3 bg-[#FA243C] hover:bg-[#ff4054] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#FA243C]/25"
+              className="w-full py-3 bg-[#FF4FA3] hover:bg-[#FF6EB3] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#FF4FA3]/25"
             >
               Done
             </button>
@@ -1708,11 +1708,11 @@ export default function Library() {
                             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
                             <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 sm:p-5">
                               <div className="min-w-0">
-                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-[#ff6b7a]">Featured playlist</span>
+                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-[#FF4FA3]">Featured playlist</span>
                                 <h3 className="truncate text-lg font-bold text-white sm:text-xl">{playlist.name}</h3>
                                 <p className="mt-1 text-xs text-white/70">{playlist.songCount || playlist.songs?.length || 0} songs</p>
                               </div>
-                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FA243C] text-white shadow-lg shadow-[#FA243C]/25 transition-transform group-hover:scale-105">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FF4FA3] text-white shadow-lg shadow-[#FF4FA3]/25 transition-transform group-hover:scale-105">
                                 <ChevronRight className="h-5 w-5" />
                               </span>
                             </div>
@@ -1725,7 +1725,7 @@ export default function Library() {
                       <ListMusic className="mb-3 h-12 w-12 text-zinc-600" />
                       <h3 className="text-lg font-bold text-white">No playlists yet</h3>
                       <p className="mb-4 mt-1 text-xs text-zinc-400">Create your first playlist to feature it here.</p>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); setIsCreatePlaylistOpen(true); }} className="rounded-full bg-[#FA243C] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#ff4054]">Create Playlist</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setIsCreatePlaylistOpen(true); }} className="rounded-full bg-[#FF4FA3] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#FF6EB3]">Create Playlist</button>
                     </div>
                   )}
                 </section>
@@ -1737,7 +1737,7 @@ export default function Library() {
                       <h2 className="text-xl font-bold text-white">Artists</h2>
                       <p className="mt-1 text-xs text-zinc-500">Explore music by artist.</p>
                     </div>
-                    <button type="button" onClick={() => setTab('artists')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">
+                    <button type="button" onClick={() => setTab('artists')} className="shrink-0 text-xs font-semibold text-[#FF4FA3] hover:text-white">
                       View all <ChevronRight className="ml-1 inline h-4 w-4" />
                     </button>
                   </div>
@@ -1750,7 +1750,7 @@ export default function Library() {
                           onClick={() => openArtist(artist.id)}
                           className="yk-artist-carousel-card group flex flex-col items-center shrink-0 w-28 snap-start text-center transition hover:opacity-90 cursor-pointer"
                         >
-                          <div className="relative mb-2.5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#FA243C]/40 transition-colors shadow-md">
+                          <div className="relative mb-2.5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#FF4FA3]/40 transition-colors shadow-md">
                             {artist.hasArtwork ? (
                               <img
                                 src={'/api/artists/' + artist.id + '/artwork'}
@@ -1759,10 +1759,10 @@ export default function Library() {
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
-                              <Mic className="h-8 w-8 text-zinc-600 group-hover:text-[#FA243C] transition-colors" />
+                              <Mic className="h-8 w-8 text-zinc-600 group-hover:text-[#FF4FA3] transition-colors" />
                             )}
                           </div>
-                          <span className="w-full truncate text-xs font-semibold text-white group-hover:text-[#FA243C] transition-colors">{artist.name}</span>
+                          <span className="w-full truncate text-xs font-semibold text-white group-hover:text-[#FF4FA3] transition-colors">{artist.name}</span>
                           <span className="mt-0.5 text-[11px] text-zinc-500">{artist.songCount || 0} songs</span>
                         </button>
                       ))}
@@ -1779,7 +1779,7 @@ export default function Library() {
                       <h2 className="text-xl font-bold text-white">Recently Added</h2>
                       <p className="mt-1 text-xs text-zinc-500">Pick up where your collection is growing.</p>
                     </div>
-                    <button type="button" onClick={() => setTab('songs')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">
+                    <button type="button" onClick={() => setTab('songs')} className="shrink-0 text-xs font-semibold text-[#FF4FA3] hover:text-white">
                       View all <ChevronRight className="ml-1 inline h-4 w-4" />
                     </button>
                   </div>
@@ -1803,12 +1803,12 @@ export default function Library() {
                               <Music className="h-7 w-7 text-zinc-600" />
                             )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                              <div className="w-8 h-8 rounded-full bg-[#FA243C] text-white flex items-center justify-center shadow-md">
+                              <div className="w-8 h-8 rounded-full bg-[#FF4FA3] text-white flex items-center justify-center shadow-md">
                                 <Play className="w-4 h-4 fill-current ml-0.5" />
                               </div>
                             </div>
                           </div>
-                          <span className="block truncate text-xs font-semibold text-white group-hover:text-[#FA243C] transition-colors">{song.title}</span>
+                          <span className="block truncate text-xs font-semibold text-white group-hover:text-[#FF4FA3] transition-colors">{song.title}</span>
                           <span className="mt-0.5 block truncate text-[11px] text-zinc-400">{song.artist || 'Unknown Artist'}</span>
                         </div>
                       ))}
@@ -1825,7 +1825,7 @@ export default function Library() {
                       <h2 className="text-xl font-bold text-white">Songs</h2>
                       <p className="mt-1 text-xs text-zinc-500">Play a track, favourite it, or add it to your queue.</p>
                     </div>
-                    <button type="button" onClick={() => setTab('songs')} className="shrink-0 text-xs font-semibold text-[#FA243C] hover:text-white">
+                    <button type="button" onClick={() => setTab('songs')} className="shrink-0 text-xs font-semibold text-[#FF4FA3] hover:text-white">
                       View all <ChevronRight className="ml-1 inline h-4 w-4" />
                     </button>
                   </div>
@@ -1840,7 +1840,7 @@ export default function Library() {
                           <div
                             key={song.id}
                             className={`flex items-center gap-3 p-3 transition-colors ${
-                              isCurrent ? 'bg-[#FA243C]/10' : 'hover:bg-white/[0.03]'
+                              isCurrent ? 'bg-[#FF4FA3]/10' : 'hover:bg-white/[0.03]'
                             }`}
                           >
                             {/* Small square artwork */}
@@ -1859,7 +1859,7 @@ export default function Library() {
 
                             {/* Song title on first line, artist name underneath */}
                             <div className="min-w-0 flex-1">
-                              <p className={`truncate text-sm font-semibold ${isCurrent ? 'text-[#FA243C]' : 'text-white'}`}>
+                              <p className={`truncate text-sm font-semibold ${isCurrent ? 'text-[#FF4FA3]' : 'text-white'}`}>
                                 {song.title}
                               </p>
                               <p className="truncate text-xs text-zinc-400">
@@ -1879,8 +1879,8 @@ export default function Library() {
                                 onClick={() => handlePlayInJukebox(song, songs, index)}
                                 className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition ${
                                   isThisPlaying
-                                    ? 'bg-[#FA243C] text-white shadow-sm'
-                                    : 'bg-white/5 hover:bg-[#FA243C] text-white'
+                                    ? 'bg-[#FF4FA3] text-white shadow-sm'
+                                    : 'bg-white/5 hover:bg-[#FF4FA3] text-white'
                                 }`}
                                 aria-label={isThisPlaying ? 'Pause ' + song.title : 'Play ' + song.title}
                                 title={isThisPlaying ? 'Pause' : 'Play ' + song.title}
@@ -1893,7 +1893,7 @@ export default function Library() {
                                 onClick={() => handleToggleFavorite(song.id)}
                                 className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition ${
                                   isFav
-                                    ? 'text-[#FA243C] bg-[#FA243C]/15 hover:bg-[#FA243C]/25'
+                                    ? 'text-[#FF4FA3] bg-[#FF4FA3]/15 hover:bg-[#FF4FA3]/25'
                                     : 'text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10'
                                 }`}
                                 aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
@@ -1926,15 +1926,15 @@ export default function Library() {
 
           {/* Artists Grid */}
           {tab === 'artists' && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+            <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
               {artists.map(artist => (
                 <div 
                   key={artist.id}
                   onClick={() => openArtist(artist.id)}
-                  className="group flex cursor-pointer flex-col items-center rounded-xl p-3 text-center transition hover:bg-white/[0.04]"
+                  className="group flex w-32 shrink-0 snap-start cursor-pointer flex-col items-center rounded-2xl border border-white/5 bg-[#141622] p-4 text-center transition hover:border-[#FF4FA3]/30 hover:bg-[#1A1C2C]"
                 >
-                  <div className="w-24 h-24 rounded-full bg-[#1C1E2D] flex items-center justify-center mb-4 border border-white/10 group-hover:border-[#FA243C]/40 transition-colors shadow-inner overflow-hidden relative">
-                    <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#FA243C] transition-colors absolute" />
+                  <div className="relative mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#FF4FA3]/50">
+                    <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#FF4FA3] transition-colors absolute" />
                     {artist.hasArtwork && (
                       <img
                         src={`/api/artists/${artist.id}/artwork`}
@@ -1946,7 +1946,7 @@ export default function Library() {
                       />
                     )}
                   </div>
-                  <h3 className="font-semibold text-sm text-white truncate w-full group-hover:text-[#FA243C] transition-colors">{artist.name}</h3>
+                  <h3 className="w-full truncate text-sm font-semibold text-white transition-colors group-hover:text-[#FF4FA3]">{artist.name}</h3>
                   <p className="text-xs text-zinc-400 mt-1">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>
                 </div>
               ))}
@@ -1960,14 +1960,14 @@ export default function Library() {
 
           {/* Albums Grid */}
           {tab === 'albums' && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+            <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
               {albums.map(album => (
                 <div 
                   key={album.id}
                   onClick={() => openAlbum(album.id)}
                   className="group cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]"
                 >
-                  <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center border border-white/5 group-hover:border-[#FA243C]/40 transition-colors shadow-inner overflow-hidden">
+                  <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#FF4FA3]/40">
                     {album.hasArtwork ? (
                       <img
                         src={`/api/albums/${album.id}/artwork`}
@@ -1978,10 +1978,10 @@ export default function Library() {
                         }}
                       />
                     ) : (
-                      <Disc className="w-12 h-12 text-zinc-500 group-hover:text-[#FA243C] transition-colors" />
+                      <Disc className="w-12 h-12 text-zinc-500 group-hover:text-[#FF4FA3] transition-colors" />
                     )}
                   </div>
-                  <h3 className="font-semibold text-sm text-white truncate group-hover:text-[#FA243C] transition-colors">{album.title}</h3>
+                  <h3 className="font-semibold text-sm text-white truncate group-hover:text-[#FF4FA3] transition-colors">{album.title}</h3>
                   <p className="text-xs text-zinc-400 truncate mt-0.5">{album.artist || 'Unknown Artist'}</p>
                   <p className="text-[11px] text-zinc-500 mt-1">{album.year || 'Album'} • {album.songCount || 0} Tracks</p>
                 </div>
@@ -2013,12 +2013,12 @@ export default function Library() {
                     const isCurrent = jukeboxCurrentSong?.id === song.id;
                     const isThisPlaying = isCurrent && jukeboxIsPlaying;
                     return (
-                      <tr key={song.id} className={`transition-colors group ${isCurrent ? 'bg-[#FA243C]/10' : 'hover:bg-[#1A1C2C]/60'}`}>
+                      <tr key={song.id} className={`transition-colors group ${isCurrent ? 'bg-[#FF4FA3]/10' : 'hover:bg-[#1A1C2C]/60'}`}>
                         <td className="px-5 py-3.5 font-medium text-white flex items-center gap-3">
                           <button
                             type="button"
                             onClick={() => handlePlayInJukebox(song, songs, idx)}
-                            className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden relative group/play cursor-pointer border border-white/5 hover:border-[#FA243C]/40 transition-colors"
+                            className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden relative group/play cursor-pointer border border-white/5 hover:border-[#FF4FA3]/40 transition-colors"
                             title={isThisPlaying ? 'Pause' : 'Play in Jukebox'}
                           >
                             {song.hasArtwork ? (
@@ -2031,17 +2031,17 @@ export default function Library() {
                                 }}
                               />
                             ) : (
-                              <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#FA243C] transition-colors" />
+                              <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#FF4FA3] transition-colors" />
                             )}
                             <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${isThisPlaying ? 'opacity-100' : 'opacity-0 group-hover/play:opacity-100'}`}>
                               {isThisPlaying ? (
-                                <Pause className="w-4 h-4 text-[#FA243C] fill-current" />
+                                <Pause className="w-4 h-4 text-[#FF4FA3] fill-current" />
                               ) : (
                                 <Play className="w-4 h-4 text-white fill-current ml-0.5" />
                               )}
                             </div>
                           </button>
-                          <span className={`truncate ${isCurrent ? 'text-[#FA243C] font-semibold' : ''}`} title={song.title}>{song.title}</span>
+                          <span className={`truncate ${isCurrent ? 'text-[#FF4FA3] font-semibold' : ''}`} title={song.title}>{song.title}</span>
                           <LyricBadges
                             hasLrc={song.hasLrc}
                             hasElrc={song.hasElrc}
@@ -2061,7 +2061,7 @@ export default function Library() {
                               onClick={() => handlePlayInJukebox(song, songs, idx)}
                               className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
                                 isThisPlaying 
-                                  ? 'bg-[#FA243C] text-white shadow-sm' 
+                                  ? 'bg-[#FF4FA3] text-white shadow-sm' 
                                   : 'bg-white/5 hover:bg-white/15 text-zinc-200 hover:text-white border border-white/5'
                               }`}
                               title={isThisPlaying ? 'Pause song' : 'Play song in Jukebox'}
