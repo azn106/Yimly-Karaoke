@@ -1797,11 +1797,11 @@ export default function Library() {
                     </button>
                   </div>
                   {songs.length ? (
-                    <div className="flex items-start gap-3 overflow-x-auto pb-2 scrollbar-none">
+                    <div className="yk-horizontal-rail flex items-start gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
                       {songs.slice(0, 10).map((song, idx) => (
                         <div
                           key={song.id}
-                          className="group flex flex-col shrink-0 w-36 rounded-xl p-2 transition hover:bg-white/[0.04] cursor-pointer"
+                          className="group flex flex-col shrink-0 w-36 snap-start rounded-xl p-2 transition hover:bg-white/[0.04] cursor-pointer"
                           onClick={() => handlePlayInJukebox(song, songs, idx)}
                         >
                           <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#1C1E2D] flex items-center justify-center">
