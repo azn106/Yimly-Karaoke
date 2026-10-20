@@ -128,7 +128,7 @@ export default function PlaylistsGrid({
                   <img
                     src={playlist.coverImageUrl && /^(https?:|data:)/i.test(playlist.coverImageUrl) ? playlist.coverImageUrl : `/api/playlists/${playlist.id}/cover`}
                     alt={playlist.name}
-                    className="w-full h-full object-cover yk-artwork-image "
+                    className="w-full h-full object-cover yk-artwork-image yk-artwork-image "
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = 'none';
                     }}
