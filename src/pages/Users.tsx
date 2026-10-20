@@ -248,7 +248,7 @@ export default function Users() {
             resetForm();
             setShowAddModal(true);
           }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#F472B6] hover:bg-[#e0378b] text-white text-sm font-semibold shadow-lg shadow-[#F472B6]/20 transition-colors shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#F472B6] hover:bg-[#DB2777] text-white text-sm font-semibold shadow-lg shadow-[#F472B6]/20 transition-colors shrink-0"
         >
           <UserPlus className="w-4 h-4" />
           <span>Add New User</span>
@@ -455,7 +455,7 @@ export default function Users() {
                   id="btn-submit-create-user"
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#F472B6] hover:bg-[#e0378b] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-[#F472B6] hover:bg-[#DB2777] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Create Account</span>
@@ -529,7 +529,7 @@ export default function Users() {
                   id="btn-submit-edit-user"
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#F472B6] hover:bg-[#e0378b] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-[#F472B6] hover:bg-[#DB2777] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Save Changes</span>
@@ -585,7 +585,7 @@ export default function Users() {
                   id="btn-submit-change-password"
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#F472B6] hover:bg-[#e0378b] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-[#F472B6] hover:bg-[#DB2777] text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Update Password</span>
