@@ -51,6 +51,8 @@ export default function Layout() {
           element.style.setProperty('--yk-scroll-translate', '0px');
           element.style.setProperty('--yk-artwork-opacity', '1');
           element.style.setProperty('--yk-scroll-scale', '1');
+          element.style.setProperty('--yk-scroll-rotate-x', '0deg');
+          element.style.setProperty('--yk-scroll-rotate-y', '0deg');
         });
         return;
       }
@@ -62,13 +64,20 @@ export default function Layout() {
         const progress = (rect.top + rect.height / 2 - viewport.top) / height;
         // Make the scroll response visible on a phone-sized viewport:
         // artwork shifts up/down by up to 24px and gently scales as it crosses the centre.
+        const width = Math.max(viewport.width, 1);
+        const horizontalProgress = (rect.left + rect.width / 2 - viewport.left) / width;
         const distanceFromCentre = Math.min(1, Math.abs(progress - 0.5) * 2);
         const offset = Math.max(-24, Math.min(24, (0.5 - progress) * 48));
         const scale = 1.08 - distanceFromCentre * 0.16;
         const visibility = 1 - distanceFromCentre * 0.28;
+        // Tilt follows vertical scroll position, while horizontal position adds a subtle card-like angle.
+        const rotateX = Math.max(-6, Math.min(6, (0.5 - progress) * 12));
+        const rotateY = Math.max(-6, Math.min(6, (horizontalProgress - 0.5) * 12));
         element.style.setProperty('--yk-scroll-translate', `${offset.toFixed(2)}px`);
         element.style.setProperty('--yk-scroll-scale', scale.toFixed(3));
         element.style.setProperty('--yk-artwork-opacity', visibility.toFixed(3));
+        element.style.setProperty('--yk-scroll-rotate-x', `${rotateX.toFixed(2)}deg`);
+        element.style.setProperty('--yk-scroll-rotate-y', `${rotateY.toFixed(2)}deg`);
       });
     };
 
@@ -100,6 +109,8 @@ export default function Layout() {
         element.style.removeProperty('--yk-scroll-translate');
         element.style.removeProperty('--yk-artwork-opacity');
         element.style.removeProperty('--yk-scroll-scale');
+        element.style.removeProperty('--yk-scroll-rotate-x');
+        element.style.removeProperty('--yk-scroll-rotate-y');
       });
     };
   }, [loading]);
