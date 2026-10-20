@@ -61,7 +61,6 @@ export default function Library() {
 
   // Horizontal featured-playlist rail. Cards are sized to roughly twice an album card.
   const playlistRailRef = useRef<HTMLDivElement | null>(null);
-  const artistRailRef = useRef<HTMLDivElement | null>(null);
   const scrollPlaylistRail = (direction: -1 | 1) => {
     playlistRailRef.current?.scrollBy({
       left: direction * Math.max(320, Math.round((playlistRailRef.current?.clientWidth || 360) * 0.75)),
@@ -250,46 +249,6 @@ export default function Library() {
     }
   };
 
-
-  useEffect(() => {
-    const rail = playlistRailRef.current;
-    if (!rail) return;
-    const cards = rail.querySelectorAll('.yk-featured-playlist-card');
-    if (!('IntersectionObserver' in window)) {
-      cards.forEach(card => card.classList.add('is-revealed'));
-      return;
-    }
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-revealed');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { root: rail, threshold: 0.45 });
-    cards.forEach(card => observer.observe(card));
-    return () => observer.disconnect();
-  }, [playlists, tab]);
-
-  useEffect(() => {
-    const rail = artistRailRef.current;
-    if (!rail) return;
-    const images = rail.querySelectorAll('.yk-artwork-circle-reveal');
-    if (!('IntersectionObserver' in window)) {
-      images.forEach(image => image.classList.add('is-circle-revealed'));
-      return;
-    }
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-circle-revealed');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { root: rail, threshold: 0.4 });
-    images.forEach(image => observer.observe(image));
-    return () => observer.disconnect();
-  }, [artists, tab]);
 
   useEffect(() => {
     loadAllData();
@@ -1082,16 +1041,14 @@ export default function Library() {
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-[#141622] p-8 rounded-3xl border border-white/5 shadow-xl">
           <div className="w-28 h-28 rounded-full bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#FF4FA3]/10 overflow-hidden relative">
             <Mic className="w-12 h-12 text-[#FF4FA3] absolute" />
-            {selectedArtist.hasArtwork && (
-              <img
-                src={`/api/artists/${selectedArtist.id}/artwork`}
-                alt={selectedArtist.name}
-                className="w-full h-full object-cover yk-artwork-motion relative z-10"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-            )}
+            <img
+              src={`/api/artists/${selectedArtist.id}/artwork`}
+              alt={selectedArtist.name}
+              className="relative z-10 h-full w-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
           </div>
           <div className="text-center sm:text-left flex-1">
             <span className="text-xs uppercase tracking-widest text-[#FF4FA3] font-bold">Artist</span>
@@ -1145,7 +1102,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-motion"
+                        className="w-full h-full object-cover"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -1192,7 +1149,7 @@ export default function Library() {
                             <img
                               src={`/api/songs/${song.id}/artwork`}
                               alt={song.title}
-                              className="w-full h-full object-cover yk-artwork-motion"
+                              className="w-full h-full object-cover"
                               onError={(e) => {
                                 (e.target as HTMLElement).style.display = 'none';
                               }}
@@ -1287,7 +1244,7 @@ export default function Library() {
               <img
                 src={`/api/albums/${selectedAlbum.id}/artwork`}
                 alt={selectedAlbum.title}
-                className="w-full h-full object-cover yk-artwork-motion"
+                className="w-full h-full object-cover"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                 }}
@@ -1507,7 +1464,7 @@ export default function Library() {
                                 : `/api/songs/${item.id}/artwork`
                             }
                             alt={item.title || item.name}
-                            className="w-full h-full object-cover yk-artwork-motion"
+                            className="w-full h-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = 'none';
                             }}
@@ -1689,15 +1646,15 @@ export default function Library() {
                             key={playlist.id}
                             type="button"
                             onClick={() => openPlaylist(playlist.id)}
-                            className="yk-featured-playlist-card group relative h-60 w-[min(88vw,23rem)] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/10 bg-[#141416] text-left shadow-lg shadow-black/20 sm:h-64"
+                            className="group relative h-60 w-[min(88vw,23rem)] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/10 bg-[#141416] text-left shadow-lg shadow-black/20 sm:h-64"
                             aria-label={`Open playlist ${playlist.name}`}
                           >
                             {playlist.coverImageUrl || playlist.coverPath ? (
                               <img
                                 key={playlist.id}
-                                src={playlist.coverImageUrl || `/api/playlists/${playlist.id}/cover`}
+                                src={playlist.coverImageUrl && /^(https?:|data:)/i.test(playlist.coverImageUrl) ? playlist.coverImageUrl : `/api/playlists/${playlist.id}/cover`}
                                 alt=""
-                                className="yk-featured-playlist-artwork absolute inset-0 h-full w-full object-cover"
+                                className="absolute inset-0 h-full w-full object-cover"
                                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1742,7 +1699,7 @@ export default function Library() {
                     </button>
                   </div>
                   {artists.length ? (
-                    <div ref={artistRailRef} className="yk-horizontal-rail flex items-center gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
+                    <div className="yk-horizontal-rail flex items-center gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
                       {artists.map(artist => (
                         <button
                           type="button"
@@ -1755,7 +1712,7 @@ export default function Library() {
                               <img
                                 src={'/api/artists/' + artist.id + '/artwork'}
                                 alt={artist.name}
-                                className="h-full w-full object-cover yk-artwork-motion yk-artwork-circle-reveal"
+                                className="h-full w-full object-cover"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1796,7 +1753,7 @@ export default function Library() {
                               <img
                                 src={'/api/songs/' + song.id + '/artwork'}
                                 alt=""
-                                className="h-full w-full object-cover yk-artwork-motion transition"
+                                className="h-full w-full object-cover transition"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1849,7 +1806,7 @@ export default function Library() {
                                 <img
                                   src={'/api/songs/' + song.id + '/artwork'}
                                   alt=""
-                                  className="h-full w-full object-cover yk-artwork-motion"
+                                  className="h-full w-full object-cover"
                                   onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                                 />
                               ) : (
@@ -1935,16 +1892,14 @@ export default function Library() {
                 >
                   <div className="relative mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#FF4FA3]/50">
                     <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#FF4FA3] transition-colors absolute" />
-                    {artist.hasArtwork && (
-                      <img
-                        src={`/api/artists/${artist.id}/artwork`}
-                        alt={artist.name}
-                        className="w-full h-full object-cover yk-artwork-motion relative z-10"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    )}
+                    <img
+                      src={`/api/artists/${artist.id}/artwork`}
+                      alt={artist.name}
+                      className="relative z-10 h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
                   </div>
                   <h3 className="w-full truncate text-sm font-semibold text-white transition-colors group-hover:text-[#FF4FA3]">{artist.name}</h3>
                   <p className="text-xs text-zinc-400 mt-1">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>
@@ -1972,7 +1927,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-motion"
+                        className="w-full h-full object-cover"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -2025,7 +1980,7 @@ export default function Library() {
                               <img
                                 src={`/api/songs/${song.id}/artwork`}
                                 alt={song.title}
-                                className="w-full h-full object-cover yk-artwork-motion"
+                                className="w-full h-full object-cover"
                                 onError={(e) => {
                                   (e.target as HTMLElement).style.display = 'none';
                                 }}
