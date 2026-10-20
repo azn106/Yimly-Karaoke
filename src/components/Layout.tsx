@@ -50,6 +50,7 @@ export default function Layout() {
         observed.forEach((element) => {
           element.style.setProperty('--yk-scroll-translate', '0px');
           element.style.setProperty('--yk-artwork-opacity', '1');
+          element.style.setProperty('--yk-scroll-scale', '1');
         });
         return;
       }
@@ -59,9 +60,14 @@ export default function Layout() {
         const rect = element.getBoundingClientRect();
         const height = Math.max(viewport.height, 1);
         const progress = (rect.top + rect.height / 2 - viewport.top) / height;
-        const offset = Math.max(-8, Math.min(8, (0.5 - progress) * 16));
-        const visibility = Math.max(0, Math.min(1, 1 - Math.abs(progress - 0.5) * 0.45));
+        // Make the scroll response visible on a phone-sized viewport:
+        // artwork shifts up/down by up to 24px and gently scales as it crosses the centre.
+        const distanceFromCentre = Math.min(1, Math.abs(progress - 0.5) * 2);
+        const offset = Math.max(-24, Math.min(24, (0.5 - progress) * 48));
+        const scale = 1.08 - distanceFromCentre * 0.16;
+        const visibility = 1 - distanceFromCentre * 0.28;
         element.style.setProperty('--yk-scroll-translate', `${offset.toFixed(2)}px`);
+        element.style.setProperty('--yk-scroll-scale', scale.toFixed(3));
         element.style.setProperty('--yk-artwork-opacity', visibility.toFixed(3));
       });
     };
@@ -93,6 +99,7 @@ export default function Layout() {
       observed.forEach((element) => {
         element.style.removeProperty('--yk-scroll-translate');
         element.style.removeProperty('--yk-artwork-opacity');
+        element.style.removeProperty('--yk-scroll-scale');
       });
     };
   }, [loading]);

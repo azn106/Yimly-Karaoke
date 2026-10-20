@@ -173,21 +173,21 @@ html, body {
 }
 
 
-/* Yimly artwork motion: scroll-reactive depth and selective heartbeat. */
+/* Yimly artwork motion: visible scroll depth and a gentle heartbeat. */
 @keyframes yk-artwork-heartbeat {
-  0%, 62%, 100% { scale: 1.08; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
-  8% { scale: 1.10; box-shadow: 0 0 14px rgba(250, 36, 60, 0.12); }
-  16% { scale: 1.08; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
-  24% { scale: 1.092; box-shadow: 0 0 9px rgba(250, 36, 60, 0.09); }
-  32% { scale: 1.08; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
+  0%, 58%, 100% { scale: 1; filter: drop-shadow(0 0 0 rgba(250, 36, 60, 0)); }
+  8% { scale: 1.09; filter: drop-shadow(0 0 8px rgba(250, 36, 60, 0.24)); }
+  16% { scale: 1; filter: drop-shadow(0 0 0 rgba(250, 36, 60, 0)); }
+  24% { scale: 1.05; filter: drop-shadow(0 0 5px rgba(250, 36, 60, 0.16)); }
+  32% { scale: 1; filter: drop-shadow(0 0 0 rgba(250, 36, 60, 0)); }
 }
 
 .yk-artwork-motion {
   transform-origin: center;
-  /* JS updates these lightweight variables for consistent mobile/WebView behaviour. */
   translate: 0 var(--yk-scroll-translate, 0px);
   opacity: var(--yk-artwork-opacity, 1);
-  scale: 1.08;
+  scale: var(--yk-scroll-scale, 1);
+  transition: opacity 120ms linear;
 }
 
 .yk-heartbeat-artwork {
@@ -205,5 +205,6 @@ html, body {
     scale: 1 !important;
     transition: none !important;
     will-change: auto !important;
+    filter: none !important;
   }
 }
