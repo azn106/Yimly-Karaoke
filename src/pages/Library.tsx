@@ -1843,7 +1843,7 @@ export default function Library() {
                     </button>
                   </div>
                   {songs.length ? (
-                    <div className="overflow-hidden rounded-2xl border border-white/5 bg-[#141622] divide-y divide-white/5">
+                    <div className="divide-y divide-white/[0.04]">
                       {songs.slice(0, 10).map((song, index) => {
                         const isCurrent = jukeboxCurrentSong?.id === song.id;
                         const isThisPlaying = isCurrent && jukeboxIsPlaying;
@@ -1852,9 +1852,7 @@ export default function Library() {
                         return (
                           <div
                             key={song.id}
-                            className={`flex items-center gap-2.5 p-2 transition-colors ${
-                              isCurrent ? 'bg-[#F472B6]/10' : 'hover:bg-white/[0.03]'
-                            }`}
+                            className="flex items-center gap-2.5 py-2 transition-colors"
                           >
                             {/* Small square artwork */}
                             <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1C1E2D]">
@@ -1876,14 +1874,9 @@ export default function Library() {
                                 {song.title}
                               </p>
                               <p className="truncate text-xs text-zinc-400">
-                                {song.artist || 'Unknown Artist'}{song.album ? ' · ' + song.album : ''}
+                                {song.artist || 'Unknown Artist'}
                               </p>
                             </div>
-
-                            {/* Duration aligned on right */}
-                            <span className="shrink-0 text-xs tabular-nums text-zinc-500 font-mono hidden sm:block">
-                              {Math.floor((song.duration || 0) / 60)}:{String((song.duration || 0) % 60).padStart(2, '0')}
-                            </span>
 
                             {/* Play/Pause, favourite-heart, and add-to-queue on the same row */}
                             <div className="flex items-center gap-1.5 shrink-0">
