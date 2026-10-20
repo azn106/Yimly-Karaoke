@@ -351,7 +351,7 @@ function NavigationSections({
 
       <div className="space-y-1">
         <div className={`flex items-center rounded-xl transition-colors ${isJukeboxActive ? 'bg-[#FA243C]/15 border border-[#FA243C]/25' : 'hover:bg-white/5'}`}>
-          <NavLink to="/library" onClick={onNavigate} className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxActive ? 'text-[#FA243C] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxActive ? 'page' : undefined}>
+          <NavLink to="/library" onClick={() => { onNavigate(); window.dispatchEvent(new Event('yimly:navigate-library-section')); }} className={`flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium ${isJukeboxActive ? 'text-[#FA243C] font-semibold' : 'text-zinc-400 hover:text-white'}`} aria-current={isJukeboxActive ? 'page' : undefined}>
             <Music className={iconSize} /><span>Jukebox</span>
           </NavLink>
           <button type="button" onClick={() => onToggleSection('jukebox')} className="mr-1 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label={expandedSection === 'jukebox' ? 'Collapse Jukebox menu' : 'Expand Jukebox menu'} aria-expanded={expandedSection === 'jukebox'}>
@@ -408,7 +408,13 @@ function NavItem({ to, icon, label, badge, activeWhen, onNavigate }: { to: strin
   return (
     <NavLink
       to={to}
-      onClick={onNavigate}
+      onClick={() => {
+        onNavigate?.();
+        if (to.startsWith('/library')) {
+          // Clear local detail views even when the clicked tab URL is already current.
+          window.dispatchEvent(new Event('yimly:navigate-library-section'));
+        }
+      }}
       className={
         `flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-sm font-medium ${
           isActive 
