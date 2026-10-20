@@ -1663,13 +1663,6 @@ export default function Library() {
 
           {/* Jukebox Overview Dashboard */}
           {tab === 'home' && (() => {
-            const featuredPlaylist = playlists.length > 0 ? playlists[carouselIndex % playlists.length] : null;
-            const isCurrentPlaylistPlaying = !!(
-              featuredPlaylist &&
-              jukeboxIsPlaying &&
-              (jukeboxCurrentSong?.albumId === featuredPlaylist.id || featuredPlaylist.songs?.some(s => s.id === jukeboxCurrentSong?.id))
-            );
-
             return (
               <div className="space-y-10">
                 {/* 1. Featured Playlists: one horizontal row, swipe/scroll to browse. */}
