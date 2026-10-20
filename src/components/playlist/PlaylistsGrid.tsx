@@ -33,6 +33,7 @@ interface PlaylistsGridProps {
   onCoverUpload: (playlistId: number, file: File) => void;
   onCoverRemove: (playlistId: number) => void;
   onPlayAll: (playlist: Playlist) => void;
+  layout?: 'grid' | 'carousel';
 }
 
 export default function PlaylistsGrid({
@@ -48,6 +49,7 @@ export default function PlaylistsGrid({
   onCoverUpload,
   onCoverRemove,
   onPlayAll,
+  layout = 'grid',
 }: PlaylistsGridProps) {
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -100,15 +102,15 @@ export default function PlaylistsGrid({
 
         <button
           onClick={onCreateNew}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#FF4FA3] hover:bg-[#e0378b] text-white rounded-full text-xs font-semibold shadow-lg shadow-[#FF4FA3]/20 transition-all shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#FF4FA3] hover:bg-[#E0378B] text-white rounded-full text-xs font-semibold shadow-lg shadow-[#FF4FA3]/20 transition-all shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>New Playlist</span>
         </button>
       </div>
 
-      {/* Playlists Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+      {/* Playlist browse layout */}
+      <div className={layout === 'carousel' ? 'yk-horizontal-rail flex items-stretch gap-4 overflow-x-auto pb-4 snap-x snap-mandatory' : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5'}>
         {playlists.map((playlist) => {
           const isOwner = playlist.userId === currentUser?.id;
           const canEdit = playlist.canEdit || isOwner || isAdmin;
@@ -118,7 +120,7 @@ export default function PlaylistsGrid({
             <div
               key={playlist.id}
               onClick={() => onOpenPlaylist(playlist.id)}
-              className="bg-[#141622] hover:bg-[#1A1C2C] p-4 rounded-2xl border border-white/5 hover:border-[#FF4FA3]/30 cursor-pointer transition-all group shadow-lg flex flex-col justify-between relative"
+              className={`bg-[#141622] hover:bg-[#1A1C2C] p-4 rounded-2xl border border-white/5 hover:border-[#FF4FA3]/30 cursor-pointer transition-all group shadow-lg flex flex-col justify-between relative ${layout === 'carousel' ? 'w-56 shrink-0 snap-start' : ''}`}
             >
               {/* Artwork / Cover Container */}
               <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center border border-white/5 group-hover:border-[#FF4FA3]/30 transition-all relative overflow-hidden shadow-inner">
@@ -355,7 +357,7 @@ export default function PlaylistsGrid({
             </div>
             <button
               onClick={onCreateNew}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#FF4FA3] hover:bg-[#e0378b] text-white rounded-full text-xs font-semibold shadow-md shadow-[#FF4FA3]/20 transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#FF4FA3] hover:bg-[#E0378B] text-white rounded-full text-xs font-semibold shadow-md shadow-[#FF4FA3]/20 transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Create First Playlist</span>
