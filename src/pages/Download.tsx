@@ -317,7 +317,7 @@ export default function DownloadMusic() {
             <button
               type="submit"
               disabled={resolving || !inputVal.trim()}
-              className="px-6 py-3.5 bg-[#F472B6] hover:bg-[#ff69b2] text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
+              className="px-6 py-3.5 bg-[#F472B6] hover:bg-[#DB2777] text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
             >
               {resolving ? (
                 <>
@@ -472,7 +472,7 @@ export default function DownloadMusic() {
               type="button"
               onClick={handleStartDownload}
               disabled={selectedIndices.size === 0 || startingDownload || libraries.length === 0}
-              className="px-6 py-3 bg-[#F472B6] hover:bg-[#ff69b2] text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-3 bg-[#F472B6] hover:bg-[#DB2777] text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center gap-2 disabled:opacity-50"
             >
               {startingDownload ? (
                 <>
