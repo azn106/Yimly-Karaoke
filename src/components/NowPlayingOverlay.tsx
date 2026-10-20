@@ -49,9 +49,23 @@ export default function NowPlayingOverlay() {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
 
-  // Touch drag-down tracking for swipe-to-minimize
+  // Track touch positions in refs so touch-end always reads the latest distance.
+  // React state can be stale inside touch handlers on fast mobile gestures.
   const touchStartY = useRef<number | null>(null);
+  const dragDistanceRef = useRef<number>(0);
+  const compactTouchStartY = useRef<number | null>(null);
   const [dragOffset, setDragOffset] = useState<number>(0);
+
+  const resetTouchDrag = () => {
+    touchStartY.current = null;
+    dragDistanceRef.current = 0;
+    setDragOffset(0);
+  };
+
+  const closeExpandedPlayer = () => {
+    setIsExpanded(false);
+    resetTouchDrag();
+  };
 
   // Prevent background scrolling while expanded player is open
   useEffect(() => {
@@ -68,7 +82,7 @@ export default function NowPlayingOverlay() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isExpanded) {
-        setIsExpanded(false);
+        closeExpandedPlayer();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -108,25 +122,58 @@ export default function NowPlayingOverlay() {
     seek(seekTime);
   };
 
+  const handleCompactTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    // Do not turn gestures on transport controls into player-opening gestures.
+    if (target.closest('button') || e.touches.length !== 1) {
+      compactTouchStartY.current = null;
+      return;
+    }
+    compactTouchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleCompactTouchEnd = (e: React.TouchEvent) => {
+    if (compactTouchStartY.current === null || e.changedTouches.length !== 1) {
+      compactTouchStartY.current = null;
+      return;
+    }
+    const deltaY = e.changedTouches[0].clientY - compactTouchStartY.current;
+    compactTouchStartY.current = null;
+    if (deltaY <= -80) setIsExpanded(true);
+  };
+
+  const handleCompactTouchCancel = () => {
+    compactTouchStartY.current = null;
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
     touchStartY.current = e.touches[0].clientY;
+    dragDistanceRef.current = 0;
+    setDragOffset(0);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStartY.current === null) return;
+    if (touchStartY.current === null || e.touches.length !== 1) return;
     const currentY = e.touches[0].clientY;
     const diff = currentY - touchStartY.current;
-    if (diff > 0) {
-      setDragOffset(diff);
-    }
+    // Only drag down to minimise. Clear the visual offset if the finger moves up.
+    dragDistanceRef.current = Math.max(0, diff);
+    setDragOffset(dragDistanceRef.current);
   };
 
   const handleTouchEnd = () => {
-    if (dragOffset > 70) {
+    // Read the ref, not React state: touchend can run before a state render commits.
+    const shouldClose = dragDistanceRef.current >= 80;
+    resetTouchDrag();
+    if (shouldClose) {
       setIsExpanded(false);
     }
-    touchStartY.current = null;
-    setDragOffset(0);
+  };
+
+  const handleTouchCancel = () => {
+    // A cancelled/interrupted gesture must never leave the sheet visually displaced.
+    resetTouchDrag();
   };
 
   return (
@@ -138,6 +185,9 @@ export default function NowPlayingOverlay() {
         className="fixed bottom-0 left-0 right-0 xl:left-[230px] z-40 bg-[#11121A]/95 backdrop-blur-md border-t border-white/10 shadow-2xl transition-all select-none pb-[max(0.45rem,env(safe-area-inset-bottom))]"
         role="region"
         aria-label="Compact media player"
+        onTouchStart={handleCompactTouchStart}
+        onTouchEnd={handleCompactTouchEnd}
+        onTouchCancel={handleCompactTouchCancel}
       >
         {/* Subtle rose-pink progress bar across top edge */}
         <div className="w-full h-[2.5px] bg-white/10 relative overflow-hidden">
@@ -236,7 +286,7 @@ export default function NowPlayingOverlay() {
         className={`fixed inset-0 z-50 bg-black/75 backdrop-blur-xs transition-opacity duration-300 xl:left-[230px] ${
           isExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
-        onClick={() => setIsExpanded(false)}
+        onClick={closeExpandedPlayer}
         aria-hidden="true"
       />
 
@@ -258,7 +308,9 @@ export default function NowPlayingOverlay() {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchCancel}
           className="pt-2.5 pb-1.5 shrink-0 cursor-grab active:cursor-grabbing select-none hover:bg-white/[0.02] transition-colors"
+          style={{ touchAction: 'none' }}
           title="Swipe down to minimize"
         >
           <div className="w-12 h-1.5 bg-white/20 hover:bg-white/30 rounded-full mx-auto transition-colors" />
@@ -269,7 +321,7 @@ export default function NowPlayingOverlay() {
           {/* Minimize Button */}
           <button
             type="button"
-            onClick={() => setIsExpanded(false)}
+            onClick={closeExpandedPlayer}
             className="p-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F472B6]"
             title="Minimize player"
             aria-label="Minimize player"
@@ -318,7 +370,7 @@ export default function NowPlayingOverlay() {
           {/* Close Button */}
           <button
             type="button"
-            onClick={() => setIsExpanded(false)}
+            onClick={closeExpandedPlayer}
             className="p-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F472B6]"
             title="Close"
             aria-label="Close"
