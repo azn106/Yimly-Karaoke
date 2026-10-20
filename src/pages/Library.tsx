@@ -1122,7 +1122,7 @@ export default function Library() {
               <img
                 src={`/api/artists/${selectedArtist.id}/artwork`}
                 alt={selectedArtist.name}
-                className="w-full h-full object-cover relative z-10"
+                className="w-full h-full object-cover yk-artwork-motion relative z-10"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                 }}
@@ -1181,7 +1181,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -1228,7 +1228,7 @@ export default function Library() {
                             <img
                               src={`/api/songs/${song.id}/artwork`}
                               alt={song.title}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover yk-artwork-motion"
                               onError={(e) => {
                                 (e.target as HTMLElement).style.display = 'none';
                               }}
@@ -1323,7 +1323,7 @@ export default function Library() {
               <img
                 src={`/api/albums/${selectedAlbum.id}/artwork`}
                 alt={selectedAlbum.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover yk-artwork-motion"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                 }}
@@ -1543,7 +1543,7 @@ export default function Library() {
                                 : `/api/songs/${item.id}/artwork`
                             }
                             alt={item.title || item.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover yk-artwork-motion"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = 'none';
                             }}
@@ -1723,7 +1723,7 @@ export default function Library() {
                           key={featuredPlaylist.id}
                           src={featuredPlaylist.coverImageUrl || `/api/playlists/${featuredPlaylist.id}/cover`}
                           alt={featuredPlaylist.name}
-                          className="w-full h-full object-cover transition-all duration-500 ease-out"
+                          className="w-full h-full object-cover yk-artwork-motion yk-heartbeat-artwork transition-all duration-500 ease-out"
                           onError={(e) => {
                             (e.currentTarget as HTMLImageElement).style.display = 'none';
                           }}
@@ -1861,7 +1861,7 @@ export default function Library() {
                               <img
                                 src={'/api/artists/' + artist.id + '/artwork'}
                                 alt={artist.name}
-                                className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                className="h-full w-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1902,7 +1902,7 @@ export default function Library() {
                               <img
                                 src={'/api/songs/' + song.id + '/artwork'}
                                 alt=""
-                                className="h-full w-full object-cover transition group-hover:scale-105"
+                                className="h-full w-full object-cover yk-artwork-motion transition group-hover:scale-105"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1955,7 +1955,7 @@ export default function Library() {
                                 <img
                                   src={'/api/songs/' + song.id + '/artwork'}
                                   alt=""
-                                  className="h-full w-full object-cover"
+                                  className="h-full w-full object-cover yk-artwork-motion"
                                   onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                                 />
                               ) : (
@@ -2045,7 +2045,7 @@ export default function Library() {
                       <img
                         src={`/api/artists/${artist.id}/artwork`}
                         alt={artist.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 relative z-10"
+                        className="w-full h-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300 relative z-10"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -2078,7 +2078,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -2131,7 +2131,7 @@ export default function Library() {
                               <img
                                 src={`/api/songs/${song.id}/artwork`}
                                 alt={song.title}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover yk-artwork-motion"
                                 onError={(e) => {
                                   (e.target as HTMLElement).style.display = 'none';
                                 }}

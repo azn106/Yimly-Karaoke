@@ -374,7 +374,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {featuredSongs.map((song) => {
+            {featuredSongs.map((song, index) => {
               const isCurrent = jukeboxCurrentSong?.id === song.id;
               const isThisPlaying = isCurrent && jukeboxIsPlaying;
               return (
@@ -396,7 +396,7 @@ export default function Home() {
                       <img
                         src={`/api/songs/${song.id}/artwork`}
                         alt={song.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className={`w-full h-full object-cover yk-artwork-motion group-hover:scale-105 transition-transform duration-300 ${index === 0 || isThisPlaying ? 'yk-heartbeat-artwork' : ''}`}
                       />
                     ) : (
                       <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#FA243C] transition-colors" />

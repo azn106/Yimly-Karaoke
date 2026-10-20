@@ -171,3 +171,67 @@ html, body {
   z-index: 99999 !important;
   overflow: hidden !important;
 }
+
+
+/* Yimly artwork motion: scroll-reactive depth and selective heartbeat. */
+@keyframes yk-artwork-reveal {
+  from { opacity: 0.62; }
+  to { opacity: 1; }
+}
+
+@keyframes yk-artwork-parallax {
+  from { translate: 0 8px; }
+  to { translate: 0 -8px; }
+}
+
+@keyframes yk-artwork-heartbeat {
+  0%, 62%, 100% { scale: 1; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
+  8% { scale: 1.018; box-shadow: 0 0 14px rgba(250, 36, 60, 0.12); }
+  16% { scale: 1; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
+  24% { scale: 1.012; box-shadow: 0 0 9px rgba(250, 36, 60, 0.09); }
+  32% { scale: 1; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
+}
+
+.yk-artwork-motion {
+  transform-origin: center;
+  will-change: auto;
+}
+
+.yk-heartbeat-artwork {
+  animation: yk-artwork-heartbeat 3.8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Scroll-driven motion is progressive enhancement; unsupported browsers stay static. */
+@supports (animation-timeline: view()) {
+  .yk-artwork-motion {
+    animation-name: yk-artwork-reveal, yk-artwork-parallax;
+    animation-duration: auto, auto;
+    animation-timing-function: linear, linear;
+    animation-fill-mode: both, both;
+    animation-timeline: view(), view();
+    animation-range: entry 0% entry 75%, cover 0% cover 100%;
+  }
+
+  /* Preserve heartbeat when an image has both scroll and playback/featured states. */
+  .yk-artwork-motion.yk-heartbeat-artwork {
+    animation-name: yk-artwork-reveal, yk-artwork-parallax, yk-artwork-heartbeat;
+    animation-duration: auto, auto, 3.8s;
+    animation-timing-function: linear, linear, ease-in-out;
+    animation-fill-mode: both, both, both;
+    animation-timeline: view(), view(), auto;
+    animation-range: entry 0% entry 75%, cover 0% cover 100%, normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yk-artwork-motion,
+  .yk-heartbeat-artwork {
+    animation: none !important;
+    transform: none !important;
+    translate: none !important;
+    scale: 1 !important;
+    transition: none !important;
+    will-change: auto !important;
+  }
+}

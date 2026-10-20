@@ -241,7 +241,7 @@ export default function PlayerBar() {
                 <img
                   src={`/api/songs/${currentSong.id}/artwork`}
                   alt={currentSong.title}
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover yk-artwork-motion ${isPlaying ? 'yk-heartbeat-artwork' : ''}`}
                   onError={(e) => {
                     (e.target as HTMLElement).style.display = 'none';
                   }}
