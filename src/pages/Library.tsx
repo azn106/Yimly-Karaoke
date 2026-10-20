@@ -1056,7 +1056,7 @@ export default function Library() {
             <img
               src={`/api/artists/${selectedArtist.id}/artwork`}
               alt={selectedArtist.name}
-              className="relative z-10 h-full w-full object-cover yk-artwork-image"
+              className="relative z-10 h-full w-full object-cover yk-artwork-image yk-artwork-image"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = 'none';
               }}
@@ -1114,7 +1114,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-image"
+                        className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -1161,7 +1161,7 @@ export default function Library() {
                             <img
                               src={`/api/songs/${song.id}/artwork`}
                               alt={song.title}
-                              className="w-full h-full object-cover yk-artwork-image"
+                              className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
                               onError={(e) => {
                                 (e.target as HTMLElement).style.display = 'none';
                               }}
@@ -1256,7 +1256,7 @@ export default function Library() {
               <img
                 src={`/api/albums/${selectedAlbum.id}/artwork`}
                 alt={selectedAlbum.title}
-                className="w-full h-full object-cover yk-artwork-image"
+                className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                 }}
@@ -1476,7 +1476,7 @@ export default function Library() {
                                 : `/api/songs/${item.id}/artwork`
                             }
                             alt={item.title || item.name}
-                            className="w-full h-full object-cover yk-artwork-image"
+                            className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = 'none';
                             }}
@@ -1666,7 +1666,7 @@ export default function Library() {
                                 key={playlist.id}
                                 src={playlist.coverImageUrl && /^(https?:|data:)/i.test(playlist.coverImageUrl) ? playlist.coverImageUrl : `/api/playlists/${playlist.id}/cover`}
                                 alt=""
-                                className="absolute inset-0 h-full w-full object-cover yk-artwork-image"
+                                className="absolute inset-0 h-full w-full object-cover yk-artwork-image yk-artwork-image"
                                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1724,7 +1724,7 @@ export default function Library() {
                               <img
                                 src={'/api/artists/' + artist.id + '/artwork'}
                                 alt={artist.name}
-                                className="h-full w-full object-cover yk-artwork-image"
+                                className="h-full w-full object-cover yk-artwork-image yk-artwork-image"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1765,7 +1765,7 @@ export default function Library() {
                               <img
                                 src={'/api/songs/' + song.id + '/artwork'}
                                 alt=""
-                                className="h-full w-full object-cover yk-artwork-image transition"
+                                className="h-full w-full object-cover yk-artwork-image yk-artwork-image transition"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1818,7 +1818,7 @@ export default function Library() {
                                 <img
                                   src={'/api/songs/' + song.id + '/artwork'}
                                   alt=""
-                                  className="h-full w-full object-cover yk-artwork-image"
+                                  className="h-full w-full object-cover yk-artwork-image yk-artwork-image"
                                   onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                                 />
                               ) : (
@@ -1907,7 +1907,7 @@ export default function Library() {
                     <img
                       src={`/api/artists/${artist.id}/artwork`}
                       alt={artist.name}
-                      className="relative z-10 h-full w-full object-cover yk-artwork-image"
+                      className="relative z-10 h-full w-full object-cover yk-artwork-image yk-artwork-image"
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).style.display = 'none';
                       }}
@@ -1939,7 +1939,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-image"
+                        className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -1992,7 +1992,7 @@ export default function Library() {
                               <img
                                 src={`/api/songs/${song.id}/artwork`}
                                 alt={song.title}
-                                className="w-full h-full object-cover yk-artwork-image"
+                                className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
                                 onError={(e) => {
                                   (e.target as HTMLElement).style.display = 'none';
                                 }}
