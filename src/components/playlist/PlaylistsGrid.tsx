@@ -102,7 +102,7 @@ export default function PlaylistsGrid({
 
         <button
           onClick={onCreateNew}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#F472B6] hover:bg-[#e0378b] text-white rounded-full text-xs font-semibold shadow-lg shadow-[#F472B6]/20 transition-all shrink-0"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#F472B6] hover:bg-[#DB2777] text-white rounded-full text-xs font-semibold shadow-lg shadow-[#F472B6]/20 transition-all shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>New Playlist</span>
@@ -128,7 +128,7 @@ export default function PlaylistsGrid({
                   <img
                     src={playlist.coverImageUrl && /^(https?:|data:)/i.test(playlist.coverImageUrl) ? playlist.coverImageUrl : `/api/playlists/${playlist.id}/cover`}
                     alt={playlist.name}
-                    className="w-full h-full object-cover "
+                    className="w-full h-full object-cover yk-artwork-image "
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = 'none';
                     }}
@@ -357,7 +357,7 @@ export default function PlaylistsGrid({
             </div>
             <button
               onClick={onCreateNew}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#F472B6] hover:bg-[#e0378b] text-white rounded-full text-xs font-semibold shadow-md shadow-[#F472B6]/20 transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#F472B6] hover:bg-[#DB2777] text-white rounded-full text-xs font-semibold shadow-md shadow-[#F472B6]/20 transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Create First Playlist</span>
