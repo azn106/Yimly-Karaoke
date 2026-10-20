@@ -1114,7 +1114,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
+                        className="h-[70%] w-[70%] object-cover yk-artwork-image yk-artwork-image"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -1767,7 +1767,7 @@ export default function Library() {
                               <img
                                 src={`/api/albums/${album.id}/artwork`}
                                 alt={album.title}
-                                className="h-full w-full object-cover yk-artwork-image"
+                                className="h-[70%] w-[70%] object-cover yk-artwork-image"
                                 onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1809,7 +1809,7 @@ export default function Library() {
                               <img
                                 src={'/api/songs/' + song.id + '/artwork'}
                                 alt=""
-                                className="h-full w-full object-cover yk-artwork-image yk-artwork-image transition"
+                                className="h-[70%] w-[70%] object-cover yk-artwork-image yk-artwork-image transition"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1983,7 +1983,7 @@ export default function Library() {
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
+                        className="h-[70%] w-[70%] object-cover yk-artwork-image yk-artwork-image"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
