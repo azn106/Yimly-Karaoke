@@ -1658,7 +1658,7 @@ export default function Library() {
                             key={playlist.id}
                             type="button"
                             onClick={() => openPlaylist(playlist.id)}
-                            className="group relative h-60 w-[min(88vw,23rem)] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/10 bg-[#141416] text-left shadow-lg shadow-black/20 sm:h-64"
+                            className="group relative h-[7.5rem] w-[min(44vw,11.5rem)] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-[#141416] text-left shadow-lg shadow-black/20 sm:h-32"
                             aria-label={`Open playlist ${playlist.name}`}
                           >
                             {playlist.coverImageUrl || playlist.coverPath ? (
@@ -1671,18 +1671,18 @@ export default function Library() {
                               />
                             ) : (
                               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#24242B] to-[#111114]">
-                                <ListMusic className="h-16 w-16 text-white/20" strokeWidth={1} />
+                                <ListMusic className="h-8 w-8 text-white/20" strokeWidth={1} />
                               </div>
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
-                            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 sm:p-5">
+                            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-2">
                               <div className="min-w-0">
-                                <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-[#F472B6]">Featured playlist</span>
-                                <h3 className="truncate text-lg font-bold text-white sm:text-xl">{playlist.name}</h3>
-                                <p className="mt-1 text-xs text-white/70">{playlist.songCount || playlist.songs?.length || 0} songs</p>
+                                <span className="mb-0.5 block text-[8px] font-bold uppercase tracking-[0.1em] text-[#F472B6]">Featured playlist</span>
+                                <h3 className="truncate text-sm font-bold text-white">{playlist.name}</h3>
+                                <p className="mt-0.5 text-[10px] text-white/70">{playlist.songCount || playlist.songs?.length || 0} songs</p>
                               </div>
-                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/25 transition-transform group-hover:scale-105">
-                                <ChevronRight className="h-5 w-5" />
+                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/25 transition-transform group-hover:scale-105">
+                                <ChevronRight className="h-4 w-4" />
                               </span>
                             </div>
                           </button>
