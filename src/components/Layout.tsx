@@ -53,6 +53,13 @@ export default function Layout() {
           element.style.setProperty('--yk-scroll-scale', '1');
           element.style.setProperty('--yk-scroll-rotate-x', '0deg');
           element.style.setProperty('--yk-scroll-rotate-y', '0deg');
+          const card = element.closest<HTMLElement>('.group');
+          if (card) {
+            card.classList.add('yk-scroll-card');
+            card.style.setProperty('--yk-scroll-clip', '0%');
+            card.style.setProperty('--yk-scroll-title-y', '0px');
+            card.style.setProperty('--yk-scroll-title-opacity', '1');
+          }
         });
         return;
       }
@@ -62,14 +69,16 @@ export default function Layout() {
         const rect = element.getBoundingClientRect();
         const height = Math.max(viewport.height, 1);
         const progress = (rect.top + rect.height / 2 - viewport.top) / height;
-        // Make the scroll response visible on a phone-sized viewport:
-        // artwork shifts up/down by up to 24px and gently scales as it crosses the centre.
+        // The whole effect is tied to scroll position, so it reverses naturally when scrolling back up.
         const width = Math.max(viewport.width, 1);
         const horizontalProgress = (rect.left + rect.width / 2 - viewport.left) / width;
         const distanceFromCentre = Math.min(1, Math.abs(progress - 0.5) * 2);
         const offset = Math.max(-24, Math.min(24, (0.5 - progress) * 48));
         const scale = 1.08 - distanceFromCentre * 0.16;
         const visibility = 1 - distanceFromCentre * 0.28;
+        const clip = distanceFromCentre * 14;
+        const titleOffset = distanceFromCentre * 12;
+        const titleOpacity = 1 - distanceFromCentre * 0.22;
         // Tilt follows vertical scroll position, while horizontal position adds a subtle card-like angle.
         const rotateX = Math.max(-6, Math.min(6, (0.5 - progress) * 12));
         const rotateY = Math.max(-6, Math.min(6, (horizontalProgress - 0.5) * 12));
@@ -78,6 +87,15 @@ export default function Layout() {
         element.style.setProperty('--yk-artwork-opacity', visibility.toFixed(3));
         element.style.setProperty('--yk-scroll-rotate-x', `${rotateX.toFixed(2)}deg`);
         element.style.setProperty('--yk-scroll-rotate-y', `${rotateY.toFixed(2)}deg`);
+
+        // Put reveal/title variables on the card wrapper so the artwork and its title move together.
+        const card = element.closest<HTMLElement>('.group');
+        if (card) {
+          card.classList.add('yk-scroll-card');
+          card.style.setProperty('--yk-scroll-clip', `${clip.toFixed(2)}%`);
+          card.style.setProperty('--yk-scroll-title-y', `${titleOffset.toFixed(2)}px`);
+          card.style.setProperty('--yk-scroll-title-opacity', titleOpacity.toFixed(3));
+        }
       });
     };
 
@@ -111,6 +129,13 @@ export default function Layout() {
         element.style.removeProperty('--yk-scroll-scale');
         element.style.removeProperty('--yk-scroll-rotate-x');
         element.style.removeProperty('--yk-scroll-rotate-y');
+        const card = element.closest<HTMLElement>('.group');
+        if (card) {
+          card.style.removeProperty('--yk-scroll-clip');
+          card.style.removeProperty('--yk-scroll-title-y');
+          card.style.removeProperty('--yk-scroll-title-opacity');
+          card.classList.remove('yk-scroll-card');
+        }
       });
     };
   }, [loading]);
