@@ -70,7 +70,7 @@ export default function NowPlayingPanel() {
                   <img
                     src={`/api/songs/${currentSong.id}/artwork`}
                     alt={`Artwork for ${currentSong.title}`}
-                    className="absolute inset-0 h-full w-full object-cover yk-artwork-image"
+                    className="absolute inset-0 h-full w-full object-cover yk-artwork-image yk-artwork-image"
                     onError={event => { event.currentTarget.style.display = 'none'; }}
                   />
                 )}
@@ -202,7 +202,7 @@ export default function NowPlayingPanel() {
                             <img
                               src={`/api/songs/${song.id}/artwork`}
                               alt=""
-                              className="absolute inset-0 h-full w-full object-cover yk-artwork-image"
+                              className="absolute inset-0 h-full w-full object-cover yk-artwork-image yk-artwork-image"
                               onError={event => { event.currentTarget.style.display = 'none'; }}
                             />
                           )}
