@@ -1998,110 +1998,65 @@ export default function Library() {
             </div>
           )}
 
-          {/* Songs Table */}
+          {/* Songs List — clean, borderless styling matching the Jukebox rows */}
           {tab === 'songs' && (
-            <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                  <tr>
-                    <th className="px-5 py-3.5">Title</th>
-                    <th className="px-5 py-3.5">Artist</th>
-                    <th className="px-5 py-3.5">Album</th>
-                    <th className="px-5 py-3.5">Duration</th>
-                    <th className="px-5 py-3.5">Variant</th>
-                    <th className="px-5 py-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {songs.map((song, idx) => {
-                    const isCurrent = jukeboxCurrentSong?.id === song.id;
-                    const isThisPlaying = isCurrent && jukeboxIsPlaying;
-                    return (
-                      <tr key={song.id} className={`transition-colors group ${isCurrent ? 'bg-[#F472B6]/10' : 'hover:bg-[#1A1C2C]/60'}`}>
-                        <td className="px-5 py-3.5 font-medium text-white flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => handlePlayInJukebox(song, songs, idx)}
-                            className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden relative group/play cursor-pointer border border-white/5 hover:border-[#F472B6]/40 transition-colors"
-                            title={isThisPlaying ? 'Pause' : 'Play in Jukebox'}
-                          >
-                            {song.hasArtwork ? (
-                              <img
-                                src={`/api/songs/${song.id}/artwork`}
-                                alt={song.title}
-                                className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
-                                onError={(e) => {
-                                  (e.target as HTMLElement).style.display = 'none';
-                                }}
-                              />
-                            ) : (
-                              <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
-                            )}
-                            <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${isThisPlaying ? 'opacity-100' : 'opacity-0 group-hover/play:opacity-100'}`}>
-                              {isThisPlaying ? (
-                                <Pause className="w-4 h-4 text-[#F472B6] fill-current" />
-                              ) : (
-                                <Play className="w-4 h-4 text-white fill-current ml-0.5" />
-                              )}
-                            </div>
-                          </button>
-                          <span className={`truncate ${isCurrent ? 'text-[#F472B6] font-semibold' : ''}`} title={song.title}>{song.title}</span>
-                          <LyricBadges
-                            hasLrc={song.hasLrc}
-                            hasElrc={song.hasElrc}
-                            onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
-                          />
-                        </td>
-                        <td className="px-5 py-3.5 text-zinc-300 text-xs truncate max-w-xs" title={song.artist}>
-                          {renderArtistLinks(song)}
-                        </td>
-                        <td className="px-5 py-3.5 text-zinc-400 text-xs truncate max-w-xs" title={song.album}>{song.album || '—'}</td>
-                        <td className="px-5 py-3.5 text-zinc-400 text-xs font-mono">{formatDuration(song.duration)}</td>
-                        <td className="px-5 py-3.5 text-zinc-400 text-xs capitalize">{song.variant}</td>
-                        <td className="px-5 py-3.5 text-right">
-                          <div className="inline-flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handlePlayInJukebox(song, songs, idx)}
-                              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
-                                isThisPlaying 
-                                  ? 'bg-[#F472B6] text-white shadow-sm' 
-                                  : 'bg-white/5 hover:bg-white/15 text-zinc-200 hover:text-white border border-white/5'
-                              }`}
-                              title={isThisPlaying ? 'Pause song' : 'Play song in Jukebox'}
-                            >
-                              {isThisPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                              <span>{isThisPlaying ? 'Pause' : 'Play'}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleQueueInJukebox(song)}
-                              className="p-1.5 rounded-lg text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-colors"
-                              title="Add to Jukebox queue"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteSong(song)}
-                              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-transparent text-zinc-500 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
-                              title="Delete song from library"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {songs.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-12 text-center text-zinc-500">
-                        No songs found in library.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="min-w-0">
+              <div className="divide-y divide-white/[0.04]">
+                {songs.map((song, idx) => (
+                  <div key={song.id} className="flex items-center gap-2.5 py-2 transition-colors">
+                    {/* Artwork remains a play target; no separate Play/Heart/Plus controls on this page. */}
+                    <button
+                      type="button"
+                      onClick={() => handlePlayInJukebox(song, songs, idx)}
+                      className="group/play relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+                      title="Play in Jukebox"
+                      aria-label={`Play ${song.title} in Jukebox`}
+                    >
+                      {song.hasArtwork ? (
+                        <img
+                          src={`/api/songs/${song.id}/artwork`}
+                          alt=""
+                          className="h-full w-full object-cover yk-artwork-image"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <Music className="h-4 w-4 text-zinc-500" />
+                      )}
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-semibold text-white" title={song.title}>{song.title}</span>
+                        <LyricBadges
+                          hasLrc={song.hasLrc}
+                          hasElrc={song.hasElrc}
+                          onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
+                        />
+                      </div>
+                      <div className="truncate text-xs text-zinc-400" title={song.artist}>
+                        {renderArtistLinks(song)}
+                      </div>
+                    </div>
+
+                    <span className="hidden shrink-0 text-xs text-zinc-500 sm:block">{song.album || '—'}</span>
+                    <span className="hidden shrink-0 font-mono text-xs text-zinc-500 md:block">{formatDuration(song.duration)}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSong(song)}
+                      className="shrink-0 rounded-full p-2 text-zinc-500 transition-colors hover:text-red-400 focus-visible:text-red-400"
+                      title="Delete song from library"
+                      aria-label={`Delete ${song.title} from library`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {songs.length === 0 && (
+                  <div className="py-12 text-center text-sm text-zinc-500">No songs found in library.</div>
+                )}
+              </div>
             </div>
           )}
 
