@@ -126,9 +126,9 @@ export default function PlaylistsGrid({
               <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center border border-white/5 group-hover:border-[#FF4FA3]/30 transition-all relative overflow-hidden shadow-inner">
                 {playlist.coverPath || playlist.coverImageUrl ? (
                   <img
-                    src={playlist.coverImageUrl || `/api/playlists/${playlist.id}/cover`}
+                    src={playlist.coverImageUrl && /^(https?:|data:)/i.test(playlist.coverImageUrl) ? playlist.coverImageUrl : `/api/playlists/${playlist.id}/cover`}
                     alt={playlist.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover "
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = 'none';
                     }}
