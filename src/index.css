@@ -185,15 +185,17 @@ html, body {
 }
 
 @keyframes yk-artwork-heartbeat {
-  0%, 62%, 100% { scale: 1; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
-  8% { scale: 1.018; box-shadow: 0 0 14px rgba(250, 36, 60, 0.12); }
-  16% { scale: 1; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
-  24% { scale: 1.012; box-shadow: 0 0 9px rgba(250, 36, 60, 0.09); }
-  32% { scale: 1; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
+  0%, 62%, 100% { scale: 1.08; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
+  8% { scale: 1.10; box-shadow: 0 0 14px rgba(250, 36, 60, 0.12); }
+  16% { scale: 1.08; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
+  24% { scale: 1.092; box-shadow: 0 0 9px rgba(250, 36, 60, 0.09); }
+  32% { scale: 1.08; box-shadow: 0 0 0 rgba(250, 36, 60, 0); }
 }
 
 .yk-artwork-motion {
   transform-origin: center;
+  /* Overscan lets the artwork move without exposing empty edges in clipped cards. */
+  scale: 1.08;
   will-change: auto;
 }
 
@@ -202,7 +204,13 @@ html, body {
   transform-origin: center;
 }
 
-/* Scroll-driven motion is progressive enhancement; unsupported browsers stay static. */
+/* Scroll-driven motion is progressive enhancement; JS supplies a mobile fallback below. */
+@supports not (animation-timeline: view()) {
+  .yk-artwork-motion {
+    translate: 0 var(--yk-scroll-translate, 0px);
+  }
+}
+
 @supports (animation-timeline: view()) {
   .yk-artwork-motion {
     animation-name: yk-artwork-reveal, yk-artwork-parallax;
