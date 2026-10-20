@@ -2122,6 +2122,7 @@ export default function Library() {
               onCoverUpload={handleCoverUpload}
               onCoverRemove={handleCoverRemove}
               onPlayAll={handlePlayAll}
+              layout="carousel"
             />
           )}
         </>
