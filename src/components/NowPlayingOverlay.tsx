@@ -113,26 +113,26 @@ export default function NowPlayingOverlay() {
             <div className="w-10 shrink-0" aria-hidden="true" />
           </header>
 
-          <section className="shrink-0 px-5 sm:px-8 pb-4">
-            <div className="flex justify-center mb-4">
-              <div className="relative w-[min(42vw,220px)] h-[min(42vw,220px)] sm:w-[min(34vw,260px)] sm:h-[min(34vw,260px)] max-w-[260px] max-h-[260px] min-w-[132px] min-h-[132px] rounded-2xl overflow-hidden border border-white/20 shadow-2xl bg-black/20">
-                <Music className="absolute inset-0 m-auto w-12 h-12 text-white/45" />
+          <section className="shrink-0 px-5 sm:px-8 pb-3">
+            <div className="flex justify-center mb-3">
+              <div className="relative w-[min(38vw,188px)] h-[min(38vw,188px)] sm:w-[min(30vw,220px)] sm:h-[min(30vw,220px)] max-w-[220px] max-h-[220px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/15 shadow-xl bg-black/20">
+                <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
                 {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className="relative z-10 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
               </div>
             </div>
-            <div className="w-full max-w-xl mx-auto">
-              <input type="range" min="0" max={trackDuration || 100} step="0.5" value={activeTime} onChange={onSeekChange} onMouseDown={onSeekStart} onMouseUp={onSeekEnd} onTouchStart={onSeekStart} onTouchEnd={onSeekEnd} className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-[#F472B6]" style={{ background: 'linear-gradient(to right, #F472B6 0%, #F472B6 ' + progress + '%, rgba(255,255,255,0.35) ' + progress + '%, rgba(255,255,255,0.35) 100%)' }} aria-label="Seek track position" />
-              <div className="flex justify-between text-xs font-mono text-white/75 tabular-nums mt-1"><span>{formatTime(activeTime)}</span><span>{formatTime(trackDuration)}</span></div>
-              <div className="flex items-center justify-between gap-2 mt-3">
-                <button type="button" onClick={toggleShuffle} className={'p-2 rounded-full ' + (isShuffle ? 'text-[#F9A8D4] bg-white/15' : 'text-white/75')} aria-label={isShuffle ? 'Turn shuffle off' : 'Turn shuffle on'}><Shuffle className="w-5 h-5" /></button>
-                <button type="button" onClick={previous} className="p-2 text-white rounded-full" aria-label="Previous track"><SkipBack className="w-6 h-6 fill-current" /></button>
-                <button type="button" onClick={togglePlay} className="w-14 h-14 rounded-full bg-white text-[#8A174F] flex items-center justify-center shadow-xl" aria-label={isPlaying ? 'Pause playback' : 'Start playback'}>{isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}</button>
-                <button type="button" onClick={next} className="p-2 text-white rounded-full" aria-label="Next track"><SkipForward className="w-6 h-6 fill-current" /></button>
-                <button type="button" onClick={cycleRepeat} className={'p-2 rounded-full ' + (repeatMode !== 'off' ? 'text-[#F9A8D4] bg-white/15' : 'text-white/75')} aria-label={'Repeat mode ' + repeatMode}>{repeatMode === 'one' ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}</button>
+            <div className="w-full max-w-lg mx-auto">
+              <input type="range" min="0" max={trackDuration || 100} step="0.5" value={activeTime} onChange={onSeekChange} onMouseDown={onSeekStart} onMouseUp={onSeekEnd} onTouchStart={onSeekStart} onTouchEnd={onSeekEnd} className="w-full h-1 rounded-full appearance-none cursor-pointer accent-[#F472B6]" style={{ background: 'linear-gradient(to right, #F472B6 0%, #F472B6 ' + progress + '%, rgba(255,255,255,0.28) ' + progress + '%, rgba(255,255,255,0.28) 100%)' }} aria-label="Seek track position" />
+              <div className="flex justify-between text-[10px] font-mono text-white/65 tabular-nums mt-1"><span>{formatTime(activeTime)}</span><span>{formatTime(trackDuration)}</span></div>
+              <div className="flex items-center justify-center gap-5 sm:gap-7 mt-2">
+                <button type="button" onClick={toggleShuffle} className={'p-1.5 rounded-full transition-colors ' + (isShuffle ? 'text-[#F9A8D4]' : 'text-white/65 hover:text-white')} aria-label={isShuffle ? 'Turn shuffle off' : 'Turn shuffle on'} aria-pressed={isShuffle}><Shuffle className="w-[18px] h-[18px]" /></button>
+                <button type="button" onClick={previous} className="p-1.5 text-white/90 hover:text-white rounded-full" aria-label="Previous track"><SkipBack className="w-5 h-5 fill-current" /></button>
+                <button type="button" onClick={togglePlay} className="w-12 h-12 rounded-full bg-white text-[#8A174F] flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform" aria-label={isPlaying ? 'Pause playback' : 'Start playback'}>{isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}</button>
+                <button type="button" onClick={next} className="p-1.5 text-white/90 hover:text-white rounded-full" aria-label="Next track"><SkipForward className="w-5 h-5 fill-current" /></button>
+                <button type="button" onClick={cycleRepeat} className={'p-1.5 rounded-full transition-colors ' + (repeatMode !== 'off' ? 'text-[#F9A8D4]' : 'text-white/65 hover:text-white')} aria-label={'Repeat mode ' + repeatMode}>{repeatMode === 'one' ? <Repeat1 className="w-[18px] h-[18px]" /> : <Repeat className="w-[18px] h-[18px]" />}</button>
               </div>
-              <div className="flex items-center gap-3 mt-2 px-1">
-                <button type="button" onClick={toggleMute} className="p-1 text-white/75" aria-label={isMuted ? 'Unmute' : 'Mute'}>{isMuted || volume === 0 ? <VolumeX className="w-4 h-4" /> : volume < 0.5 ? <Volume1 className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>
-                <input type="range" min="0" max="1" step="0.01" value={isMuted ? 0 : volume} onChange={(event) => setVolume(parseFloat(event.target.value))} className="flex-1 h-1 rounded-lg appearance-none cursor-pointer accent-[#F472B6]" aria-label="Volume" />
+              <div className="flex items-center gap-2 mt-2 px-1 max-w-xs mx-auto">
+                <button type="button" onClick={toggleMute} className="p-1 text-white/60 hover:text-white" aria-label={isMuted ? 'Unmute' : 'Mute'}>{isMuted || volume === 0 ? <VolumeX className="w-3.5 h-3.5" /> : volume < 0.5 ? <Volume1 className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}</button>
+                <input type="range" min="0" max="1" step="0.01" value={isMuted ? 0 : volume} onChange={(event) => setVolume(parseFloat(event.target.value))} className="flex-1 h-1 rounded-full appearance-none cursor-pointer accent-[#F472B6]" aria-label="Volume" />
               </div>
             </div>
           </section>
