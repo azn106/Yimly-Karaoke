@@ -1852,12 +1852,12 @@ export default function Library() {
                         return (
                           <div
                             key={song.id}
-                            className={`flex items-center gap-3 p-3 transition-colors ${
+                            className={`flex items-center gap-2.5 p-2 transition-colors ${
                               isCurrent ? 'bg-[#F472B6]/10' : 'hover:bg-white/[0.03]'
                             }`}
                           >
                             {/* Small square artwork */}
-                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1C1E2D]">
+                            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1C1E2D]">
                               {song.hasArtwork ? (
                                 <img
                                   src={'/api/songs/' + song.id + '/artwork'}
