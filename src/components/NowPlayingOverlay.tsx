@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic, Music, ChevronUp, ChevronDown, Volume2, VolumeX, Volume1 } from 'lucide-react';
 import { usePlayback } from '../context/PlaybackContext';
+import EqualizerIndicator from './EqualizerIndicator';
 
 export default function NowPlayingOverlay() {
   const {
@@ -58,19 +59,6 @@ export default function NowPlayingOverlay() {
     touchStartY.current = null;
     setDragOffset(0);
   };
-
-  const pinkBars = (
-    <div className="flex items-center justify-center gap-[3px] h-6" aria-label={isPlaying ? 'Currently playing' : 'Paused'}>
-      {isPlaying ? (
-        <>
-          <span className="w-[3px] h-3 bg-[#F472B6] rounded-full animate-[yk-equalizer_700ms_ease-in-out_infinite]" />
-          <span className="w-[3px] h-5 bg-[#F472B6] rounded-full animate-[yk-equalizer_900ms_ease-in-out_infinite]" />
-          <span className="w-[3px] h-4 bg-[#F472B6] rounded-full animate-[yk-equalizer_600ms_ease-in-out_infinite]" />
-          <span className="w-[3px] h-3 bg-[#F472B6] rounded-full animate-[yk-equalizer_800ms_ease-in-out_infinite]" />
-        </>
-      ) : <Pause className="w-4 h-4 text-[#F472B6]" />}
-    </div>
-  );
 
   return (
     <>
@@ -161,7 +149,7 @@ export default function NowPlayingOverlay() {
                 return (
                   <button key={String(song.id) + '-' + index} type="button" onClick={() => { if (queue.length > 0) jumpToQueueIndex(index); }} className={'w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-colors border border-transparent ' + (isCurrent ? 'bg-[#F472B6]/20 border-[#F472B6]/30' : 'hover:bg-white/10')} aria-label={isCurrent ? song.title + ', current track' : 'Play ' + song.title}>
                     <div className="w-10 h-10 rounded-lg bg-black/20 flex items-center justify-center shrink-0 overflow-hidden">
-                      {isCurrent ? pinkBars : song.hasArtwork ? <img src={'/api/songs/' + song.id + '/artwork'} alt="" className="w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <Music className="w-4 h-4 text-white/40" />}
+                      {isCurrent ? <EqualizerIndicator isPlaying={isPlaying} className="scale-150" /> : song.hasArtwork ? <img src={'/api/songs/' + song.id + '/artwork'} alt="" className="w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <Music className="w-4 h-4 text-white/40" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className={'text-sm font-semibold truncate ' + (isCurrent ? 'text-[#F9A8D4]' : 'text-white')}>{song.title}</p>
