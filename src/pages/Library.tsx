@@ -1977,32 +1977,32 @@ export default function Library() {
             </div>
           )}
 
-          {/* Albums Grid */}
+          {/* Albums Grid — responsive vertical grid on the dedicated Albums tab */}
           {tab === 'albums' && (
-            <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-6 pb-6 sm:grid-cols-3 sm:gap-x-5 sm:gap-y-7 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {albums.map(album => (
-                <div 
+                <div
                   key={album.id}
                   onClick={() => openAlbum(album.id)}
-                  className="group w-[6.3rem] shrink-0 cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]"
+                  className="group min-w-0 cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]"
                 >
                   <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
                     {album.hasArtwork ? (
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
+                        className="h-full w-full object-cover yk-artwork-image"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
                       />
                     ) : (
-                      <Disc className="w-12 h-12 text-zinc-500 group-hover:text-[#F472B6] transition-colors" />
+                      <Disc className="h-12 w-12 text-zinc-500 transition-colors group-hover:text-[#F472B6]" />
                     )}
                   </div>
-                  <h3 className="font-semibold text-sm text-white truncate group-hover:text-[#F472B6] transition-colors">{album.title}</h3>
-                  <p className="text-xs text-zinc-400 truncate mt-0.5">{album.artist || 'Unknown Artist'}</p>
-                  <p className="text-[11px] text-zinc-500 mt-1">{album.year || 'Album'} • {album.songCount || 0} Tracks</p>
+                  <h3 className="truncate text-sm font-semibold text-white transition-colors group-hover:text-[#F472B6]">{album.title}</h3>
+                  <p className="mt-0.5 truncate text-xs text-zinc-400">{album.artist || 'Unknown Artist'}</p>
+                  <p className="mt-1 text-[11px] text-zinc-500">{album.year || 'Album'} • {album.songCount || 0} Tracks</p>
                 </div>
               ))}
               {albums.length === 0 && (
