@@ -1759,7 +1759,7 @@ export default function Library() {
                           type="button"
                           key={album.id}
                           onClick={() => openAlbum(album.id)}
-                          className="group w-36 sm:w-40 shrink-0 snap-start rounded-xl p-2 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F472B6]"
+                          className="group w-[6.3rem] sm:w-[7rem] shrink-0 snap-start rounded-xl p-2 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F472B6]"
                           aria-label={`Open album ${album.title}`}
                         >
                           <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
@@ -1767,7 +1767,7 @@ export default function Library() {
                               <img
                                 src={`/api/albums/${album.id}/artwork`}
                                 alt={album.title}
-                                className="h-[70%] w-[70%] object-cover yk-artwork-image"
+                                className="h-full w-full object-cover yk-artwork-image"
                                 onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1801,7 +1801,7 @@ export default function Library() {
                       {songs.slice(0, 10).map((song, idx) => (
                         <div
                           key={song.id}
-                          className="group flex flex-col shrink-0 w-36 snap-start rounded-xl p-2 transition hover:bg-white/[0.04] cursor-pointer"
+                          className="group flex flex-col shrink-0 w-[6.3rem] snap-start rounded-xl p-2 transition hover:bg-white/[0.04] cursor-pointer"
                           onClick={() => handlePlayInJukebox(song, songs, idx)}
                         >
                           <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#1C1E2D] flex items-center justify-center">
@@ -1809,7 +1809,7 @@ export default function Library() {
                               <img
                                 src={'/api/songs/' + song.id + '/artwork'}
                                 alt=""
-                                className="h-[70%] w-[70%] object-cover yk-artwork-image yk-artwork-image transition"
+                                className="h-full w-full object-cover yk-artwork-image yk-artwork-image transition"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                               />
                             ) : (
@@ -1976,14 +1976,14 @@ export default function Library() {
                 <div 
                   key={album.id}
                   onClick={() => openAlbum(album.id)}
-                  className="group cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]"
+                  className="group w-[6.3rem] shrink-0 cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]"
                 >
                   <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
                     {album.hasArtwork ? (
                       <img
                         src={`/api/albums/${album.id}/artwork`}
                         alt={album.title}
-                        className="h-[70%] w-[70%] object-cover yk-artwork-image yk-artwork-image"
+                        className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
