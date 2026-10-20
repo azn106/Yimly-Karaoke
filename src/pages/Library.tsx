@@ -1663,7 +1663,7 @@ export default function Library() {
                     </div>
                   </div>
                   {playlists.length ? (
-                    <div ref={playlistRailRef} className="yk-horizontal-rail flex items-stretch gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
+                    <div ref={playlistRailRef} className="yk-horizontal-rail flex items-stretch gap-4 overflow-x-auto pb-3 snap-x snap-proximity">
                       {playlists.map((playlist) => {
                         return (
                           <button
@@ -1723,7 +1723,7 @@ export default function Library() {
                     </button>
                   </div>
                   {artists.length ? (
-                    <div className="yk-horizontal-rail flex items-center gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
+                    <div className="yk-horizontal-rail flex items-center gap-4 overflow-x-auto pb-2 snap-x snap-proximity scrollbar-none">
                       {artists.map(artist => (
                         <button
                           type="button"
@@ -1765,7 +1765,7 @@ export default function Library() {
                     </button>
                   </div>
                   {albums.length ? (
-                    <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
+                    <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-2 snap-x snap-proximity scrollbar-none">
                       {albums.map(album => (
                         <button
                           type="button"
@@ -1809,7 +1809,7 @@ export default function Library() {
                     </button>
                   </div>
                   {songs.length ? (
-                    <div className="yk-horizontal-rail flex items-start gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
+                    <div className="yk-horizontal-rail flex items-start gap-3 overflow-x-auto pb-2 snap-x snap-proximity scrollbar-none">
                       {songs.slice(0, 10).map((song, idx) => (
                         <div
                           key={song.id}
@@ -1947,7 +1947,7 @@ export default function Library() {
 
           {/* Artists Grid */}
           {tab === 'artists' && (
-            <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
+            <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-proximity">
               {artists.map(artist => (
                 <div 
                   key={artist.id}
@@ -1979,7 +1979,7 @@ export default function Library() {
 
           {/* Albums Grid */}
           {tab === 'albums' && (
-            <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
+            <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-proximity">
               {albums.map(album => (
                 <div 
                   key={album.id}
