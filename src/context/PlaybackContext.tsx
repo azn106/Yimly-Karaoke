@@ -271,13 +271,15 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       let weightTotal = 0;
       let positiveFlux = 0;
       let fluxWeightTotal = 0;
+      // Spectral-flux-based transient detection algorithm:
+      // Computes positive magnitude changes between consecutive spectral frames
+      // across weighted frequency bins to isolate sharp drum attacks, kick drums,
+      // and percussive transients from sustained vocals or pads.
       for (let i = startBin; i < endBin; i++) {
         const weight = i < frequencyData.length * 0.18 ? 1.2 : 1;
         sum += frequencyData[i] * weight;
         weightTotal += weight;
 
-        // Spectral flux reacts to newly appearing sound energy rather than
-        // sustained volume, making sharp drum attacks stand out from vocals/pads.
         const fluxWeight = i < frequencyData.length * 0.48 ? 1.15 : 0.8;
         positiveFlux += Math.max(0, frequencyData[i] - previousSpectrum[i]) * fluxWeight;
         fluxWeightTotal += fluxWeight;
@@ -285,6 +287,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       const rawEnergy = Math.min(1, (sum / Math.max(1, weightTotal)) / 115);
       const rawTransient = Math.min(1, (positiveFlux / Math.max(1, fluxWeightTotal)) / 18);
       previousSpectrum.set(frequencyData);
+      
+      // Smooth energy envelope for slow continuous breathing, and transient level for sharp percussive pulses
       smoothedBass = smoothedBass * 0.78 + rawEnergy * 0.22;
       smoothedTransient = smoothedTransient * 0.35 + rawTransient * 0.65;
       setBassLevel(smoothedBass);
