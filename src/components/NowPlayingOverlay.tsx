@@ -134,11 +134,14 @@ export default function NowPlayingOverlay() {
           <section className="shrink-0 px-5 sm:px-8 pb-2">
             <div className="flex justify-center mb-3">
               <div
-                  className="relative w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/15 shadow-xl bg-black/20 will-change-transform"
+                  className="relative w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/20 shadow-xl bg-black/20 will-change-transform"
                   style={{
-                    transform: 'scale(' + (1 + (isPlaying ? bassLevel * 0.035 : 0)) + ')',
-                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (8 + (isPlaying ? bassLevel * 26 : 0)) + 'px rgba(244,114,182,' + (0.12 + (isPlaying ? bassLevel * 0.22 : 0)) + ')',
-                    transition: 'transform 45ms linear, box-shadow 80ms linear',
+                    // Boost the measured bass envelope so strong kick hits create a clearly visible
+                    // heartbeat pulse without changing the fullscreen background artwork.
+                    transform: 'scale(' + (1 + (isPlaying ? Math.min(1, bassLevel * 3.2) * 0.10 : 0)) + ')',
+                    transformOrigin: 'center center',
+                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (8 + (isPlaying ? Math.min(1, bassLevel * 3.2) * 44 : 0)) + 'px rgba(244,114,182,' + (0.12 + (isPlaying ? Math.min(1, bassLevel * 3.2) * 0.38 : 0)) + ')',
+                    transition: 'transform 55ms linear, box-shadow 70ms linear',
                   }}
                 >
                 <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
