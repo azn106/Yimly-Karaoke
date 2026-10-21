@@ -14,6 +14,7 @@ export default function NowPlayingOverlay() {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
   const touchStartY = useRef<number | null>(null);
+  const isQueueTouch = useRef(false);
   const [dragOffset, setDragOffset] = useState(0);
 
   useEffect(() => {
@@ -48,13 +49,25 @@ export default function NowPlayingOverlay() {
   };
   const onSeekStart = () => { setIsSeeking(true); setSeekTime(currentTime); };
   const onSeekEnd = () => { setIsSeeking(false); seek(seekTime); };
-  const onTouchStart = (event: React.TouchEvent) => { touchStartY.current = event.touches[0].clientY; };
-  const onTouchMove = (event: React.TouchEvent) => {
-    if (touchStartY.current === null) return;
+  const onExpandedTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('[data-queue-scroll]')) {
+      isQueueTouch.current = true;
+      touchStartY.current = null;
+      return;
+    }
+    isQueueTouch.current = false;
+    touchStartY.current = event.touches[0].clientY;
+  };
+  const onExpandedTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (isQueueTouch.current || touchStartY.current === null) return;
     const delta = event.touches[0].clientY - touchStartY.current;
     if (delta > 0) setDragOffset(delta);
   };
-  const onTouchEnd = (event: React.TouchEvent) => {
+  const onExpandedTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (isQueueTouch.current) {
+      isQueueTouch.current = false;
+      return;
+    }
     const endY = event.changedTouches[0]?.clientY;
     const delta = touchStartY.current !== null && endY !== undefined ? endY - touchStartY.current : 0;
     if (delta > 70 || dragOffset > 70) setIsExpanded(false);
@@ -101,6 +114,7 @@ export default function NowPlayingOverlay() {
       <div
         className={'fixed inset-0 z-50 flex flex-col shadow-2xl overflow-hidden transition-transform duration-300 h-[100dvh] w-full rounded-none border-0 ' + (isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none')}
         style={{ transform: isExpanded ? (dragOffset > 0 ? 'translateY(' + dragOffset + 'px)' : 'translateY(0)') : 'translateY(100%)', pointerEvents: isExpanded ? 'auto' : 'none', transition: dragOffset > 0 ? 'none' : undefined }}
+        onTouchStart={onExpandedTouchStart} onTouchMove={onExpandedTouchMove} onTouchEnd={onExpandedTouchEnd}
         aria-hidden={!isExpanded} role="dialog" aria-modal="true" aria-label="Now playing expanded player"
       >
         {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: 'blur(20px)', transform: 'scale(1.16)', opacity: 1 }} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
@@ -108,8 +122,7 @@ export default function NowPlayingOverlay() {
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.10) 0%, rgba(190,24,93,0.14) 42%, rgba(18,8,22,0.30) 100%)' }} />
 
         <div className="relative z-10 flex flex-col flex-1 min-h-0">
-          <header onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="flex items-center gap-3 px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 shrink-0 cursor-grab select-none" title="Swipe down to minimize">
-            <button type="button" onClick={() => setIsExpanded(false)} className="p-2 -ml-2 text-white/85 hover:text-white rounded-full" title="Minimize player" aria-label="Minimize player"><ChevronDown className="w-6 h-6" /></button>
+          <header className="flex items-center gap-3 px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 shrink-0 cursor-grab select-none" title="Swipe down to minimize">
             <div className="min-w-0 flex-1 text-center">
               <h2 className="text-base sm:text-lg font-bold text-white truncate">{currentSong?.title || 'No track selected'}</h2>
               <p className="text-sm text-white/75 truncate">{currentSong?.artist || 'Unknown Artist'}{currentSong?.album ? ' · ' + currentSong.album : ''}</p>
@@ -147,7 +160,7 @@ export default function NowPlayingOverlay() {
               <h3 className="text-sm font-bold text-white">Up Next</h3>
               <span className="text-xs text-white/65">{visibleQueue.length}</span>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div data-queue-scroll className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
               {visibleQueue.map((song, index) => {
                 const isCurrent = (queue.length > 0 && index === queueIndex) || (queue.length === 0 && song.id === currentSong?.id);
                 return (
