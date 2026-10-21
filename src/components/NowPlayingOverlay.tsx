@@ -182,20 +182,22 @@ export default function NowPlayingOverlay() {
 
           <section className="shrink-0 px-5 sm:px-8 pb-2">
             <div className="flex justify-center mb-3">
-              <div
-                  className="relative w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/20 shadow-xl bg-black/20 will-change-transform"
+              <div className={'yk-artwork-breathe w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] ' + (isPlaying ? 'yk-artwork-breathe-active' : '')}>
+                <div
+                  className="relative w-full h-full rounded-2xl overflow-hidden border border-white/20 shadow-xl bg-black/20 will-change-transform"
                   style={{
-                    // A transient pulse returns to baseline after each detected bass rise.
-                    transform: 'scale(' + (1 + (isPlaying ? bassPulse * 0.10 : 0)) + ')',
+                    // Beat-driven pulse layers on top of the slower, continuous breathing motion.
+                    transform: 'scale(' + (1 + (isPlaying ? bassPulse * 0.075 : 0)) + ')',
                     transformOrigin: 'center center',
                     borderColor: 'rgba(244,114,182,' + (0.16 + (isPlaying ? bassPulse * 0.84 : 0)) + ')',
                     borderWidth: '1px',
                     boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (7 + (isPlaying ? bassPulse * 38 : 0)) + 'px rgba(244,114,182,' + (0.10 + (isPlaying ? bassPulse * 0.40 : 0)) + '), inset 0 0 ' + (isPlaying ? bassPulse * 10 : 0) + 'px rgba(244,114,182,' + (isPlaying ? bassPulse * 0.18 : 0) + ')',
-                    transition: 'transform 90ms ease-out, border-color 110ms ease-out, box-shadow 110ms ease-out',
+                    transition: 'transform 120ms ease-out, border-color 110ms ease-out, box-shadow 110ms ease-out',
                   }}
                 >
-                <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
-                {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className="relative z-10 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                  <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
+                  {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className="relative z-10 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                </div>
               </div>
             </div>
             <div className="w-full max-w-lg mx-auto">
