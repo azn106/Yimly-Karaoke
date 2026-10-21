@@ -1,7 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic, Music, ChevronUp, ChevronDown, Volume2, VolumeX, Volume1 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic, Music, ChevronUp, ChevronDown, Volume2, VolumeX, Volume1, Captions, LoaderCircle } from 'lucide-react';
 import { usePlayback } from '../context/PlaybackContext';
 import EqualizerIndicator from './EqualizerIndicator';
+
+type TimedLyricLine = { time: number; text: string; id: string };
+
+function parseLrcLyrics(content: string): TimedLyricLine[] {
+  const parsed: TimedLyricLine[] = [];
+  const timestampPattern = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+  content.split(/\r?\n/).forEach((rawLine, lineIndex) => {
+    const matches = [...rawLine.matchAll(timestampPattern)];
+    if (matches.length === 0) return;
+    const text = rawLine.replace(timestampPattern, '').trim();
+    if (!text || /^\[(?:ar|al|ti|by|re|ve|offset|length|tool|kana):/i.test(text)) return;
+    for (const match of matches) {
+      const minutes = Number(match[1]);
+      const seconds = Number(match[2]);
+      const fraction = match[3] ? Number('0.' + match[3]) : 0;
+      if (seconds >= 60) continue;
+      parsed.push({
+        time: minutes * 60 + seconds + fraction,
+        text,
+        id: lineIndex + '-' + match.index,
+      });
+    }
+  });
+  return parsed.sort((a, b) => a.time - b.time);
+}
 
 export default function NowPlayingOverlay() {
   const {
@@ -13,6 +38,11 @@ export default function NowPlayingOverlay() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [lyricsLines, setLyricsLines] = useState<TimedLyricLine[]>([]);
+  const [lyricsLoading, setLyricsLoading] = useState(false);
+  const [lyricsUnavailable, setLyricsUnavailable] = useState(false);
+  const activeLyricRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
   const isQueueTouch = useRef(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -98,6 +128,53 @@ export default function NowPlayingOverlay() {
   useEffect(() => () => {
     if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current);
   }, []);
+
+  useEffect(() => {
+    setShowLyrics(false);
+    setLyricsLines([]);
+    setLyricsUnavailable(false);
+  }, [currentSong?.id]);
+
+  useEffect(() => {
+    if (!showLyrics || !currentSong?.id) return;
+    const controller = new AbortController();
+    setLyricsLoading(true);
+    setLyricsUnavailable(false);
+    fetch('/api/songs/' + currentSong.id + '/lyrics?format=lrc', {
+      signal: controller.signal,
+      credentials: 'same-origin',
+      headers: { Accept: 'text/plain' },
+    })
+      .then(async response => {
+        if (!response.ok) throw new Error('Lyrics unavailable');
+        return response.text();
+      })
+      .then(content => {
+        if (controller.signal.aborted) return;
+        const parsed = parseLrcLyrics(content);
+        setLyricsLines(parsed);
+        setLyricsUnavailable(parsed.length === 0);
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) {
+          setLyricsLines([]);
+          setLyricsUnavailable(true);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLyricsLoading(false);
+      });
+    return () => controller.abort();
+  }, [showLyrics, currentSong?.id]);
+
+  const activeLyricIndex = lyricsLines.reduce((active, line, index) => (
+    line.time <= currentTime ? index : active
+  ), -1);
+
+  useEffect(() => {
+    if (!showLyrics || activeLyricIndex < 0) return;
+    activeLyricRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [showLyrics, activeLyricIndex]);
 
   useEffect(() => {
     if (!isExpanded) return;
@@ -205,12 +282,24 @@ export default function NowPlayingOverlay() {
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(190,24,93,0.48) 0%, rgba(157,23,77,0.58) 48%, rgba(35,12,29,0.72) 100%)' }} />
 
         <div className="relative z-10 flex flex-col flex-1 min-h-0">
-          <header className="flex items-center gap-3 px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 shrink-0 cursor-grab select-none" title="Swipe down to minimize">
-            <div className="min-w-0 flex-1 text-center">
+          <header className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3 px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 shrink-0 select-none" title="Swipe down to minimize">
+            <div className="flex items-center justify-start">
+              <button
+                type="button"
+                onClick={() => setShowLyrics(value => !value)}
+                className={'w-10 h-10 flex items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 ' + (showLyrics ? 'bg-white text-[#8A174F]' : 'text-white/85 hover:bg-white/15 hover:text-white')}
+                title={showLyrics ? 'Show cover art' : 'Show synced lyrics'}
+                aria-label={showLyrics ? 'Show cover art' : 'Show synced lyrics'}
+                aria-pressed={showLyrics}
+              ><Captions className="w-5 h-5" /></button>
+            </div>
+            <div className="min-w-0 text-center">
               <h2 className="text-base sm:text-lg font-bold text-white truncate">{currentSong?.title || 'No track selected'}</h2>
               <p className="text-sm text-white/75 truncate">{currentSong?.artist || 'Unknown Artist'}{currentSong?.album ? ' · ' + currentSong.album : ''}</p>
             </div>
-            <button type="button" onClick={() => setIsExpanded(false)} className="p-2 -mr-2 text-white/85 hover:text-white rounded-full shrink-0" title="Minimize player" aria-label="Minimize player"><ChevronDown className="w-6 h-6" /></button>
+            <div className="flex items-center justify-end">
+              <button type="button" onClick={() => setIsExpanded(false)} className="w-10 h-10 -mr-1 flex items-center justify-center text-white/85 hover:bg-white/15 hover:text-white rounded-full shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200" title="Minimize player" aria-label="Minimize player"><ChevronDown className="w-6 h-6" /></button>
+            </div>
           </header>
 
           <section className="shrink-0 px-5 sm:px-8 pb-2">
@@ -226,8 +315,35 @@ export default function NowPlayingOverlay() {
                     boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 7px rgba(244,114,182,0.08)',
                   }}
                 >
-                  <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
-                  {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className={'relative z-10 w-full h-full object-cover ' + (isPlaying ? 'yk-artwork-image-breathe' : '')} style={{ '--yk-breathe-depth': (0.012 + Math.min(1, bassLevel) * 0.045).toFixed(3) } as React.CSSProperties} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                  {showLyrics ? (
+                    <div
+                      className="absolute inset-0 z-20 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 text-center"
+                      data-lyrics-scroll
+                      onTouchStart={(event) => { isQueueTouch.current = true; touchStartY.current = null; event.stopPropagation(); }}
+                      onTouchMove={(event) => event.stopPropagation()}
+                      onTouchEnd={(event) => { event.stopPropagation(); isQueueTouch.current = false; }}
+                      onWheel={(event) => event.stopPropagation()}
+                    >
+                      {lyricsLoading ? (
+                        <div className="h-full flex flex-col items-center justify-center gap-3 text-white/80"><LoaderCircle className="w-7 h-7 animate-spin" /><span className="text-sm">Loading synced lyrics…</span></div>
+                      ) : lyricsUnavailable ? (
+                        <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
+                      ) : (
+                        <div className="min-h-full flex flex-col justify-center gap-4">
+                          {lyricsLines.map((line, index) => {
+                            const active = index === activeLyricIndex;
+                            const nearby = Math.abs(index - activeLyricIndex) <= 2;
+                            return <div key={line.id} ref={active ? activeLyricRef : null} className={'transition-all duration-300 ease-out text-balance ' + (active ? 'text-white text-lg sm:text-xl font-bold scale-[1.02] drop-shadow-[0_1px_8px_rgba(244,114,182,0.45)]' : nearby ? 'text-white/70 text-sm sm:text-base font-medium' : 'text-white/35 text-sm')} aria-current={active ? 'true' : undefined}>{line.text}</div>;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
+                      {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className={'relative z-10 w-full h-full object-cover ' + (isPlaying ? 'yk-artwork-image-breathe' : '')} style={{ '--yk-breathe-depth': (0.012 + Math.min(1, bassLevel) * 0.045).toFixed(3) } as React.CSSProperties} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
