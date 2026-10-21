@@ -7,7 +7,7 @@ export default function NowPlayingOverlay() {
   const {
     currentSong, isPlaying, currentTime, duration, volume, isMuted, queue, queueIndex,
     isShuffle, repeatMode, togglePlay, seek, next, previous, setVolume, toggleMute,
-    toggleShuffle, cycleRepeat, jumpToQueueIndex
+    toggleShuffle, cycleRepeat, jumpToQueueIndex, bassLevel
   } = usePlayback();
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -133,7 +133,14 @@ export default function NowPlayingOverlay() {
 
           <section className="shrink-0 px-5 sm:px-8 pb-2">
             <div className="flex justify-center mb-3">
-              <div className="relative w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/15 shadow-xl bg-black/20">
+              <div
+                  className="relative w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/15 shadow-xl bg-black/20 will-change-transform"
+                  style={{
+                    transform: 'scale(' + (1 + (isPlaying ? bassLevel * 0.035 : 0)) + ')',
+                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (8 + (isPlaying ? bassLevel * 26 : 0)) + 'px rgba(244,114,182,' + (0.12 + (isPlaying ? bassLevel * 0.22 : 0)) + ')',
+                    transition: 'transform 45ms linear, box-shadow 80ms linear',
+                  }}
+                >
                 <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
                 {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className="relative z-10 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
               </div>
