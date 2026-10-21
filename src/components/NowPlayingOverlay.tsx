@@ -74,6 +74,7 @@ export default function NowPlayingOverlay() {
     touchStartY.current = null;
     setDragOffset(0);
   };
+  const onCompactTouchStart = (event: React.TouchEvent) => { touchStartY.current = event.touches[0].clientY; };
   const onCompactTouchEnd = (event: React.TouchEvent) => {
     const endY = event.changedTouches[0]?.clientY;
     const delta = touchStartY.current !== null && endY !== undefined ? endY - touchStartY.current : 0;
@@ -83,7 +84,7 @@ export default function NowPlayingOverlay() {
 
   return (
     <>
-      <div onTouchStart={onTouchStart} onTouchEnd={onCompactTouchEnd} className="fixed bottom-0 left-0 right-0 xl:left-[230px] z-40 bg-[#11121A]/95 backdrop-blur-md border-t border-white/10 shadow-2xl select-none pb-[max(0.45rem,env(safe-area-inset-bottom))] touch-pan-y" role="region" aria-label="Compact media player">
+      <div onTouchStart={onCompactTouchStart} onTouchEnd={onCompactTouchEnd} className="fixed bottom-0 left-0 right-0 xl:left-[230px] z-40 bg-[#11121A]/95 backdrop-blur-md border-t border-white/10 shadow-2xl select-none pb-[max(0.45rem,env(safe-area-inset-bottom))] touch-pan-y" role="region" aria-label="Compact media player">
         <div className="w-full h-[2.5px] bg-white/10 relative overflow-hidden">
           <div className="h-full bg-[#F472B6] transition-all duration-150" style={{ width: progress + '%' }} />
         </div>
