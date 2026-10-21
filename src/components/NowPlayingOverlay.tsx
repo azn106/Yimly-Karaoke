@@ -91,20 +91,16 @@ export default function NowPlayingOverlay() {
       <div className={'fixed inset-0 z-50 bg-black/55 backdrop-blur-sm transition-opacity duration-300 xl:left-[230px] ' + (isExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')} onClick={() => setIsExpanded(false)} style={{ pointerEvents: isExpanded ? 'auto' : 'none' }} aria-hidden="true" />
 
       <div
-        className={'fixed inset-x-2 top-2 bottom-2 xl:left-[238px] xl:right-2 z-50 flex flex-col rounded-3xl border border-white/20 shadow-2xl overflow-hidden transition-transform duration-300 max-h-none h-auto max-w-4xl mx-auto ' + (isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none')}
+        className={'fixed inset-0 z-50 flex flex-col shadow-2xl overflow-hidden transition-transform duration-300 h-[100dvh] w-full rounded-none border-0 ' + (isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none')}
         style={{ transform: isExpanded ? (dragOffset > 0 ? 'translateY(' + dragOffset + 'px)' : 'translateY(0)') : 'translateY(100%)', pointerEvents: isExpanded ? 'auto' : 'none', transition: dragOffset > 0 ? 'none' : undefined }}
         aria-hidden={!isExpanded} role="dialog" aria-modal="true" aria-label="Now playing expanded player"
       >
-        {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: 'blur(20px)', transform: 'scale(1.12)', opacity: 0.98 }} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+        {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: 'blur(20px)', transform: 'scale(1.16)', opacity: 1 }} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
         {/* Keep the cover artwork visible through a translucent pink tint across the entire player card. */}
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.08) 0%, rgba(190,24,93,0.12) 42%, rgba(35,15,34,0.25) 100%)' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.10) 0%, rgba(190,24,93,0.14) 42%, rgba(18,8,22,0.30) 100%)' }} />
 
         <div className="relative z-10 flex flex-col flex-1 min-h-0">
-          <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="pt-3 pb-1 shrink-0 cursor-grab select-none" title="Swipe down to minimize">
-            <div className="w-12 h-1.5 bg-white/40 rounded-full mx-auto" />
-          </div>
-
-          <header className="flex items-center gap-3 px-4 sm:px-6 pt-1 pb-3 shrink-0">
+          <header onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="flex items-center gap-3 px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 shrink-0 cursor-grab select-none" title="Swipe down to minimize">
             <button type="button" onClick={() => setIsExpanded(false)} className="p-2 -ml-2 text-white/85 hover:text-white rounded-full" title="Minimize player" aria-label="Minimize player"><ChevronDown className="w-6 h-6" /></button>
             <div className="min-w-0 flex-1 text-center">
               <h2 className="text-base sm:text-lg font-bold text-white truncate">{currentSong?.title || 'No track selected'}</h2>
@@ -113,9 +109,9 @@ export default function NowPlayingOverlay() {
             <div className="w-10 shrink-0" aria-hidden="true" />
           </header>
 
-          <section className="shrink-0 px-5 sm:px-8 pb-3">
+          <section className="shrink-0 px-5 sm:px-8 pb-2">
             <div className="flex justify-center mb-3">
-              <div className="relative w-[min(42vw,220px)] h-[min(42vw,220px)] sm:w-[min(30vw,240px)] sm:h-[min(30vw,240px)] max-w-[240px] max-h-[240px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/15 shadow-xl bg-black/20">
+              <div className="relative w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/15 shadow-xl bg-black/20">
                 <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
                 {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className="relative z-10 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
               </div>
@@ -137,7 +133,7 @@ export default function NowPlayingOverlay() {
             </div>
           </section>
 
-          <section className="flex-1 min-h-0 flex flex-col border-t border-white/15 bg-[#17121F]/5">
+          <section className="flex-1 min-h-0 flex flex-col border-t border-white/15 bg-[#17121F]/10 backdrop-blur-[2px]">
             <div className="flex items-center gap-2 px-4 sm:px-6 py-3 shrink-0">
               <ListMusic className="w-5 h-5 text-[#F9A8D4]" />
               <h3 className="text-sm font-bold text-white">Up Next</h3>
