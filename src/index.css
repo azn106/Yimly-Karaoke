@@ -199,7 +199,7 @@ html, body {
 /* Now Playing artwork: slow card breathing underneath the transient beat pulse. */
 @keyframes yk-artwork-breathe {
   0%, 100% { transform: scale(0.985); }
-  50% { transform: scale(1.025); }
+  50% { transform: scale(calc(0.985 + var(--yk-breathe-depth, 0.04))); }
 }
 
 .yk-artwork-breathe {
