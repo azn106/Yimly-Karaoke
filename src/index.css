@@ -196,23 +196,22 @@ html, body {
 }
 .yk-horizontal-rail::-webkit-scrollbar { display: none; }
 
-/* Now Playing artwork: slow card breathing underneath the transient beat pulse. */
-@keyframes yk-artwork-breathe {
-  0%, 100% { transform: scale(0.985); }
-  50% { transform: scale(calc(0.985 + var(--yk-breathe-depth, 0.04))); }
+/* Now Playing: only the artwork image breathes; transient hits animate its frame. */
+@keyframes yk-artwork-image-breathe {
+  0%, 100% { transform: scale(1.005); }
+  50% { transform: scale(calc(1.005 + var(--yk-breathe-depth, 0.035))); }
 }
 
-.yk-artwork-breathe {
-  transform: scale(1);
+.yk-artwork-image-breathe {
   transform-origin: center center;
-}
-.yk-artwork-breathe-active {
-  animation: yk-artwork-breathe 4.2s ease-in-out infinite;
+  animation: yk-artwork-image-breathe 4.6s ease-in-out infinite;
+  will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .yk-artwork-breathe-active {
+  .yk-artwork-image-breathe {
     animation: none !important;
+    transform: none !important;
   }
 }
 
