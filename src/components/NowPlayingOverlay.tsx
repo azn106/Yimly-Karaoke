@@ -21,6 +21,8 @@ export default function NowPlayingOverlay() {
   const pulseRef = useRef(0);
   const pulseFrameRef = useRef<number>(0);
   const pulseLastFrameRef = useRef(0);
+  const lastBeatTimeRef = useRef(0);
+  const pulseReleaseRef = useRef(285);
 
   // Turn rising bass transients into distinct, short pulses. A raw bass level is
   // an envelope, so mapping it directly to scale only makes the artwork stay larger.
@@ -34,20 +36,34 @@ export default function NowPlayingOverlay() {
       if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current);
       pulseFrameRef.current = 0;
       pulseLastFrameRef.current = 0;
+      lastBeatTimeRef.current = 0;
+      pulseReleaseRef.current = 285;
       return;
     }
 
     const rise = bassLevel - previousBass;
     if (bassLevel > 0.055 && rise > 0.012) {
-      pulseRef.current = Math.max(pulseRef.current, Math.min(1, 0.32 + bassLevel * 1.6));
+      const now = performance.now();
+      const beatGap = lastBeatTimeRef.current ? now - lastBeatTimeRef.current : 0;
+      lastBeatTimeRef.current = now;
+
+      // Estimate the pulse's return speed from the spacing between detected hits:
+      // close hits release quickly; widely spaced hits get a longer, smoother tail.
+      if (beatGap >= 80 && beatGap <= 1400) {
+        pulseReleaseRef.current = Math.max(105, Math.min(720, beatGap * 0.88));
+      }
+
+      const hitStrength = Math.min(1, 0.32 + bassLevel * 1.6);
+      // Let each new hit refresh the pulse instead of waiting for the last one to finish.
+      pulseRef.current = Math.max(pulseRef.current * 0.62, hitStrength);
     }
 
     if (pulseRef.current > 0 && !pulseFrameRef.current) {
       const animatePulse = (timestamp: number) => {
         const elapsed = pulseLastFrameRef.current ? timestamp - pulseLastFrameRef.current : 16;
         pulseLastFrameRef.current = timestamp;
-        // Exponential release gives each hit a soft, natural tail instead of a linear fade.
-        pulseRef.current *= Math.exp(-elapsed / 285);
+        // Adaptive exponential release follows the estimated beat spacing.
+        pulseRef.current *= Math.exp(-elapsed / pulseReleaseRef.current);
         setBassPulse(pulseRef.current);
         if (pulseRef.current > 0.008) {
           pulseFrameRef.current = requestAnimationFrame(animatePulse);
