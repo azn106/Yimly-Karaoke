@@ -54,15 +54,23 @@ export default function NowPlayingOverlay() {
     const delta = event.touches[0].clientY - touchStartY.current;
     if (delta > 0) setDragOffset(delta);
   };
-  const onTouchEnd = () => {
-    if (dragOffset > 70) setIsExpanded(false);
+  const onTouchEnd = (event: React.TouchEvent) => {
+    const endY = event.changedTouches[0]?.clientY;
+    const delta = touchStartY.current !== null && endY !== undefined ? endY - touchStartY.current : 0;
+    if (delta > 70 || dragOffset > 70) setIsExpanded(false);
     touchStartY.current = null;
     setDragOffset(0);
+  };
+  const onCompactTouchEnd = (event: React.TouchEvent) => {
+    const endY = event.changedTouches[0]?.clientY;
+    const delta = touchStartY.current !== null && endY !== undefined ? endY - touchStartY.current : 0;
+    if (delta < -55) setIsExpanded(true);
+    touchStartY.current = null;
   };
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 xl:left-[230px] z-40 bg-[#11121A]/95 backdrop-blur-md border-t border-white/10 shadow-2xl select-none pb-[max(0.45rem,env(safe-area-inset-bottom))]" role="region" aria-label="Compact media player">
+      <div onTouchStart={onTouchStart} onTouchEnd={onCompactTouchEnd} className="fixed bottom-0 left-0 right-0 xl:left-[230px] z-40 bg-[#11121A]/95 backdrop-blur-md border-t border-white/10 shadow-2xl select-none pb-[max(0.45rem,env(safe-area-inset-bottom))] touch-pan-y" role="region" aria-label="Compact media player">
         <div className="w-full h-[2.5px] bg-white/10 relative overflow-hidden">
           <div className="h-full bg-[#F472B6] transition-all duration-150" style={{ width: progress + '%' }} />
         </div>
@@ -106,7 +114,7 @@ export default function NowPlayingOverlay() {
               <h2 className="text-base sm:text-lg font-bold text-white truncate">{currentSong?.title || 'No track selected'}</h2>
               <p className="text-sm text-white/75 truncate">{currentSong?.artist || 'Unknown Artist'}{currentSong?.album ? ' · ' + currentSong.album : ''}</p>
             </div>
-            <div className="w-10 shrink-0" aria-hidden="true" />
+            <button type="button" onClick={() => setIsExpanded(false)} className="p-2 -mr-2 text-white/85 hover:text-white rounded-full shrink-0" title="Minimize player" aria-label="Minimize player"><ChevronDown className="w-6 h-6" /></button>
           </header>
 
           <section className="shrink-0 px-5 sm:px-8 pb-2">
