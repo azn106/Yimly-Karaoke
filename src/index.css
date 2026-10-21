@@ -196,6 +196,26 @@ html, body {
 }
 .yk-horizontal-rail::-webkit-scrollbar { display: none; }
 
+/* Now Playing artwork: slow card breathing underneath the transient beat pulse. */
+@keyframes yk-artwork-breathe {
+  0%, 100% { transform: scale(0.985); }
+  50% { transform: scale(1.025); }
+}
+
+.yk-artwork-breathe {
+  transform: scale(1);
+  transform-origin: center center;
+}
+.yk-artwork-breathe-active {
+  animation: yk-artwork-breathe 4.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yk-artwork-breathe-active {
+    animation: none !important;
+  }
+}
+
 /* Inline Equalizer indicator for current playing song */
 @keyframes yk-eq-1 {
   0%, 100% { transform: scaleY(0.25); }
