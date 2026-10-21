@@ -40,7 +40,7 @@ export default function NowPlayingOverlay() {
       const card = artworkCardRef.current;
       if (card) {
         card.style.borderColor = 'transparent';
-        card.style.borderWidth = '1px';
+        card.style.borderWidth = '3px';
         card.style.background = 'conic-gradient(from 0deg, rgba(244,114,182,0.22), rgba(244,114,182,0.22))';
         card.style.boxShadow = '0 20px 45px rgba(0,0,0,0.32), 0 0 7px rgba(244,114,182,0.08)';
       }
@@ -70,7 +70,7 @@ export default function NowPlayingOverlay() {
         const card = artworkCardRef.current;
         if (card) {
           card.style.borderColor = 'transparent';
-          card.style.borderWidth = (1 + pulse * 2.0) + 'px';
+          card.style.borderWidth = (3 + pulse * 1.5) + 'px';
           card.style.background = 'conic-gradient(from ' + angle + 'deg, ' +
             'rgba(244,114,182,0.20) 0deg, ' +
             'rgba(244,114,182,0.24) 250deg, ' +
