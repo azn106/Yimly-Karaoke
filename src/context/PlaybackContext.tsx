@@ -255,12 +255,20 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       if (timestamp - lastSampleAt < 40) return;
       lastSampleAt = timestamp;
       analyser.getByteFrequencyData(frequencyData);
-      // Average the lowest frequency bins to follow kick and bass energy.
-      const bassBins = Math.max(1, Math.floor(frequencyData.length * 0.07));
+      // Use broad-spectrum energy so vocals, percussion, guitars, synths and bass
+      // can all drive the artwork. Ignore the very lowest bins and extreme high-end noise.
+      const startBin = 2;
+      const endBin = Math.max(startBin + 1, Math.floor(frequencyData.length * 0.72));
       let sum = 0;
-      for (let i = 0; i < bassBins; i++) sum += frequencyData[i];
-      const rawBass = Math.min(1, (sum / bassBins) / 150);
-      smoothedBass = smoothedBass * 0.58 + rawBass * 0.42;
+      let weightedEnergy = 0;
+      let weightTotal = 0;
+      for (let i = startBin; i < endBin; i++) {
+        const weight = i < frequencyData.length * 0.18 ? 1.2 : 1;
+        sum += frequencyData[i] * weight;
+        weightTotal += weight;
+      }
+      const rawEnergy = Math.min(1, (sum / Math.max(1, weightTotal)) / 115);
+      smoothedBass = smoothedBass * 0.42 + rawEnergy * 0.58;
       setBassLevel(smoothedBass);
     };
 
