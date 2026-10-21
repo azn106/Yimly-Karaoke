@@ -7,7 +7,7 @@ export default function NowPlayingOverlay() {
   const {
     currentSong, isPlaying, currentTime, duration, volume, isMuted, queue, queueIndex,
     isShuffle, repeatMode, togglePlay, seek, next, previous, setVolume, toggleMute,
-    toggleShuffle, cycleRepeat, jumpToQueueIndex, bassLevel
+    toggleShuffle, cycleRepeat, jumpToQueueIndex, bassLevel, transientLevel
   } = usePlayback();
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -17,18 +17,18 @@ export default function NowPlayingOverlay() {
   const isQueueTouch = useRef(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [bassPulse, setBassPulse] = useState(0);
-  const previousBassRef = useRef(0);
+  const previousTransientRef = useRef(0);
   const pulseRef = useRef(0);
   const pulseFrameRef = useRef<number>(0);
   const pulseLastFrameRef = useRef(0);
   const lastBeatTimeRef = useRef(0);
   const pulseReleaseRef = useRef(285);
 
-  // Turn rising bass transients into distinct, short pulses. A raw bass level is
-  // an envelope, so mapping it directly to scale only makes the artwork stay larger.
+  // Breathing follows the smoothed overall energy; only sharp spectral attacks
+  // trigger the separate, quick drum-like pulse.
   useEffect(() => {
-    const previousBass = previousBassRef.current;
-    previousBassRef.current = bassLevel;
+    const previousTransient = previousTransientRef.current;
+    previousTransientRef.current = transientLevel;
 
     if (!isPlaying) {
       pulseRef.current = 0;
@@ -41,8 +41,8 @@ export default function NowPlayingOverlay() {
       return;
     }
 
-    const rise = bassLevel - previousBass;
-    if (bassLevel > 0.055 && rise > 0.012) {
+    const rise = transientLevel - previousTransient;
+    if (transientLevel > 0.12 && rise > 0.045) {
       const now = performance.now();
       const beatGap = lastBeatTimeRef.current ? now - lastBeatTimeRef.current : 0;
       lastBeatTimeRef.current = now;
@@ -53,7 +53,7 @@ export default function NowPlayingOverlay() {
         pulseReleaseRef.current = Math.max(105, Math.min(720, beatGap * 0.88));
       }
 
-      const hitStrength = Math.min(1, 0.32 + bassLevel * 1.6);
+      const hitStrength = Math.min(1, 0.28 + transientLevel * 1.25);
       // Let each new hit refresh the pulse instead of waiting for the last one to finish.
       pulseRef.current = Math.max(pulseRef.current * 0.62, hitStrength);
     }
@@ -76,7 +76,7 @@ export default function NowPlayingOverlay() {
       };
       pulseFrameRef.current = requestAnimationFrame(animatePulse);
     }
-  }, [bassLevel, isPlaying]);
+  }, [transientLevel, isPlaying]);
 
   useEffect(() => () => {
     if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current);
@@ -198,7 +198,13 @@ export default function NowPlayingOverlay() {
 
           <section className="shrink-0 px-5 sm:px-8 pb-2">
             <div className="flex justify-center mb-3">
-              <div className={'yk-artwork-breathe w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] ' + (isPlaying ? 'yk-artwork-breathe-active' : '')}>
+              <div
+                className={'yk-artwork-breathe w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] ' + (isPlaying ? 'yk-artwork-breathe-active' : '')}
+                style={{
+                  '--yk-breathe-depth': (0.018 + Math.min(1, bassLevel) * 0.035).toFixed(3),
+                  animationDuration: (5.8 - Math.min(1, bassLevel) * 2.7).toFixed(2) + 's',
+                } as React.CSSProperties}
+              >
                 <div
                   className="relative w-full h-full rounded-2xl overflow-hidden border border-white/20 shadow-xl bg-black/20 will-change-transform"
                   style={{
