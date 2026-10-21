@@ -238,7 +238,7 @@ export default function PlaylistDetailView({
       </button>
 
       {/* Hero Header */}
-      <div className="flex flex-col md:flex-row items-center md:items-start gap-8 bg-[#141622] p-8 rounded-3xl border border-white/5 shadow-2xl relative overflow-hidden">
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-8 bg-[#141622] p-8 rounded-3xl border border-white/5 shadow-2xl relative overflow-visible">
         {/* Cover with hover change overlay if canEdit */}
         <div className="relative group shrink-0">
           <div className="w-44 h-44 rounded-2xl bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center border border-white/10 shadow-xl shadow-[#F472B6]/10 overflow-hidden">
@@ -402,7 +402,7 @@ export default function PlaylistDetailView({
 
               {moreMenuOpen && (
                 <div 
-                  className="absolute left-0 md:left-auto md:right-0 top-11 w-52 bg-[#181A28] border border-white/15 rounded-xl shadow-2xl z-30 py-1.5 text-xs text-zinc-300 divide-y divide-white/5"
+                  className="absolute right-0 top-11 w-52 max-w-[calc(100vw-3rem)] bg-[#181A28] border border-white/15 rounded-xl shadow-2xl z-50 py-1.5 text-xs text-zinc-300 divide-y divide-white/5"
                   onClick={() => setMoreMenuOpen(false)}
                 >
                   <div className="py-1">
