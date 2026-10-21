@@ -88,10 +88,10 @@ export default function NowPlayingOverlay() {
         </div>
       </div>
 
-      <div className={'fixed inset-0 z-50 bg-black/65 backdrop-blur-sm transition-opacity duration-300 xl:left-[230px] ' + (isExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')} onClick={() => setIsExpanded(false)} style={{ pointerEvents: isExpanded ? 'auto' : 'none' }} aria-hidden="true" />
+      <div className={'fixed inset-0 z-50 bg-black/55 backdrop-blur-sm transition-opacity duration-300 xl:left-[230px] ' + (isExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')} onClick={() => setIsExpanded(false)} style={{ pointerEvents: isExpanded ? 'auto' : 'none' }} aria-hidden="true" />
 
       <div
-        className={'fixed bottom-0 left-0 right-0 xl:left-[230px] z-50 flex flex-col rounded-t-3xl shadow-2xl overflow-hidden transition-transform duration-300 max-h-[92vh] max-h-[92dvh] h-[92vh] h-[92dvh] sm:max-h-[90vh] sm:max-h-[90dvh] sm:h-[88vh] sm:h-[88dvh] max-w-4xl mx-auto ' + (isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none')}
+        className={'fixed inset-x-2 top-2 bottom-2 xl:left-[238px] xl:right-2 z-50 flex flex-col rounded-3xl border border-white/20 shadow-2xl overflow-hidden transition-transform duration-300 max-h-none h-auto max-w-4xl mx-auto ' + (isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none')}
         style={{ transform: isExpanded ? (dragOffset > 0 ? 'translateY(' + dragOffset + 'px)' : 'translateY(0)') : 'translateY(100%)', pointerEvents: isExpanded ? 'auto' : 'none', transition: dragOffset > 0 ? 'none' : undefined }}
         aria-hidden={!isExpanded} role="dialog" aria-modal="true" aria-label="Now playing expanded player"
       >
@@ -100,7 +100,7 @@ export default function NowPlayingOverlay() {
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.08) 0%, rgba(190,24,93,0.12) 42%, rgba(35,15,34,0.25) 100%)' }} />
 
         <div className="relative z-10 flex flex-col flex-1 min-h-0">
-          <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="pt-2.5 pb-1 shrink-0 cursor-grab select-none" title="Swipe down to minimize">
+          <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="pt-3 pb-1 shrink-0 cursor-grab select-none" title="Swipe down to minimize">
             <div className="w-12 h-1.5 bg-white/40 rounded-full mx-auto" />
           </div>
 
@@ -115,7 +115,7 @@ export default function NowPlayingOverlay() {
 
           <section className="shrink-0 px-5 sm:px-8 pb-3">
             <div className="flex justify-center mb-3">
-              <div className="relative w-[min(38vw,188px)] h-[min(38vw,188px)] sm:w-[min(30vw,220px)] sm:h-[min(30vw,220px)] max-w-[220px] max-h-[220px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/15 shadow-xl bg-black/20">
+              <div className="relative w-[min(42vw,220px)] h-[min(42vw,220px)] sm:w-[min(30vw,240px)] sm:h-[min(30vw,240px)] max-w-[240px] max-h-[240px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/15 shadow-xl bg-black/20">
                 <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
                 {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className="relative z-10 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
               </div>
