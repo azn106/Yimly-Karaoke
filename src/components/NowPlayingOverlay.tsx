@@ -18,6 +18,7 @@ export default function NowPlayingOverlay() {
   const [dragOffset, setDragOffset] = useState(0);
   const previousTransientRef = useRef(0);
   const pulseRef = useRef(0);
+  const smoothPulseRef = useRef(0);
   const pulseFrameRef = useRef<number>(0);
   const pulseLastFrameRef = useRef(0);
   const lastBeatTimeRef = useRef(0);
@@ -32,6 +33,7 @@ export default function NowPlayingOverlay() {
 
     if (!isPlaying) {
       pulseRef.current = 0;
+      smoothPulseRef.current = 0;
       if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current);
       pulseFrameRef.current = 0;
       pulseLastFrameRef.current = 0;
@@ -64,24 +66,28 @@ export default function NowPlayingOverlay() {
       const animatePulse = (timestamp: number) => {
         const elapsed = pulseLastFrameRef.current ? Math.min(50, timestamp - pulseLastFrameRef.current) : 16;
         pulseLastFrameRef.current = timestamp;
-        const pulse = Math.max(0, pulseRef.current);
+        const targetPulse = Math.max(0, pulseRef.current);
         pulseRef.current *= Math.exp(-elapsed / pulseReleaseRef.current);
-        const angle = (timestamp * 0.055) % 360;
+        // Ease the visible response so each drum hit blooms rather than flashes.
+        const smoothing = 1 - Math.exp(-elapsed / (targetPulse > smoothPulseRef.current ? 58 : 190));
+        smoothPulseRef.current += (targetPulse - smoothPulseRef.current) * smoothing;
+        const pulse = Math.max(0, smoothPulseRef.current);
+        const angle = (timestamp * 0.042) % 360;
         const card = artworkCardRef.current;
         if (card) {
           card.style.borderColor = 'transparent';
-          card.style.borderWidth = (3 + pulse * 1.5) + 'px';
+          card.style.borderWidth = (3 + pulse * 0.9) + 'px';
           card.style.background = 'conic-gradient(from ' + angle + 'deg, ' +
-            'rgba(244,114,182,0.20) 0deg, ' +
-            'rgba(244,114,182,0.24) 250deg, ' +
-            'rgba(249,168,212,' + (0.62 + pulse * 0.38) + ') 300deg, ' +
-            'rgba(255,255,255,' + (0.78 + pulse * 0.22) + ') 322deg, ' +
-            'rgba(244,114,182,' + (0.45 + pulse * 0.55) + ') 342deg, ' +
-            'rgba(244,114,182,0.20) 360deg)';
+            'rgba(244,114,182,0.16) 0deg, ' +
+            'rgba(244,114,182,0.20) 258deg, ' +
+            'rgba(249,168,212,' + (0.42 + pulse * 0.30) + ') 294deg, ' +
+            'rgba(255,245,251,' + (0.58 + pulse * 0.30) + ') 316deg, ' +
+            'rgba(244,114,182,' + (0.34 + pulse * 0.38) + ') 340deg, ' +
+            'rgba(244,114,182,0.16) 360deg)';
           card.style.boxShadow =
             '0 20px 45px rgba(0,0,0,0.32), ' +
-            '0 0 ' + (7 + pulse * 30) + 'px rgba(244,114,182,' + (0.08 + pulse * 0.48) + '), ' +
-            '0 0 ' + (2 + pulse * 15) + 'px rgba(249,168,212,' + (pulse * 0.52) + ')';
+            '0 0 ' + (6 + pulse * 16) + 'px rgba(244,114,182,' + (0.07 + pulse * 0.28) + '), ' +
+            '0 0 ' + (2 + pulse * 7) + 'px rgba(249,168,212,' + (pulse * 0.30) + ')';
         }
         pulseFrameRef.current = requestAnimationFrame(animatePulse);
       };
