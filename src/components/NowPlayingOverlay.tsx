@@ -209,7 +209,7 @@ export default function NowPlayingOverlay() {
   const onSeekStart = () => { setIsSeeking(true); setSeekTime(currentTime); };
   const onSeekEnd = () => { setIsSeeking(false); seek(seekTime); };
   const onExpandedTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest('[data-queue-scroll]')) {
+    if ((event.target as HTMLElement).closest('[data-queue-scroll], [data-lyrics-scroll]')) {
       isQueueTouch.current = true;
       touchStartY.current = null;
       return;
