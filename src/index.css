@@ -196,6 +196,13 @@ html, body {
 }
 .yk-horizontal-rail::-webkit-scrollbar { display: none; }
 
+/* Now Playing: the image breathes while a conic-gradient border sweeps clockwise. */
+.yk-audio-reactive-border {
+  border-style: solid;
+  background-origin: border-box;
+  background-clip: border-box;
+}
+
 /* Now Playing: only the artwork image breathes; transient hits animate its frame. */
 @keyframes yk-artwork-image-breathe {
   0%, 100% { transform: scale(1.005); }
