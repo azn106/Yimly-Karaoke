@@ -38,8 +38,8 @@ export default function NowPlayingOverlay() {
     }
 
     const rise = bassLevel - previousBass;
-    if (bassLevel > 0.075 && rise > 0.018) {
-      pulseRef.current = Math.max(pulseRef.current, Math.min(1, 0.28 + bassLevel * 1.8));
+    if (bassLevel > 0.055 && rise > 0.012) {
+      pulseRef.current = Math.max(pulseRef.current, Math.min(1, 0.32 + bassLevel * 1.6));
     }
 
     if (pulseRef.current > 0 && !pulseFrameRef.current) {
