@@ -118,9 +118,9 @@ export default function NowPlayingOverlay() {
         onTouchStart={onExpandedTouchStart} onTouchMove={onExpandedTouchMove} onTouchEnd={onExpandedTouchEnd}
         aria-hidden={!isExpanded} role="dialog" aria-modal="true" aria-label="Now playing expanded player"
       >
-        {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: 'blur(20px)', transform: 'scale(1.16)', opacity: 1 }} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+        {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: 'blur(8px)', transform: 'scale(1.10)', opacity: 0.9 }} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
         {/* Keep the cover artwork visible through a translucent pink tint across the entire player card. */}
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.10) 0%, rgba(190,24,93,0.14) 42%, rgba(18,8,22,0.30) 100%)' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(190,24,93,0.48) 0%, rgba(157,23,77,0.58) 48%, rgba(35,12,29,0.72) 100%)' }} />
 
         <div className="relative z-10 flex flex-col flex-1 min-h-0">
           <header className="flex items-center gap-3 px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 shrink-0 cursor-grab select-none" title="Swipe down to minimize">
@@ -155,7 +155,7 @@ export default function NowPlayingOverlay() {
             </div>
           </section>
 
-          <section className="flex-1 min-h-0 flex flex-col border-t border-white/15 bg-[#17121F]/10 backdrop-blur-[2px]">
+          <section className="flex-1 min-h-0 flex flex-col border-t border-white/15 bg-[#3A102A]/35 backdrop-blur-[5px]">
             <div className="flex items-center gap-2 px-4 sm:px-6 py-3 shrink-0">
               <ListMusic className="w-5 h-5 text-[#F9A8D4]" />
               <h3 className="text-sm font-bold text-white">Up Next</h3>
