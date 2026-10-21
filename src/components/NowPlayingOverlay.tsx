@@ -187,8 +187,10 @@ export default function NowPlayingOverlay() {
                     // A transient pulse returns to baseline after each detected bass rise.
                     transform: 'scale(' + (1 + (isPlaying ? bassPulse * 0.10 : 0)) + ')',
                     transformOrigin: 'center center',
-                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (8 + (isPlaying ? bassPulse * 44 : 0)) + 'px rgba(244,114,182,' + (0.12 + (isPlaying ? bassPulse * 0.38 : 0)) + ')',
-                    transition: 'transform 35ms ease-out, box-shadow 45ms ease-out',
+                    borderColor: 'rgba(244,114,182,' + (isPlaying ? 0.22 + bassPulse * 0.78 : 0.18) + ')',
+                    borderWidth: isPlaying ? (1 + bassPulse * 1.5) + 'px' : '1px',
+                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (8 + (isPlaying ? bassPulse * 44 : 0)) + 'px rgba(244,114,182,' + (0.12 + (isPlaying ? bassPulse * 0.38 : 0)) + '), inset 0 0 ' + (isPlaying ? bassPulse * 12 : 0) + 'px rgba(244,114,182,' + (isPlaying ? bassPulse * 0.22 : 0) + ')',
+                    transition: 'transform 35ms ease-out, border-color 45ms ease-out, border-width 45ms ease-out, box-shadow 45ms ease-out',
                   }}
                 >
                 <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
