@@ -16,6 +16,54 @@ export default function NowPlayingOverlay() {
   const touchStartY = useRef<number | null>(null);
   const isQueueTouch = useRef(false);
   const [dragOffset, setDragOffset] = useState(0);
+  const [bassPulse, setBassPulse] = useState(0);
+  const previousBassRef = useRef(0);
+  const pulseRef = useRef(0);
+  const pulseFrameRef = useRef<number>(0);
+  const pulseLastFrameRef = useRef(0);
+
+  // Turn rising bass transients into distinct, short pulses. A raw bass level is
+  // an envelope, so mapping it directly to scale only makes the artwork stay larger.
+  useEffect(() => {
+    const previousBass = previousBassRef.current;
+    previousBassRef.current = bassLevel;
+
+    if (!isPlaying) {
+      pulseRef.current = 0;
+      setBassPulse(0);
+      if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current);
+      pulseFrameRef.current = 0;
+      pulseLastFrameRef.current = 0;
+      return;
+    }
+
+    const rise = bassLevel - previousBass;
+    if (bassLevel > 0.075 && rise > 0.018) {
+      pulseRef.current = Math.max(pulseRef.current, Math.min(1, 0.28 + bassLevel * 1.8));
+    }
+
+    if (pulseRef.current > 0 && !pulseFrameRef.current) {
+      const animatePulse = (timestamp: number) => {
+        const elapsed = pulseLastFrameRef.current ? timestamp - pulseLastFrameRef.current : 16;
+        pulseLastFrameRef.current = timestamp;
+        pulseRef.current = Math.max(0, pulseRef.current - elapsed / 210);
+        setBassPulse(pulseRef.current);
+        if (pulseRef.current > 0.005) {
+          pulseFrameRef.current = requestAnimationFrame(animatePulse);
+        } else {
+          pulseRef.current = 0;
+          setBassPulse(0);
+          pulseFrameRef.current = 0;
+          pulseLastFrameRef.current = 0;
+        }
+      };
+      pulseFrameRef.current = requestAnimationFrame(animatePulse);
+    }
+  }, [bassLevel, isPlaying]);
+
+  useEffect(() => () => {
+    if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current);
+  }, []);
 
   useEffect(() => {
     if (!isExpanded) return;
@@ -136,12 +184,11 @@ export default function NowPlayingOverlay() {
               <div
                   className="relative w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] rounded-2xl overflow-hidden border border-white/20 shadow-xl bg-black/20 will-change-transform"
                   style={{
-                    // Boost the measured bass envelope so strong kick hits create a clearly visible
-                    // heartbeat pulse without changing the fullscreen background artwork.
-                    transform: 'scale(' + (1 + (isPlaying ? Math.min(1, bassLevel * 3.2) * 0.10 : 0)) + ')',
+                    // A transient pulse returns to baseline after each detected bass rise.
+                    transform: 'scale(' + (1 + (isPlaying ? bassPulse * 0.10 : 0)) + ')',
                     transformOrigin: 'center center',
-                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (8 + (isPlaying ? Math.min(1, bassLevel * 3.2) * 44 : 0)) + 'px rgba(244,114,182,' + (0.12 + (isPlaying ? Math.min(1, bassLevel * 3.2) * 0.38 : 0)) + ')',
-                    transition: 'transform 55ms linear, box-shadow 70ms linear',
+                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (8 + (isPlaying ? bassPulse * 44 : 0)) + 'px rgba(244,114,182,' + (0.12 + (isPlaying ? bassPulse * 0.38 : 0)) + ')',
+                    transition: 'transform 35ms ease-out, box-shadow 45ms ease-out',
                   }}
                 >
                 <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
