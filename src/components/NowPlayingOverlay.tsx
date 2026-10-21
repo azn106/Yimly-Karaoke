@@ -16,28 +16,33 @@ export default function NowPlayingOverlay() {
   const touchStartY = useRef<number | null>(null);
   const isQueueTouch = useRef(false);
   const [dragOffset, setDragOffset] = useState(0);
-  const [bassPulse, setBassPulse] = useState(0);
   const previousTransientRef = useRef(0);
   const pulseRef = useRef(0);
   const pulseFrameRef = useRef<number>(0);
   const pulseLastFrameRef = useRef(0);
   const lastBeatTimeRef = useRef(0);
   const pulseReleaseRef = useRef(285);
+  const artworkCardRef = useRef<HTMLDivElement>(null);
 
-  // Breathing follows the smoothed overall energy; only sharp spectral attacks
-  // trigger the separate, quick drum-like pulse.
+  // The artwork image breathes independently. Audio transients affect only
+  // the card border/glow, so the two visual responses never compete for scale.
   useEffect(() => {
     const previousTransient = previousTransientRef.current;
     previousTransientRef.current = transientLevel;
 
     if (!isPlaying) {
       pulseRef.current = 0;
-      setBassPulse(0);
       if (pulseFrameRef.current) cancelAnimationFrame(pulseFrameRef.current);
       pulseFrameRef.current = 0;
       pulseLastFrameRef.current = 0;
       lastBeatTimeRef.current = 0;
       pulseReleaseRef.current = 285;
+      const card = artworkCardRef.current;
+      if (card) {
+        card.style.borderColor = 'rgba(244,114,182,0.22)';
+        card.style.borderWidth = '1px';
+        card.style.boxShadow = '0 20px 45px rgba(0,0,0,0.32), 0 0 7px rgba(244,114,182,0.08)';
+      }
       return;
     }
 
@@ -46,32 +51,39 @@ export default function NowPlayingOverlay() {
       const now = performance.now();
       const beatGap = lastBeatTimeRef.current ? now - lastBeatTimeRef.current : 0;
       lastBeatTimeRef.current = now;
-
-      // Estimate the pulse's return speed from the spacing between detected hits:
-      // close hits release quickly; widely spaced hits get a longer, smoother tail.
       if (beatGap >= 80 && beatGap <= 1400) {
-        pulseReleaseRef.current = Math.max(105, Math.min(720, beatGap * 0.88));
+        pulseReleaseRef.current = Math.max(105, Math.min(520, beatGap * 0.72));
       }
-
-      const hitStrength = Math.min(1, 0.28 + transientLevel * 1.25);
-      // Let each new hit refresh the pulse instead of waiting for the last one to finish.
-      pulseRef.current = Math.max(pulseRef.current * 0.62, hitStrength);
+      const hitStrength = Math.min(1, 0.22 + transientLevel * 1.35);
+      pulseRef.current = Math.max(pulseRef.current * 0.55, hitStrength);
     }
 
     if (pulseRef.current > 0 && !pulseFrameRef.current) {
       const animatePulse = (timestamp: number) => {
         const elapsed = pulseLastFrameRef.current ? timestamp - pulseLastFrameRef.current : 16;
         pulseLastFrameRef.current = timestamp;
-        // Adaptive exponential release follows the estimated beat spacing.
         pulseRef.current *= Math.exp(-elapsed / pulseReleaseRef.current);
-        setBassPulse(pulseRef.current);
-        if (pulseRef.current > 0.008) {
+        const pulse = Math.max(0, pulseRef.current);
+        const card = artworkCardRef.current;
+        if (card) {
+          card.style.borderColor = 'rgba(244,114,182,' + (0.22 + pulse * 0.78) + ')';
+          card.style.borderWidth = (1 + pulse * 2.2) + 'px';
+          card.style.boxShadow =
+            '0 20px 45px rgba(0,0,0,0.32), ' +
+            '0 0 ' + (7 + pulse * 36) + 'px rgba(244,114,182,' + (0.08 + pulse * 0.52) + '), ' +
+            '0 0 ' + (2 + pulse * 13) + 'px rgba(249,168,212,' + (pulse * 0.5) + ')';
+        }
+        if (pulse > 0.008) {
           pulseFrameRef.current = requestAnimationFrame(animatePulse);
         } else {
           pulseRef.current = 0;
-          setBassPulse(0);
           pulseFrameRef.current = 0;
           pulseLastFrameRef.current = 0;
+          if (card) {
+            card.style.borderColor = 'rgba(244,114,182,0.22)';
+            card.style.borderWidth = '1px';
+            card.style.boxShadow = '0 20px 45px rgba(0,0,0,0.32), 0 0 7px rgba(244,114,182,0.08)';
+          }
         }
       };
       pulseFrameRef.current = requestAnimationFrame(animatePulse);
@@ -198,27 +210,18 @@ export default function NowPlayingOverlay() {
 
           <section className="shrink-0 px-5 sm:px-8 pb-2">
             <div className="flex justify-center mb-3">
-              <div
-                className={'yk-artwork-breathe w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px] ' + (isPlaying ? 'yk-artwork-breathe-active' : '')}
-                style={{
-                  '--yk-breathe-depth': (0.018 + Math.min(1, bassLevel) * 0.035).toFixed(3),
-                  animationDuration: (5.8 - Math.min(1, bassLevel) * 2.7).toFixed(2) + 's',
-                } as React.CSSProperties}
-              >
+              <div className="w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px]">
                 <div
-                  className="relative w-full h-full rounded-2xl overflow-hidden border border-white/20 shadow-xl bg-black/20 will-change-transform"
+                  ref={artworkCardRef}
+                  className="relative w-full h-full rounded-2xl overflow-hidden border bg-black/20 will-change-[border-color,box-shadow] shadow-xl"
                   style={{
-                    // Beat-driven pulse layers on top of the slower, continuous breathing motion.
-                    transform: 'scale(' + (1 + (isPlaying ? bassPulse * 0.075 : 0)) + ')',
-                    transformOrigin: 'center center',
-                    borderColor: 'rgba(244,114,182,' + (0.16 + (isPlaying ? bassPulse * 0.84 : 0)) + ')',
+                    borderColor: 'rgba(244,114,182,0.22)',
                     borderWidth: '1px',
-                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (7 + (isPlaying ? bassPulse * 38 : 0)) + 'px rgba(244,114,182,' + (0.10 + (isPlaying ? bassPulse * 0.40 : 0)) + '), inset 0 0 ' + (isPlaying ? bassPulse * 10 : 0) + 'px rgba(244,114,182,' + (isPlaying ? bassPulse * 0.18 : 0) + ')',
-                    transition: 'transform 120ms ease-out, border-color 110ms ease-out, box-shadow 110ms ease-out',
+                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 7px rgba(244,114,182,0.08)',
                   }}
                 >
                   <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
-                  {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className="relative z-10 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                  {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt={currentSong.title} className={'relative z-10 w-full h-full object-cover ' + (isPlaying ? 'yk-artwork-image-breathe' : '')} style={{ '--yk-breathe-depth': (0.012 + Math.min(1, bassLevel) * 0.045).toFixed(3) } as React.CSSProperties} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
                 </div>
               </div>
             </div>
