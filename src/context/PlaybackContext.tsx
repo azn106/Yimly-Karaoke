@@ -832,6 +832,81 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     });
   }, [broadcastSync, dispatchOrExecute, repeatMode]);
 
+  // Expose the web player to supported OS/car Bluetooth media controls via Media Session.
+  // Actual availability depends on the browser and the phone/car integration.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+
+    const mediaSession = navigator.mediaSession;
+    try {
+      mediaSession.metadata = currentSong
+        ? new MediaMetadata({
+            title: currentSong.title || 'Unknown title',
+            artist: currentSong.artist || 'Unknown artist',
+            album: currentSong.album || 'Yimly Karaoke',
+            artwork: currentSong.hasArtwork
+              ? [
+                  { src: `/api/songs/${currentSong.id}/artwork`, sizes: '96x96', type: 'image/jpeg' },
+                  { src: `/api/songs/${currentSong.id}/artwork`, sizes: '512x512', type: 'image/jpeg' },
+                ]
+              : [],
+          })
+        : null;
+    } catch (error) {
+      console.warn('[PlaybackContext] Media Session metadata unavailable:', error);
+    }
+
+    const handlers: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
+      ['play', () => resume()],
+      ['pause', () => pause()],
+      ['previoustrack', () => previous()],
+      ['nexttrack', () => next()],
+      ['seekto', (details) => {
+        if (typeof details.seekTime === 'number' && Number.isFinite(details.seekTime)) {
+          seek(details.seekTime);
+        }
+      }],
+    ];
+
+    const registered: MediaSessionAction[] = [];
+    for (const [action, handler] of handlers) {
+      try {
+        mediaSession.setActionHandler(action, handler);
+        registered.push(action);
+      } catch {
+        // Browsers expose different subsets of the Media Session actions.
+      }
+    }
+
+    try {
+      mediaSession.playbackState = isPlaying ? 'playing' : currentSong ? 'paused' : 'none';
+    } catch {}
+
+    return () => {
+      for (const action of registered) {
+        try { mediaSession.setActionHandler(action, null); } catch {}
+      }
+    };
+  }, [currentSong, isPlaying, next, pause, previous, resume, seek]);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const mediaSession = navigator.mediaSession;
+    try {
+      if (duration > 0 && Number.isFinite(duration) && typeof mediaSession.setPositionState === 'function') {
+        mediaSession.setPositionState({
+          duration,
+          playbackRate: 1,
+          position: Math.min(currentTime, duration),
+        });
+      } else if (typeof mediaSession.setPositionState === 'function') {
+        mediaSession.setPositionState();
+      }
+    } catch {
+      // Position reporting is optional and browser-dependent.
+    }
+  }, [currentTime, duration]);
+
   const value: PlaybackContextType = {
     currentSong,
     isPlaying,
