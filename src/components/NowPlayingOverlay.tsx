@@ -24,8 +24,8 @@ export default function NowPlayingOverlay() {
   const pulseReleaseRef = useRef(285);
   const artworkCardRef = useRef<HTMLDivElement>(null);
 
-  // The artwork image breathes independently. Audio transients affect only
-  // the card border/glow, so the two visual responses never compete for scale.
+  // Audio-Reactive Radar Border: a continuous clockwise conic sweep, with each
+  // detected transient launching a brighter, expanding halo ripple.
   useEffect(() => {
     const previousTransient = previousTransientRef.current;
     previousTransientRef.current = transientLevel;
@@ -39,8 +39,9 @@ export default function NowPlayingOverlay() {
       pulseReleaseRef.current = 285;
       const card = artworkCardRef.current;
       if (card) {
-        card.style.borderColor = 'rgba(244,114,182,0.22)';
+        card.style.borderColor = 'transparent';
         card.style.borderWidth = '1px';
+        card.style.background = 'conic-gradient(from 0deg, rgba(244,114,182,0.22), rgba(244,114,182,0.22))';
         card.style.boxShadow = '0 20px 45px rgba(0,0,0,0.32), 0 0 7px rgba(244,114,182,0.08)';
       }
       return;
@@ -58,33 +59,31 @@ export default function NowPlayingOverlay() {
       pulseRef.current = Math.max(pulseRef.current * 0.55, hitStrength);
     }
 
-    if (pulseRef.current > 0 && !pulseFrameRef.current) {
+    // Start only one animation loop. Transient updates feed the running loop via refs.
+    if (!pulseFrameRef.current) {
       const animatePulse = (timestamp: number) => {
-        const elapsed = pulseLastFrameRef.current ? timestamp - pulseLastFrameRef.current : 16;
+        const elapsed = pulseLastFrameRef.current ? Math.min(50, timestamp - pulseLastFrameRef.current) : 16;
         pulseLastFrameRef.current = timestamp;
-        pulseRef.current *= Math.exp(-elapsed / pulseReleaseRef.current);
         const pulse = Math.max(0, pulseRef.current);
+        pulseRef.current *= Math.exp(-elapsed / pulseReleaseRef.current);
+        const angle = (timestamp * 0.055) % 360;
         const card = artworkCardRef.current;
         if (card) {
-          card.style.borderColor = 'rgba(244,114,182,' + (0.22 + pulse * 0.78) + ')';
-          card.style.borderWidth = (1 + pulse * 2.2) + 'px';
+          card.style.borderColor = 'transparent';
+          card.style.borderWidth = (1 + pulse * 2.0) + 'px';
+          card.style.background = 'conic-gradient(from ' + angle + 'deg, ' +
+            'rgba(244,114,182,0.20) 0deg, ' +
+            'rgba(244,114,182,0.24) 250deg, ' +
+            'rgba(249,168,212,' + (0.62 + pulse * 0.38) + ') 300deg, ' +
+            'rgba(255,255,255,' + (0.78 + pulse * 0.22) + ') 322deg, ' +
+            'rgba(244,114,182,' + (0.45 + pulse * 0.55) + ') 342deg, ' +
+            'rgba(244,114,182,0.20) 360deg)';
           card.style.boxShadow =
             '0 20px 45px rgba(0,0,0,0.32), ' +
-            '0 0 ' + (7 + pulse * 36) + 'px rgba(244,114,182,' + (0.08 + pulse * 0.52) + '), ' +
-            '0 0 ' + (2 + pulse * 13) + 'px rgba(249,168,212,' + (pulse * 0.5) + ')';
+            '0 0 ' + (7 + pulse * 30) + 'px rgba(244,114,182,' + (0.08 + pulse * 0.48) + '), ' +
+            '0 0 ' + (2 + pulse * 15) + 'px rgba(249,168,212,' + (pulse * 0.52) + ')';
         }
-        if (pulse > 0.008) {
-          pulseFrameRef.current = requestAnimationFrame(animatePulse);
-        } else {
-          pulseRef.current = 0;
-          pulseFrameRef.current = 0;
-          pulseLastFrameRef.current = 0;
-          if (card) {
-            card.style.borderColor = 'rgba(244,114,182,0.22)';
-            card.style.borderWidth = '1px';
-            card.style.boxShadow = '0 20px 45px rgba(0,0,0,0.32), 0 0 7px rgba(244,114,182,0.08)';
-          }
-        }
+        pulseFrameRef.current = requestAnimationFrame(animatePulse);
       };
       pulseFrameRef.current = requestAnimationFrame(animatePulse);
     }
@@ -213,10 +212,11 @@ export default function NowPlayingOverlay() {
               <div className="w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px]">
                 <div
                   ref={artworkCardRef}
-                  className="relative w-full h-full rounded-2xl overflow-hidden border bg-black/20 will-change-[border-color,box-shadow] shadow-xl"
+                  className="yk-audio-reactive-border relative w-full h-full rounded-2xl overflow-hidden border bg-black/20 will-change-[border-color,background,box-shadow] shadow-xl"
                   style={{
-                    borderColor: 'rgba(244,114,182,0.22)',
+                    borderColor: 'transparent',
                     borderWidth: '1px',
+                    background: 'conic-gradient(from 0deg, rgba(244,114,182,0.20), rgba(244,114,182,0.24), rgba(249,168,212,0.8), rgba(244,114,182,0.20))',
                     boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 7px rgba(244,114,182,0.08)',
                   }}
                 >
