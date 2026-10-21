@@ -33,6 +33,7 @@ export interface PlaybackContextType {
   playbackError: string | null;
   isLeader: boolean;
   bassLevel: number;
+  transientLevel: number;
 
   // Actions
   playSong: (song: PlaybackSong, newQueue?: PlaybackSong[], indexInQueue?: number) => void;
@@ -113,6 +114,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [bassLevel, setBassLevel] = useState<number>(0);
+  const [transientLevel, setTransientLevel] = useState<number>(0);
 
   // Tab leadership: Only the leader tab actually controls its HTMLAudioElement
   const [isLeader, setIsLeader] = useState<boolean>(true);
@@ -220,6 +222,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     let animationFrame = 0;
     let lastSampleAt = 0;
     let smoothedBass = 0;
+    let previousSpectrum = new Uint8Array(0);
+    let smoothedTransient = 0;
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
@@ -228,6 +232,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         analyser.fftSize = 1024;
         analyser.smoothingTimeConstant = 0.72;
         frequencyData = new Uint8Array(analyser.frequencyBinCount);
+        previousSpectrum = new Uint8Array(analyser.frequencyBinCount);
         const source = audioContext.createMediaElementSource(audio);
         source.connect(analyser);
         analyser.connect(audioContext.destination);
@@ -244,7 +249,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       if (animationFrame) cancelAnimationFrame(animationFrame);
       animationFrame = 0;
       smoothedBass = 0;
+      smoothedTransient = 0;
+      previousSpectrum.fill(0);
       setBassLevel(0);
+      setTransientLevel(0);
     };
     const sampleBass = (timestamp: number) => {
       if (!analyser || !frequencyData || audio.paused || audio.ended) {
@@ -260,16 +268,27 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       const startBin = 2;
       const endBin = Math.max(startBin + 1, Math.floor(frequencyData.length * 0.72));
       let sum = 0;
-      let weightedEnergy = 0;
       let weightTotal = 0;
+      let positiveFlux = 0;
+      let fluxWeightTotal = 0;
       for (let i = startBin; i < endBin; i++) {
         const weight = i < frequencyData.length * 0.18 ? 1.2 : 1;
         sum += frequencyData[i] * weight;
         weightTotal += weight;
+
+        // Spectral flux reacts to newly appearing sound energy rather than
+        // sustained volume, making sharp drum attacks stand out from vocals/pads.
+        const fluxWeight = i < frequencyData.length * 0.48 ? 1.15 : 0.8;
+        positiveFlux += Math.max(0, frequencyData[i] - previousSpectrum[i]) * fluxWeight;
+        fluxWeightTotal += fluxWeight;
       }
       const rawEnergy = Math.min(1, (sum / Math.max(1, weightTotal)) / 115);
-      smoothedBass = smoothedBass * 0.42 + rawEnergy * 0.58;
+      const rawTransient = Math.min(1, (positiveFlux / Math.max(1, fluxWeightTotal)) / 18);
+      previousSpectrum.set(frequencyData);
+      smoothedBass = smoothedBass * 0.78 + rawEnergy * 0.22;
+      smoothedTransient = smoothedTransient * 0.35 + rawTransient * 0.65;
       setBassLevel(smoothedBass);
+      setTransientLevel(smoothedTransient);
     };
 
     const onTimeUpdate = () => {
@@ -823,6 +842,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     playbackError,
     isLeader,
     bassLevel,
+    transientLevel,
     playSong,
     playQueue,
     togglePlay,
