@@ -196,6 +196,14 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
       return res.status(403).json({ error: 'Forbidden. Access denied.' });
     }
 
+    // Count association rows separately so an empty response can be diagnosed
+    // without modifying playlist data. Song deletions cascade to playlist_songs.
+    const associationCountRows = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(playlistSongs)
+      .where(eq(playlistSongs.playlistId, id));
+    const associationCount = Number(associationCountRows[0]?.count ?? 0);
+
     // Fetch songs in playlist
     const pSongs = await db.select({
       playlistSongId: playlistSongs.id,
@@ -220,6 +228,16 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
     .leftJoin(albums, eq(songs.albumId, albums.id))
     .where(eq(playlistSongs.playlistId, id))
     .orderBy(asc(playlistSongs.position), asc(playlistSongs.addedAt));
+
+    if (pSongs.length === 0) {
+      console.warn('[playlists] Playlist returned zero joined songs', {
+        playlistId: id,
+        associationCount,
+        reason: associationCount === 0
+          ? 'no playlist_songs associations remain (possibly cleared or removed by song deletion)'
+          : 'playlist_songs rows exist but no matching songs were joined (check database integrity)',
+      });
+    }
 
     const songIds = pSongs.map(s => s.id);
     const artistsMap = await getSongArtistsMap(songIds);
