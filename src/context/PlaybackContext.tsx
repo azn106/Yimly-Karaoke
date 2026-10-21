@@ -32,6 +32,7 @@ export interface PlaybackContextType {
   repeatMode: 'off' | 'all' | 'one';
   playbackError: string | null;
   isLeader: boolean;
+  bassLevel: number;
 
   // Actions
   playSong: (song: PlaybackSong, newQueue?: PlaybackSong[], indexInQueue?: number) => void;
@@ -111,6 +112,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const [isShuffle, setIsShuffle] = useState<boolean>(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [bassLevel, setBassLevel] = useState<number>(0);
 
   // Tab leadership: Only the leader tab actually controls its HTMLAudioElement
   const [isLeader, setIsLeader] = useState<boolean>(true);
@@ -210,6 +212,58 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     audio.volume = volume;
     audioRef.current = audio;
 
+    // Analyse the existing playback element (never create a second audio player).
+    // The analyser is connected back to the destination so audio keeps playing normally.
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let frequencyData: Uint8Array | null = null;
+    let animationFrame = 0;
+    let lastSampleAt = 0;
+    let smoothedBass = 0;
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioContext = new AudioContextClass();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.72;
+        frequencyData = new Uint8Array(analyser.frequencyBinCount);
+        const source = audioContext.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+      }
+    } catch (error) {
+      // Keep playback unaffected on browsers that cannot provide Web Audio analysis.
+      console.warn('[PlaybackContext] Bass visualizer unavailable:', error);
+      audioContext = null;
+      analyser = null;
+      frequencyData = null;
+    }
+
+    const stopBassSampling = () => {
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+      smoothedBass = 0;
+      setBassLevel(0);
+    };
+    const sampleBass = (timestamp: number) => {
+      if (!analyser || !frequencyData || audio.paused || audio.ended) {
+        stopBassSampling();
+        return;
+      }
+      animationFrame = requestAnimationFrame(sampleBass);
+      if (timestamp - lastSampleAt < 40) return;
+      lastSampleAt = timestamp;
+      analyser.getByteFrequencyData(frequencyData);
+      // Average the lowest frequency bins to follow kick and bass energy.
+      const bassBins = Math.max(1, Math.floor(frequencyData.length * 0.07));
+      let sum = 0;
+      for (let i = 0; i < bassBins; i++) sum += frequencyData[i];
+      const rawBass = Math.min(1, (sum / bassBins) / 150);
+      smoothedBass = smoothedBass * 0.58 + rawBass * 0.42;
+      setBassLevel(smoothedBass);
+    };
+
     const onTimeUpdate = () => {
       if (leaderTabIdRef.current === tabId) {
         const time = audio.currentTime;
@@ -229,6 +283,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     };
 
     const onPlay = () => {
+      if (audioContext?.state === 'suspended') audioContext.resume().catch(() => {});
+      if (analyser && !animationFrame) animationFrame = requestAnimationFrame(sampleBass);
       setIsPlaying(true);
       setPlaybackError(null);
       if (leaderTabIdRef.current === tabId) {
@@ -237,6 +293,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     };
 
     const onPause = () => {
+      stopBassSampling();
       setIsPlaying(false);
       if (leaderTabIdRef.current === tabId) {
         broadcastSync({ isPlaying: false });
@@ -272,6 +329,8 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('error', onError);
       audio.removeEventListener('ended', onEnded);
+      stopBassSampling();
+      if (audioContext) audioContext.close().catch(() => {});
       try {
         audio.pause();
         audio.src = '';
@@ -755,6 +814,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     repeatMode,
     playbackError,
     isLeader,
+    bassLevel,
     playSong,
     playQueue,
     togglePlay,
