@@ -46,9 +46,10 @@ export default function NowPlayingOverlay() {
       const animatePulse = (timestamp: number) => {
         const elapsed = pulseLastFrameRef.current ? timestamp - pulseLastFrameRef.current : 16;
         pulseLastFrameRef.current = timestamp;
-        pulseRef.current = Math.max(0, pulseRef.current - elapsed / 210);
+        // Exponential release gives each hit a soft, natural tail instead of a linear fade.
+        pulseRef.current *= Math.exp(-elapsed / 285);
         setBassPulse(pulseRef.current);
-        if (pulseRef.current > 0.005) {
+        if (pulseRef.current > 0.008) {
           pulseFrameRef.current = requestAnimationFrame(animatePulse);
         } else {
           pulseRef.current = 0;
@@ -187,10 +188,10 @@ export default function NowPlayingOverlay() {
                     // A transient pulse returns to baseline after each detected bass rise.
                     transform: 'scale(' + (1 + (isPlaying ? bassPulse * 0.10 : 0)) + ')',
                     transformOrigin: 'center center',
-                    borderColor: 'rgba(244,114,182,' + (isPlaying ? 0.22 + bassPulse * 0.78 : 0.18) + ')',
-                    borderWidth: isPlaying ? (1 + bassPulse * 1.5) + 'px' : '1px',
-                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (8 + (isPlaying ? bassPulse * 44 : 0)) + 'px rgba(244,114,182,' + (0.12 + (isPlaying ? bassPulse * 0.38 : 0)) + '), inset 0 0 ' + (isPlaying ? bassPulse * 12 : 0) + 'px rgba(244,114,182,' + (isPlaying ? bassPulse * 0.22 : 0) + ')',
-                    transition: 'transform 35ms ease-out, border-color 45ms ease-out, border-width 45ms ease-out, box-shadow 45ms ease-out',
+                    borderColor: 'rgba(244,114,182,' + (0.16 + (isPlaying ? bassPulse * 0.84 : 0)) + ')',
+                    borderWidth: '1px',
+                    boxShadow: '0 20px 45px rgba(0,0,0,0.32), 0 0 ' + (7 + (isPlaying ? bassPulse * 38 : 0)) + 'px rgba(244,114,182,' + (0.10 + (isPlaying ? bassPulse * 0.40 : 0)) + '), inset 0 0 ' + (isPlaying ? bassPulse * 10 : 0) + 'px rgba(244,114,182,' + (isPlaying ? bassPulse * 0.18 : 0) + ')',
+                    transition: 'transform 90ms ease-out, border-color 110ms ease-out, box-shadow 110ms ease-out',
                   }}
                 >
                 <Music className="absolute inset-0 m-auto w-10 h-10 text-white/45" />
