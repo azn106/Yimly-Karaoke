@@ -1609,12 +1609,14 @@ export default function Library() {
                         >
                           <div className="relative mb-2.5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#F472B6]/40 transition-colors shadow-md">
                             <Mic className="absolute h-8 w-8 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
-                            <img
-                              src={'/api/artists/' + artist.id + '/artwork'}
-                              alt={artist.name}
-                              className="relative z-10 h-full w-full object-cover yk-artwork-image"
-                              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                            />
+                            {artist.hasArtwork && (
+                              <img
+                                src={'/api/artists/' + artist.id + '/artwork'}
+                                alt={artist.name}
+                                className="relative z-10 h-full w-full object-cover yk-artwork-image"
+                                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            )}
                           </div>
                           <span className="w-full truncate text-xs font-semibold text-white group-hover:text-[#F472B6] transition-colors">{artist.name}</span>
                           <span className="mt-0.5 text-[11px] text-zinc-500">{artist.songCount || 0} songs</span>
@@ -1829,14 +1831,16 @@ export default function Library() {
                 >
                   <div className="relative mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/50">
                     <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#F472B6] transition-colors absolute" />
-                    <img
-                      src={`/api/artists/${artist.id}/artwork`}
-                      alt={artist.name}
-                      className="relative z-10 h-full w-full object-cover yk-artwork-image yk-artwork-image"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+                    {artist.hasArtwork && (
+                      <img
+                        src={`/api/artists/${artist.id}/artwork`}
+                        alt={artist.name}
+                        className="relative z-10 h-full w-full object-cover yk-artwork-image"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    )}
                   </div>
                   <h3 className="w-full truncate text-sm font-semibold text-white transition-colors group-hover:text-[#F472B6]">{artist.name}</h3>
                   <p className="text-xs text-zinc-400 mt-1">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>
