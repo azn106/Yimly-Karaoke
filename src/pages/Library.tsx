@@ -35,6 +35,12 @@ export default function Library() {
   const [artists, setArtists] = useState<any[]>([]);
   const [albums, setAlbums] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
+  const [hasMoreSongs, setHasMoreSongs] = useState(false);
+  const [loadingMoreSongs, setLoadingMoreSongs] = useState(false);
+  const songsLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const songsRequestOffsetRef = useRef(0);
+  const loadingMoreSongsRef = useRef(false);
+  const SONGS_PAGE_SIZE = 50;
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
@@ -221,6 +227,10 @@ export default function Library() {
   const loadAllData = async () => {
     setLoading(true);
     setError(null);
+    setHasMoreSongs(false);
+    setLoadingMoreSongs(false);
+    loadingMoreSongsRef.current = false;
+    songsRequestOffsetRef.current = 0;
 
     const fetchWithRetry = async (url: string, retries = 2, delayMs = 500): Promise<Response> => {
       for (let attempt = 0; attempt <= retries; attempt++) {
@@ -282,7 +292,7 @@ export default function Library() {
         const endpoint = 
           tab === 'artists' ? '/api/artists' : 
           tab === 'albums' ? '/api/albums' : 
-          tab === 'songs' ? '/api/songs' : 
+          tab === 'songs' ? `/api/songs?limit=${SONGS_PAGE_SIZE}&offset=0` : 
           '/api/playlists';
 
         const dataRes = await fetchWithRetry(endpoint, 2, 500);
@@ -310,7 +320,10 @@ export default function Library() {
         if (tab === 'artists') setArtists(Array.isArray(data) ? data : []);
         else if (tab === 'albums') setAlbums(Array.isArray(data) ? data : []);
         else if (tab === 'songs') {
-          setSongs(Array.isArray(data) ? data : []);
+          const firstPage = Array.isArray(data) ? data : (Array.isArray(data?.songs) ? data.songs : []);
+          setSongs(firstPage);
+          setHasMoreSongs(Boolean(data?.hasMore));
+          songsRequestOffsetRef.current = firstPage.length;
           try {
             const favsRes = await fetchWithRetry('/api/favorites', 1, 300);
             if (favsRes.ok) {
@@ -331,6 +344,46 @@ export default function Library() {
       setLoading(false);
     }
   };
+
+  const loadMoreSongs = async () => {
+    if (tab !== 'songs' || !hasMoreSongs || loadingMoreSongsRef.current || loading || search.trim()) return;
+
+    loadingMoreSongsRef.current = true;
+    setLoadingMoreSongs(true);
+    const offset = songsRequestOffsetRef.current;
+
+    try {
+      const response = await fetch(`/api/songs?limit=${SONGS_PAGE_SIZE}&offset=${offset}`, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`Failed to load more songs (${response.status})`);
+      const payload = await response.json();
+      const nextPage = Array.isArray(payload) ? payload : (Array.isArray(payload?.songs) ? payload.songs : []);
+
+      setSongs(previous => {
+        const knownIds = new Set(previous.map(song => song.id));
+        return [...previous, ...nextPage.filter((song: any) => !knownIds.has(song.id))];
+      });
+      songsRequestOffsetRef.current = offset + nextPage.length;
+      setHasMoreSongs(Boolean(payload?.hasMore));
+    } catch (loadError) {
+      console.error('Failed to load more songs:', loadError);
+    } finally {
+      loadingMoreSongsRef.current = false;
+      setLoadingMoreSongs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab !== 'songs' || !hasMoreSongs || loading || search.trim()) return;
+    const target = songsLoadMoreRef.current;
+    if (!target || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadMoreSongs();
+    }, { rootMargin: '500px 0px' });
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [tab, hasMoreSongs, loading, loadingMoreSongs, search, songs.length]);
 
   const handleDeleteSong = async (song: any) => {
     const songTitle = song.title || 'this song';
@@ -488,10 +541,13 @@ export default function Library() {
     }
 
     // Background sync without disrupting current UI view
-    fetch('/api/songs')
+    fetch(`/api/songs?limit=${SONGS_PAGE_SIZE}&offset=0`)
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) setSongs(data);
+        const firstPage = Array.isArray(data) ? data : (Array.isArray(data?.songs) ? data.songs : []);
+        setSongs(firstPage);
+        setHasMoreSongs(Boolean(data?.hasMore));
+        songsRequestOffsetRef.current = firstPage.length;
       })
       .catch(() => {});
   };
@@ -1966,6 +2022,14 @@ export default function Library() {
                   <div className="py-12 text-center text-sm text-zinc-500">No songs found in library.</div>
                 )}
               </div>
+              {hasMoreSongs && !search.trim() && (
+                <div ref={songsLoadMoreRef} className="flex min-h-16 items-center justify-center py-5 text-sm text-zinc-500" aria-live="polite">
+                  {loadingMoreSongs ? 'Loading more songs…' : 'Scroll for more songs'}
+                </div>
+              )}
+              {!hasMoreSongs && songs.length > 0 && (
+                <div className="py-5 text-center text-xs text-zinc-600">All songs loaded</div>
+              )}
             </div>
           )}
 
