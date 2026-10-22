@@ -28,14 +28,14 @@ function parseLrcLyrics(content: string): TimedLyricLine[] {
   return parsed.sort((a, b) => a.time - b.time);
 }
 
-export default function NowPlayingOverlay() {
+export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overlay' | 'panel' }) {
   const {
     currentSong, isPlaying, currentTime, duration, volume, isMuted, queue, queueIndex,
     isShuffle, repeatMode, togglePlay, seek, next, previous, setVolume, toggleMute,
     toggleShuffle, cycleRepeat, jumpToQueueIndex, bassLevel, transientLevel
   } = usePlayback();
 
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(mode === 'panel');
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
   const [showLyrics, setShowLyrics] = useState(false);
@@ -181,11 +181,11 @@ export default function NowPlayingOverlay() {
   }, [showLyrics, isLyricsFullscreen, activeLyricIndex]);
 
   useEffect(() => {
-    if (!isExpanded) return;
+    if (mode === 'panel' || !isExpanded) return;
     const oldOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = oldOverflow; };
-  }, [isExpanded]);
+  }, [isExpanded, mode]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -248,6 +248,7 @@ export default function NowPlayingOverlay() {
 
   return (
     <>
+      {mode === 'overlay' && (
       <div onTouchStart={onCompactTouchStart} onTouchEnd={onCompactTouchEnd} className="fixed bottom-0 left-0 right-0 xl:left-[230px] z-40 bg-[#11121A]/95 backdrop-blur-md border-t border-white/10 shadow-2xl select-none pb-[max(0.45rem,env(safe-area-inset-bottom))] touch-pan-y" role="region" aria-label="Compact media player">
         <div className="w-full h-[2.5px] bg-white/10 relative overflow-hidden">
           <div className="h-full bg-[#F472B6] transition-all duration-150" style={{ width: progress + '%' }} />
@@ -273,14 +274,15 @@ export default function NowPlayingOverlay() {
           </div>
         </div>
       </div>
+      )}
 
-      <div className={'fixed inset-0 z-50 bg-black/55 backdrop-blur-sm transition-opacity duration-300 xl:left-[230px] ' + (isExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')} onClick={() => setIsExpanded(false)} style={{ pointerEvents: isExpanded ? 'auto' : 'none' }} aria-hidden="true" />
+      {mode === 'overlay' && <div className={'fixed inset-0 z-50 bg-black/55 backdrop-blur-sm transition-opacity duration-300 xl:left-[230px] ' + (isExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')} onClick={() => setIsExpanded(false)} style={{ pointerEvents: isExpanded ? 'auto' : 'none' }} aria-hidden="true" />}
 
       <div
-        className={'fixed inset-0 z-50 flex flex-col shadow-2xl overflow-hidden transition-transform duration-300 h-[100dvh] w-full rounded-none border-0 ' + (isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none')}
-        style={{ transform: isExpanded ? (dragOffset > 0 ? 'translateY(' + dragOffset + 'px)' : 'translateY(0)') : 'translateY(100%)', pointerEvents: isExpanded ? 'auto' : 'none', transition: dragOffset > 0 ? 'none' : undefined }}
+        className={(mode === 'panel' ? 'relative flex flex-col flex-1 min-h-0 w-full h-full rounded-none border-0 ' : 'fixed inset-0 z-50 flex flex-col shadow-2xl overflow-hidden transition-transform duration-300 h-[100dvh] w-full rounded-none border-0 ') + (mode === 'panel' ? '' : (isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none'))}
+        style={mode === 'panel' ? undefined : { transform: isExpanded ? (dragOffset > 0 ? 'translateY(' + dragOffset + 'px)' : 'translateY(0)') : 'translateY(100%)', pointerEvents: isExpanded ? 'auto' : 'none', transition: dragOffset > 0 ? 'none' : undefined }}
         onTouchStart={onExpandedTouchStart} onTouchMove={onExpandedTouchMove} onTouchEnd={onExpandedTouchEnd}
-        aria-hidden={!isExpanded} role="dialog" aria-modal="true" aria-label="Now playing expanded player"
+        aria-hidden={mode === 'panel' ? false : !isExpanded} role={mode === 'panel' ? 'region' : 'dialog'} aria-modal={mode === 'panel' ? undefined : true} aria-label="Now playing expanded player"
       >
         {currentSong?.hasArtwork && <img key={currentSong.id} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ filter: 'none', transform: 'scale(1.10)', opacity: 0.9 }} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
         {/* Keep the cover artwork visible through a translucent pink tint across the entire player card. */}
@@ -411,7 +413,7 @@ export default function NowPlayingOverlay() {
       </div>
 
       {isExpanded && showLyrics && isLyricsFullscreen && (
-        <div className="fixed inset-x-0 top-0 z-[60] h-[50dvh] min-h-[300px] max-h-[560px] w-full overflow-hidden rounded-b-2xl border-b border-pink-200/20 bg-[#190D18] shadow-[0_18px_50px_rgba(0,0,0,0.45)]" role="dialog" aria-modal="false" aria-label="Expanded synced lyrics">
+        <div className={mode === 'panel' ? 'absolute z-[60] top-0 left-1/2 -translate-x-1/2 h-[min(72%,560px)] min-h-[300px] max-h-[560px] w-full max-w-[390px] overflow-hidden rounded-b-2xl border-b border-pink-200/20 bg-[#190D18] shadow-[0_18px_50px_rgba(0,0,0,0.45)]' : 'fixed inset-x-0 top-0 z-[60] h-[50dvh] min-h-[300px] max-h-[560px] w-full overflow-hidden rounded-b-2xl border-b border-pink-200/20 bg-[#190D18] shadow-[0_18px_50px_rgba(0,0,0,0.45)]'} role="dialog" aria-modal="false" aria-label="Expanded synced lyrics">
           {currentSong?.hasArtwork && <img key={currentSong.id + '-fullscreen-lyrics'} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(190,24,93,0.42) 0%, rgba(157,23,77,0.52) 54%, rgba(35,12,29,0.78) 100%)' }} />
           <div className="relative z-10 flex flex-col h-full min-h-0" style={{ animation: 'ykLyricsFadeIn 350ms ease-out both' }}>
