@@ -19,6 +19,7 @@ import {
   selectFanartTvArtistImage,
   queryFanartTvArtist,
   resolveMusicBrainzId,
+  searchMusicBrainzArtists,
 } from '../lib/artist-image-refresher.js';
 import { getOrCreateArtist } from '../lib/artist-utils.js';
 
@@ -71,6 +72,38 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
 
     const invalidBuf = Buffer.from('<html><body>Not an image</body></html>');
     assert.strictEqual(validateImageMagicBytes(invalidBuf), false);
+  });
+
+  await t.test('1a. Song title disambiguates same-name MusicBrainz artists', async () => {
+    const originalFetchForSearch = globalThis.fetch;
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.hostname === 'musicbrainz.org' && url.pathname.endsWith('/artist')) {
+        return new Response(JSON.stringify({
+          artists: [
+            { id: 'mario-candidate-a', name: 'Mario', score: 100, country: 'US', type: 'Person' },
+            { id: 'mario-candidate-b', name: 'Mario', score: 95, country: 'BR', type: 'Group' },
+          ],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.hostname === 'musicbrainz.org' && url.pathname.endsWith('/recording')) {
+        return new Response(JSON.stringify({
+          recordings: [{
+            title: 'Let Me Love You',
+            'artist-credit': [{ artist: { id: 'mario-candidate-b', name: 'Mario' } }],
+          }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('Not Found', { status: 404 });
+    };
+
+    try {
+      const candidates = await searchMusicBrainzArtists('Mario', 8000, 'Let Me Love You');
+      assert.strictEqual(candidates.length, 1);
+      assert.strictEqual(candidates[0].id, 'mario-candidate-b');
+    } finally {
+      globalThis.fetch = originalFetchForSearch;
+    }
   });
 
   await t.test('2. Missing FANART_TV_API_KEY returns configuration error', async () => {
