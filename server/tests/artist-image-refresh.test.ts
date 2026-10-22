@@ -99,8 +99,8 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
 
     try {
       const candidates = await searchMusicBrainzArtists('Mario', 8000, 'Let Me Love You');
-      assert.strictEqual(candidates.length, 1);
-      assert.strictEqual(candidates[0].id, 'mario-candidate-b');
+      assert.strictEqual(candidates.length, 2, 'Keep alternative same-name artists available for manual selection');
+      assert.strictEqual(candidates[0].id, 'mario-candidate-b', 'Rank the artist credited on the matching song first');
     } finally {
       globalThis.fetch = originalFetchForSearch;
     }
