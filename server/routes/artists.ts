@@ -165,7 +165,8 @@ router.post('/:id/refresh', async (req, res) => {
 
     const { refreshArtistProfileImage } = await import('../lib/artist-image-refresher.js');
     const selectedMusicBrainzId = typeof req.body?.musicbrainzId === 'string' ? req.body.musicbrainzId : undefined;
-    const result = await refreshArtistProfileImage(artistId, selectedMusicBrainzId);
+    const forceArtistChoice = req.query.chooseArtist === 'true';
+    const result = await refreshArtistProfileImage(artistId, selectedMusicBrainzId, forceArtistChoice);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Failed to refresh artist image' });
