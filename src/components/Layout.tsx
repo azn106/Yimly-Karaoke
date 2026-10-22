@@ -3,7 +3,6 @@ import { Outlet, useNavigate, NavLink, useLocation } from 'react-router-dom';
 import { Home, Music, Mic, Settings, Users, LogOut, Disc, Menu, X, Radio, Download, ChevronUp, ChevronDown, ListMusic } from 'lucide-react';
 import { clearAuthToken } from '../lib/auth';
 import NowPlayingOverlay from './NowPlayingOverlay';
-import NowPlayingPanel from './NowPlayingPanel';
 import { usePlayback } from '../context/PlaybackContext';
 
 export default function Layout() {
@@ -257,7 +256,7 @@ export default function Layout() {
       {/* Right panel is a separate full-height grid column, visible only on desktop music routes */}
       {isRightPanelVisible && (
         <aside className="hidden xl:flex xl:col-start-3 xl:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
-          <NowPlayingPanel />
+          <NowPlayingOverlay mode="panel" />
         </aside>
       )}
     </div>
