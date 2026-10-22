@@ -8,6 +8,15 @@ import { saveArtworkBuffer } from './scanner.js';
 const activeArtistRefreshes = new Set<number>();
 let activeBulkAbortController: AbortController | null = null;
 
+export interface MusicBrainzArtistCandidate {
+  id: string;
+  name: string;
+  disambiguation?: string;
+  country?: string;
+  type?: string;
+  score?: number;
+}
+
 export interface ArtistRefreshResult {
   artistId: number;
   artistName: string;
@@ -15,6 +24,7 @@ export interface ArtistRefreshResult {
   provider?: 'fanart_tv' | 'none';
   error?: string;
   artworkUrl?: string;
+  candidates?: MusicBrainzArtistCandidate[];
 }
 
 export interface BulkRefreshSummary {
@@ -148,14 +158,13 @@ export function validateImageMagicBytes(buf: Buffer): boolean {
 /**
  * Resolves an authoritative MusicBrainz artist ID by querying MusicBrainz with strict validation.
  */
-export async function resolveMusicBrainzId(artistName: string, timeoutMs = 8000): Promise<string | null> {
+export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8000): Promise<MusicBrainzArtistCandidate[]> {
   const cleanName = artistName.trim();
-  if (!cleanName || cleanName.toLowerCase() === 'unknown artist') {
-    return null;
-  }
+  if (!cleanName || cleanName.toLowerCase() === 'unknown artist') return [];
 
-  const variations = [normalizeArtistNameForMatching(cleanName), cleanName];
+  const variations = [...new Set([normalizeArtistNameForMatching(cleanName), cleanName].filter(Boolean))];
   const targetNorm = normalizeArtistNameForMatching(cleanName);
+  const matches = new Map<string, MusicBrainzArtistCandidate>();
 
   for (const name of variations) {
     try {
@@ -167,33 +176,35 @@ export async function resolveMusicBrainzId(artistName: string, timeoutMs = 8000)
         },
         signal: AbortSignal.timeout(timeoutMs),
       });
-
       if (!res.ok) continue;
       const data = await res.json().catch(() => null);
-      if (!data || !Array.isArray(data.artists) || data.artists.length === 0) continue;
+      if (!data || !Array.isArray(data.artists)) continue;
 
-      const exactMatches = data.artists.filter((a: any) => {
-        if (!a.id) return false;
-        const nameNorm = normalizeArtistNameForMatching(a.name || '');
-        if (nameNorm === targetNorm) return true;
-        if (a.sortName && normalizeArtistNameForMatching(a.sortName) === targetNorm) return true;
-        if (Array.isArray(a.aliases)) {
-          for (const alias of a.aliases) {
-            if (normalizeArtistNameForMatching(alias.name || '') === targetNorm) return true;
-          }
-        }
-        return false;
-      });
-
-      if (exactMatches.length === 1) {
-        return exactMatches[0].id;
+      for (const artist of data.artists) {
+        if (!artist?.id) continue;
+        const names = [artist.name, artist.sortName, ...(Array.isArray(artist.aliases) ? artist.aliases.map((a: any) => a?.name) : [])]
+          .filter((value): value is string => typeof value === 'string' && value.length > 0);
+        if (!names.some(value => normalizeArtistNameForMatching(value) === targetNorm)) continue;
+        matches.set(artist.id, {
+          id: artist.id,
+          name: artist.name || cleanName,
+          ...(artist.disambiguation ? { disambiguation: artist.disambiguation } : {}),
+          ...(artist.country ? { country: artist.country } : {}),
+          ...(artist.type ? { type: artist.type } : {}),
+          ...(typeof artist.score === 'number' ? { score: artist.score } : {}),
+        });
       }
     } catch {
-      continue;
+      // MusicBrainz can be temporarily unavailable; try the next query variation.
     }
   }
 
-  return null;
+  return [...matches.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+}
+
+export async function resolveMusicBrainzId(artistName: string, timeoutMs = 8000): Promise<string | null> {
+  const candidates = await searchMusicBrainzArtists(artistName, timeoutMs);
+  return candidates.length === 1 ? candidates[0].id : null;
 }
 
 /**
@@ -396,7 +407,7 @@ async function downloadAndPersistArtistImage(
 /**
  * Refreshes the profile portrait image for an individual artist using Fanart.tv.
  */
-export async function refreshArtistProfileImage(artistId: number): Promise<ArtistRefreshResult> {
+export async function refreshArtistProfileImage(artistId: number, selectedMusicBrainzId?: string): Promise<ArtistRefreshResult> {
   if (activeArtistRefreshes.has(artistId)) {
     return { artistId, artistName: 'Unknown', status: 'failed', error: 'Refresh already in progress' };
   }
@@ -412,15 +423,31 @@ export async function refreshArtistProfileImage(artistId: number): Promise<Artis
     const artistName = artist.name;
     let knownMbid: string | null = artist.musicbrainzId || null;
 
-    // 1. Resolve MBID if needed
-    if (!knownMbid) {
-        knownMbid = await resolveMusicBrainzId(artistName);
-        // Persist resolved MBID immediately
-        if (knownMbid) {
-             await db.update(artists)
-            .set({ musicbrainzId: knownMbid })
-            .where(eq(artists.id, artistId));
-        }
+    // Resolve the artist explicitly when MusicBrainz returns multiple exact name matches.
+    if (selectedMusicBrainzId) {
+      const candidates = await searchMusicBrainzArtists(artistName);
+      const selected = candidates.find(candidate => candidate.id === selectedMusicBrainzId);
+      if (!selected) {
+        return {
+          artistId, artistName, status: 'failed', provider: 'none',
+          error: 'The selected MusicBrainz artist could not be verified for this name. Please search again.',
+        };
+      }
+      knownMbid = selected.id;
+      await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
+    } else if (!knownMbid) {
+      const candidates = await searchMusicBrainzArtists(artistName);
+      if (candidates.length > 1) {
+        return {
+          artistId, artistName, status: 'ambiguous', provider: 'none',
+          error: 'Multiple artists match this name. Choose the correct artist to continue.',
+          candidates,
+        };
+      }
+      knownMbid = candidates[0]?.id || null;
+      if (knownMbid) {
+        await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
+      }
     }
 
     const fanartApiKey = getFanartTvApiKey();
