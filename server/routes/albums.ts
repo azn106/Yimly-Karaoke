@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
     const paginated = req.query.limit !== undefined || req.query.offset !== undefined;
     const limit = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit ?? '40'), 10) || 40));
     const offset = Math.max(0, Number.parseInt(String(req.query.offset ?? '0'), 10) || 0);
-    const totalResult = paginated ? await db.select({ total: sql<number>\`count(*)\` }).from(albums) : null;
+    const totalResult = paginated ? await db.select({ total: sql<number>`count(*)` }).from(albums) : null;
     const albumQuery = db.select({
       id: albums.id,
       title: albums.title,
