@@ -129,6 +129,9 @@ router.get('/:id/artwork', async (req, res) => {
 
     if (artist.length === 0) return res.status(404).json({ error: 'Artist not found' });
 
+    // Artist portraits can change during refresh; never let a browser/shared cache keep a stale copy.
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
+
     const artworkFilename = artist[0].artworkPath;
 
     // Do NOT fall back to album or song artwork; artist portraits are dedicated images
@@ -148,7 +151,6 @@ router.get('/:id/artwork', async (req, res) => {
     const contentType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
 
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     res.sendFile(filePath);
   } catch (error) {
     res.status(500).json({ error: 'Failed to serve artist artwork' });
