@@ -494,14 +494,47 @@ export default function Library() {
   };
   const jumpItems = tab === 'artists' ? artists : albums;
   const jumpGroups = new Set(jumpItems.map(item => jumpKey(tab === 'artists' ? item.name : item.title)));
-  const jumpToLetter = (letter: string) => {
+  const jumpToLetter = async (letter: string) => {
     setActiveJumpLetter(letter);
-    const target = document.getElementById(`library-jump-${tab}-${letter}`);
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else {
-      const item = jumpItems.find(entry => jumpKey(tab === 'artists' ? entry.name : entry.title) >= letter);
-      if (item) document.getElementById(`library-card-${tab}-${item.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const getKey = (item: any) => jumpKey(tab === 'artists' ? item.name : item.title);
+    let availableItems = tab === 'artists' ? artists : albums;
+    let moreAvailable = tab === 'artists' ? hasMoreArtists : hasMoreAlbums;
+    while (moreAvailable && !availableItems.some(item => getKey(item) >= letter)) {
+      const offset = tab === 'artists' ? artistsRequestOffsetRef.current : albumsRequestOffsetRef.current;
+      const endpoint = tab === 'artists'
+        ? `/api/artists?limit=${ARTISTS_PAGE_SIZE}&offset=${offset}`
+        : `/api/albums?limit=${ALBUMS_PAGE_SIZE}&offset=${offset}`;
+      try {
+        const response = await fetch(endpoint, { credentials: 'same-origin' });
+        if (!response.ok) break;
+        const payload = await response.json();
+        const page = Array.isArray(payload) ? payload : (Array.isArray(payload?.artists) ? payload.artists : Array.isArray(payload?.albums) ? payload.albums : []);
+        if (!page.length) break;
+        if (tab === 'artists') {
+          setArtists(previous => {
+            const ids = new Set(previous.map(item => item.id));
+            return [...previous, ...page.filter((item: any) => !ids.has(item.id))];
+          });
+          artistsRequestOffsetRef.current = offset + page.length;
+          moreAvailable = Boolean(payload?.hasMore);
+          setHasMoreArtists(moreAvailable);
+        } else {
+          setAlbums(previous => {
+            const ids = new Set(previous.map(item => item.id));
+            return [...previous, ...page.filter((item: any) => !ids.has(item.id))];
+          });
+          albumsRequestOffsetRef.current = offset + page.length;
+          moreAvailable = Boolean(payload?.hasMore);
+          setHasMoreAlbums(moreAvailable);
+        }
+        availableItems = [...availableItems, ...page];
+      } catch (error) {
+        console.error('Failed to jump to catalogue letter:', error);
+        break;
+      }
     }
+    const item = availableItems.find(entry => getKey(entry) >= letter);
+    if (item) requestAnimationFrame(() => document.getElementById(`library-card-${tab}-${item.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
 
   const handleDeleteSong = async (song: any) => {
@@ -2039,7 +2072,7 @@ export default function Library() {
             <nav aria-label="Jump to artist or album letter" className="fixed right-1 top-1/2 z-30 flex max-h-[78vh] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full border border-white/10 bg-[#11121c]/90 px-1 py-2 shadow-lg backdrop-blur sm:right-3 sm:px-1.5">
               {['#', ...["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"]].map(letter => (
                 <button key={letter} type="button" onClick={() => jumpToLetter(letter)}
-                  disabled={!jumpGroups.has(letter)}
+                  disabled={!jumpGroups.has(letter) && !(tab === 'artists' ? hasMoreArtists : hasMoreAlbums)}
                   className={`flex h-[clamp(15px,2.15vh,22px)] w-5 items-center justify-center rounded-full text-[10px] font-semibold transition-colors sm:w-6 sm:text-[11px] ${activeJumpLetter === letter ? 'bg-[#F472B6] text-[#17121b]' : jumpGroups.has(letter) ? 'text-zinc-300 hover:bg-white/10 hover:text-white' : 'cursor-default text-zinc-700'}`}
                   aria-label={`Jump to ${letter === '#' ? 'numbers and symbols' : letter}`}>{letter}</button>
               ))}
