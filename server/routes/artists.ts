@@ -11,6 +11,28 @@ import path from 'path';
 const router = Router();
 router.use(requireAuth);
 
+function hasLocalPortrait(directory: string): boolean {
+  for (const filename of ['artist.jpg', 'artist.jpeg', 'artist.png', 'artist.webp', 'artist.gif']) {
+    try {
+      const stat = fs.statSync(path.join(directory, filename));
+      if (stat.isFile() && stat.size >= 8) return true;
+    } catch {
+      // Continue checking supported filenames.
+    }
+  }
+  return false;
+}
+
+function getArtistFolder(libraryPath: string, audioPath: string): string | null {
+  const resolvedLibrary = path.resolve(libraryPath);
+  const resolvedAudio = path.resolve(audioPath);
+  if (!resolvedAudio.startsWith(resolvedLibrary + path.sep)) return null;
+  const firstFolder = path.relative(resolvedLibrary, resolvedAudio).split(path.sep)[0];
+  if (!firstFolder) return null;
+  const directory = path.resolve(resolvedLibrary, firstFolder);
+  return directory.startsWith(resolvedLibrary + path.sep) ? directory : null;
+}
+
 router.get('/', async (req, res) => {
   try {
     const allArtists = await db.select({
@@ -18,19 +40,48 @@ router.get('/', async (req, res) => {
       name: artists.name,
       artworkPath: artists.artworkPath,
       songCount: sql<number>`(
-        select count(distinct s.id) from songs s 
-        left join song_artists sa on sa.song_id = s.id 
+        select count(distinct s.id) from songs s
+        left join song_artists sa on sa.song_id = s.id
         where s.artist_id = artists.id or sa.artist_id = artists.id
       )`,
       albumCount: sql<number>`(select count(*) from albums where albums.artist_id = artists.id)`,
     }).from(artists);
 
-    const formatted = allArtists.map(a => ({
-      ...a,
-      hasArtwork: !!a.artworkPath,
-    }));
+    // Discover local portraits in one pass so the UI doesn't request missing images
+    // individually for every artist. No external metadata or artwork services are used.
+    const allLibraries = await db.select({ id: libraries.id, path: libraries.path }).from(libraries);
+    const libraryPaths = new Map(allLibraries.filter(l => l.path).map(l => [l.id, path.resolve(l.path!)]));
+    const foldersByArtist = new Map<number, Set<string>>();
 
-    res.json(formatted);
+    const primarySongs = await db.select({
+      artistId: songs.artistId,
+      mainAudioPath: songs.mainAudioPath,
+      instrumentalAudioPath: songs.instrumentalAudioPath,
+      libraryId: songs.libraryId,
+    }).from(songs);
+
+    const secondarySongs = await db.select({
+      artistId: songArtists.artistId,
+      mainAudioPath: songs.mainAudioPath,
+      instrumentalAudioPath: songs.instrumentalAudioPath,
+      libraryId: songs.libraryId,
+    }).from(songArtists).innerJoin(songs, eq(songArtists.songId, songs.id));
+
+    for (const song of [...primarySongs, ...secondarySongs]) {
+      const audioPath = song.mainAudioPath || song.instrumentalAudioPath;
+      const libraryPath = song.libraryId ? libraryPaths.get(song.libraryId) : undefined;
+      if (song.artistId == null || !audioPath || !libraryPath) continue;
+      const folder = getArtistFolder(libraryPath, audioPath);
+      if (!folder) continue;
+      const folders = foldersByArtist.get(song.artistId) || new Set<string>();
+      folders.add(folder);
+      foldersByArtist.set(song.artistId, folders);
+    }
+
+    res.json(allArtists.map(artist => ({
+      ...artist,
+      hasArtwork: [...(foldersByArtist.get(artist.id) || [])].some(hasLocalPortrait),
+    })));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch artists' });
   }
