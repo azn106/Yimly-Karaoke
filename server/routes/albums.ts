@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { albums, artists, songs, lyrics } from '../db/schema.js';
-import { eq, sql, isNotNull, and, inArray } from 'drizzle-orm';
+import { eq, sql, isNotNull, and, inArray, asc } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 import { formatArtistDisplay } from '../lib/artist-utils.js';
 import { getSongArtistsMap } from './songs.js';
@@ -13,7 +13,11 @@ router.use(requireAuth);
 
 router.get('/', async (req, res) => {
   try {
-    const allAlbums = await db.select({
+    const paginated = req.query.limit !== undefined || req.query.offset !== undefined;
+    const limit = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit ?? '40'), 10) || 40));
+    const offset = Math.max(0, Number.parseInt(String(req.query.offset ?? '0'), 10) || 0);
+    const totalResult = paginated ? await db.select({ total: sql<number>\`count(*)\` }).from(albums) : null;
+    const albumQuery = db.select({
       id: albums.id,
       title: albums.title,
       year: albums.year,
@@ -23,14 +27,16 @@ router.get('/', async (req, res) => {
       songCount: sql<number>`(select count(*) from songs where songs.album_id = albums.id)`,
     })
     .from(albums)
-    .leftJoin(artists, eq(albums.artistId, artists.id));
+    .leftJoin(artists, eq(albums.artistId, artists.id))
+    .orderBy(asc(albums.title));
+    const allAlbums = paginated ? await albumQuery.limit(limit).offset(offset) : await albumQuery;
 
     const formatted = allAlbums.map(a => ({
       ...a,
       hasArtwork: !!a.artworkPath,
     }));
 
-    res.json(formatted);
+    res.json(paginated ? { albums: formatted, total: Number(totalResult?.[0]?.total || 0), offset, limit, hasMore: offset + formatted.length < Number(totalResult?.[0]?.total || 0) } : formatted);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch albums' });
   }
