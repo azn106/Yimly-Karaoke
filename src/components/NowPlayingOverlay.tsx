@@ -56,6 +56,49 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   const lastBeatTimeRef = useRef(0);
   const pulseReleaseRef = useRef(285);
   const artworkCardRef = useRef<HTMLDivElement>(null);
+  const [isBrowsing, setIsBrowsing] = useState(false);
+  const queueScrollRef = useRef<HTMLDivElement>(null);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isProgrammaticScrollRef = useRef(false);
+
+  const handleQueueScroll = () => {
+    if (isProgrammaticScrollRef.current) return;
+    setIsBrowsing(true);
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    inactivityTimerRef.current = setTimeout(() => {
+      setIsBrowsing(false);
+    }, 4000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    };
+  }, []);
+
+  const recenterCurrentTrack = () => {
+    const container = queueScrollRef.current;
+    if (!container) return;
+    const activeEl = container.querySelector('[data-queue-active="true"]') as HTMLElement || container.children[queueIndex] as HTMLElement;
+    if (!activeEl) return;
+    const containerRect = container.getBoundingClientRect();
+    const activeRect = activeEl.getBoundingClientRect();
+    const relativeTop = activeRect.top - containerRect.top + container.scrollTop;
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    const targetScrollTop = Math.min(maxScroll, Math.max(0, relativeTop));
+    isProgrammaticScrollRef.current = true;
+    container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+    setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 500);
+  };
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    if (!isBrowsing) {
+      recenterCurrentTrack();
+    }
+  }, [queueIndex, currentSong?.id, isExpanded, isBrowsing]);
 
   // Audio-Reactive Radar Border: a continuous clockwise conic sweep, with each
   // detected transient launching a brighter, expanding halo ripple.
@@ -386,11 +429,11 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               <h3 className="text-sm font-bold text-white">Up Next</h3>
               <span className="text-xs text-white/65">{visibleQueue.length}</span>
             </div>
-            <div data-queue-scroll className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div ref={queueScrollRef} onScroll={handleQueueScroll} data-queue-scroll className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
               {visibleQueue.map((song, index) => {
                 const isCurrent = (queue.length > 0 && index === queueIndex) || (queue.length === 0 && song.id === currentSong?.id);
                 return (
-                  <button key={String(song.id) + '-' + index} type="button" onClick={() => { if (queue.length > 0) jumpToQueueIndex(index); }} className={'w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-colors border border-transparent ' + (isCurrent ? 'bg-[#F472B6]/20 border-[#F472B6]/30' : 'hover:bg-white/10')} aria-label={isCurrent ? song.title + ', current track' : 'Play ' + song.title}>
+                  <button key={String(song.id) + '-' + index} type="button" data-queue-active={isCurrent ? 'true' : 'false'} onClick={() => { setIsBrowsing(false); if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current); if (queue.length > 0) jumpToQueueIndex(index); }} className={'w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-colors border border-transparent ' + (isCurrent ? 'bg-[#F472B6]/20 border-[#F472B6]/30' : 'hover:bg-white/10')} aria-label={isCurrent ? song.title + ', current track' : 'Play ' + song.title}>
                     <div className="w-10 h-10 rounded-lg bg-black/20 flex items-center justify-center shrink-0 overflow-hidden">
                       {isCurrent ? <EqualizerIndicator isPlaying={isPlaying} className="scale-150" /> : song.hasArtwork ? <img src={'/api/songs/' + song.id + '/artwork'} alt="" className="w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <Music className="w-4 h-4 text-white/40" />}
                     </div>
