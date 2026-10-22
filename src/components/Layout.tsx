@@ -255,7 +255,7 @@ export default function Layout() {
 
       {/* Right panel is a separate full-height grid column, visible only on desktop music routes */}
       {isRightPanelVisible && (
-        <aside className="hidden xl:flex xl:col-start-3 xl:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
+        <aside className="relative hidden xl:flex xl:col-start-3 xl:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
           <NowPlayingOverlay mode="panel" />
         </aside>
       )}
