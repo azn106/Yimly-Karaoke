@@ -1055,7 +1055,7 @@ export default function Library() {
           <div className="w-28 h-28 rounded-full bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#F472B6]/10 overflow-hidden relative">
             <Mic className="w-12 h-12 text-[#F472B6] absolute" />
             <img
-              src={`/api/artists/${selectedArtist.id}/artwork`}
+              src={`/api/artists/${selectedArtist.id}/artwork?v=${encodeURIComponent(selectedArtist.artworkPath || 'none')}`}
               alt={selectedArtist.name}
               className="relative z-10 h-full w-full object-cover yk-artwork-image yk-artwork-image"
               onError={(e) => {
@@ -1477,7 +1477,7 @@ export default function Library() {
                           <img
                             src={
                               item.type === 'artist'
-                                ? `/api/artists/${item.id}/artwork`
+                                ? `/api/artists/${item.id}/artwork?v=${encodeURIComponent(item.artworkPath || 'none')}`
                                 : item.type === 'album'
                                 ? `/api/albums/${item.id}/artwork`
                                 : `/api/songs/${item.id}/artwork`
@@ -1734,7 +1734,7 @@ export default function Library() {
                           <div className="relative mb-2.5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#F472B6]/40 transition-colors shadow-md">
                             {artist.hasArtwork ? (
                               <img
-                                src={'/api/artists/' + artist.id + '/artwork'}
+                                src={'/api/artists/' + artist.id + '/artwork?v=' + encodeURIComponent(artist.artworkPath || 'none')}
                                 alt={artist.name}
                                 className="h-full w-full object-cover yk-artwork-image yk-artwork-image"
                                 onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
@@ -1957,7 +1957,7 @@ export default function Library() {
                   <div className="relative mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/50">
                     <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#F472B6] transition-colors absolute" />
                     <img
-                      src={`/api/artists/${artist.id}/artwork`}
+                      src={`/api/artists/${artist.id}/artwork?v=${encodeURIComponent(artist.artworkPath || 'none')}`}
                       alt={artist.name}
                       className="relative z-10 h-full w-full object-cover yk-artwork-image yk-artwork-image"
                       onError={(e) => {
