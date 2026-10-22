@@ -411,7 +411,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
       </div>
 
       {isExpanded && showLyrics && isLyricsFullscreen && (
-        <div className={mode === 'panel' ? 'absolute inset-x-0 top-0 z-[60] mx-auto h-[58%] max-h-[560px] min-h-[260px] w-full max-w-[390px] overflow-hidden rounded-xl border border-white/10 bg-[#190D18] shadow-2xl' : 'fixed inset-0 z-[60] h-[100dvh] w-full overflow-hidden bg-[#190D18]'} role="dialog" aria-modal="true" aria-label="Full-screen synced lyrics">
+        <div className={mode === 'panel' ? 'absolute inset-x-0 top-0 z-[60] mx-auto h-[58%] max-h-[560px] min-h-[260px] w-full max-w-[390px] overflow-hidden rounded-xl border border-white/10 bg-[#190D18] shadow-2xl' : 'fixed inset-0 z-[60] h-[100dvh] w-[100vw] max-w-none rounded-none border-0 m-0 overflow-hidden bg-[#190D18]'} role="dialog" aria-modal="true" aria-label="Full-screen synced lyrics">
           {currentSong?.hasArtwork && <img key={currentSong.id + '-fullscreen-lyrics'} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(190,24,93,0.42) 0%, rgba(157,23,77,0.52) 54%, rgba(35,12,29,0.78) 100%)' }} />
           <div className="relative z-10 flex flex-col h-full min-h-0" style={{ animation: 'ykLyricsFadeIn 350ms ease-out both' }}>
