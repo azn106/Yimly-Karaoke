@@ -303,7 +303,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               <p className="text-sm text-white/75 truncate">{currentSong?.artist || 'Unknown Artist'}{currentSong?.album ? ' · ' + currentSong.album : ''}</p>
             </div>
             <div className="flex items-center justify-end">
-              <button type="button" onClick={() => setIsExpanded(false)} className="w-10 h-10 -mr-1 flex items-center justify-center text-white/85 hover:bg-white/15 hover:text-white rounded-full shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200" title="Minimize player" aria-label="Minimize player"><ChevronDown className="w-6 h-6" /></button>
+              {mode === 'overlay' && <button type="button" onClick={() => setIsExpanded(false)} className="w-10 h-10 -mr-1 flex items-center justify-center text-white/85 hover:bg-white/15 hover:text-white rounded-full shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200" title="Minimize player" aria-label="Minimize player"><ChevronDown className="w-6 h-6" /></button>}
             </div>
           </header>
 
