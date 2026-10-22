@@ -407,7 +407,7 @@ async function downloadAndPersistArtistImage(
 /**
  * Refreshes the profile portrait image for an individual artist using Fanart.tv.
  */
-export async function refreshArtistProfileImage(artistId: number, selectedMusicBrainzId?: string): Promise<ArtistRefreshResult> {
+export async function refreshArtistProfileImage(artistId: number, selectedMusicBrainzId?: string, forceArtistChoice = false): Promise<ArtistRefreshResult> {
   if (activeArtistRefreshes.has(artistId)) {
     return { artistId, artistName: 'Unknown', status: 'failed', error: 'Refresh already in progress' };
   }
@@ -435,7 +435,7 @@ export async function refreshArtistProfileImage(artistId: number, selectedMusicB
       }
       knownMbid = selected.id;
       await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
-    } else if (!knownMbid) {
+    } else if (!knownMbid || forceArtistChoice) {
       const candidates = await searchMusicBrainzArtists(artistName);
       if (candidates.length > 1) {
         return {
@@ -444,7 +444,7 @@ export async function refreshArtistProfileImage(artistId: number, selectedMusicB
           candidates,
         };
       }
-      knownMbid = candidates[0]?.id || null;
+      if (candidates.length === 1) knownMbid = candidates[0].id;
       if (knownMbid) {
         await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
       }
