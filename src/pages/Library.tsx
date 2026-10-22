@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { Search, Play, Pause, Music, Disc, Mic, RefreshCw, Calendar, FileText, ChevronRight, ChevronLeft, ArrowLeft, AlertCircle, ListMusic, Trash2, Plus, Heart } from 'lucide-react';
+import { Search, Play, Pause, Music, Disc, Mic, Calendar, FileText, ChevronRight, ChevronLeft, ArrowLeft, ListMusic, Trash2, Plus, Heart } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../types';
 import CreatePlaylistModal from '../components/playlist/CreatePlaylistModal';
 import EditPlaylistModal from '../components/playlist/EditPlaylistModal';
@@ -68,36 +68,6 @@ export default function Library() {
   const [error, setError] = useState<string | null>(null);
   const [queuedSongId, setQueuedSongId] = useState<number | null>(null);
   const [playingAll, setPlayingAll] = useState(false);
-  const [refreshingAll, setRefreshingAll] = useState(false);
-  const [refreshingArtistId, setRefreshingArtistId] = useState<number | null>(null);
-  const [refreshSummary, setRefreshSummary] = useState<any | null>(null);
-  const [artistMatchPrompt, setArtistMatchPrompt] = useState<{
-    artistId: number;
-    artistName: string;
-    candidates: Array<{ id: string; name: string; disambiguation?: string; country?: string; type?: string; score?: number }>;
-  } | null>(null);
-  const [customSearchQuery, setCustomSearchQuery] = useState('');
-  const [customMbidInput, setCustomMbidInput] = useState('');
-  const [isSearchingMb, setIsSearchingMb] = useState(false);
-
-  const handleSearchMusicBrainz = async (artistId: number, query: string) => {
-    if (!query.trim()) return;
-    setIsSearchingMb(true);
-    try {
-      const res = await fetch(`/api/artists/${artistId}/musicbrainz/search?q=${encodeURIComponent(query.trim())}`);
-      const data = await res.json().catch(() => null);
-      if (res.ok && data && Array.isArray(data.candidates)) {
-        setArtistMatchPrompt(prev => prev ? { ...prev, candidates: data.candidates } : null);
-      } else {
-        alert(data?.error || 'Failed to search MusicBrainz');
-      }
-    } catch (err: any) {
-      alert(err?.message || 'Error searching MusicBrainz');
-    } finally {
-      setIsSearchingMb(false);
-    }
-  };
-
   // Horizontal featured-playlist rail. Cards are sized to roughly twice an album card.
   const playlistRailRef = useRef<HTMLDivElement | null>(null);
   const scrollPlaylistRail = (direction: -1 | 1) => {
@@ -243,60 +213,6 @@ export default function Library() {
       alert(err?.message || 'Could not play this playlist.');
     }
   };
-
-  const handleRefreshAllArtists = async () => {
-    if (refreshingAll) return;
-    setRefreshingAll(true);
-    try {
-      const res = await fetch('/api/artists/refresh-all', { method: 'POST' });
-      const summary = await res.json().catch(() => null);
-      if (res.ok && summary) {
-        setRefreshSummary(summary);
-        loadAllData();
-      } else {
-        alert(summary?.error || 'Failed to refresh artist images.');
-      }
-    } catch (err: any) {
-      console.error('Refresh all error:', err);
-      alert(err?.message || 'Failed to refresh artist images.');
-    } finally {
-      setRefreshingAll(false);
-    }
-  };
-
-  const handleRefreshArtist = async (artistId: number, musicbrainzId?: string, forceSearch = false) => {
-    if (refreshingArtistId === artistId) return;
-    setRefreshingArtistId(artistId);
-    try {
-      const queryParam = forceSearch ? '?chooseArtist=true' : '';
-      const res = await fetch(`/api/artists/${artistId}/refresh${queryParam}`, {
-        method: 'POST',
-        headers: musicbrainzId ? { 'Content-Type': 'application/json' } : undefined,
-        body: musicbrainzId ? JSON.stringify({ musicbrainzId }) : undefined,
-      });
-      const result = await res.json().catch(() => null);
-      if (res.ok && result) {
-        if (result.status === 'ambiguous' && Array.isArray(result.candidates)) {
-          setArtistMatchPrompt({ artistId, artistName: result.artistName || 'Artist', candidates: result.candidates });
-          return;
-        }
-        const msg = `Artist refresh: ${result.status}${result.error ? ` (${result.error})` : ''}`;
-        alert(msg);
-        loadAllData();
-        if (selectedArtist && selectedArtist.id === artistId) {
-          openArtist(artistId);
-        }
-      } else {
-        alert(result?.error || 'Failed to refresh artist image.');
-      }
-    } catch (err: any) {
-      console.error('Refresh artist error:', err);
-      alert(err?.message || 'Failed to refresh artist image.');
-    } finally {
-      setRefreshingArtistId(null);
-    }
-  };
-
 
   useEffect(() => {
     loadAllData();
@@ -1090,7 +1006,7 @@ export default function Library() {
           <div className="w-28 h-28 rounded-full bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#F472B6]/10 overflow-hidden relative">
             <Mic className="w-12 h-12 text-[#F472B6] absolute" />
             <img
-              src={`/api/artists/${selectedArtist.id}/artwork?v=${encodeURIComponent(selectedArtist.artworkPath || 'none')}`}
+              src={`/api/artists/${selectedArtist.id}/artwork`}
               alt={selectedArtist.name}
               className="relative z-10 h-full w-full object-cover yk-artwork-image yk-artwork-image"
               onError={(e) => {
@@ -1128,22 +1044,7 @@ export default function Library() {
                   <span>Play All Songs</span>
                 </button>
               )}
-              <button
-                onClick={() => handleRefreshArtist(selectedArtist.id)}
-                disabled={refreshingArtistId === selectedArtist.id}
-                className="px-4 py-2 bg-[#F472B6]/15 hover:bg-[#F472B6]/25 border border-[#F472B6]/30 text-[#F472B6] text-xs font-bold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshingArtistId === selectedArtist.id ? 'animate-spin' : ''}`} />
-                <span>{refreshingArtistId === selectedArtist.id ? 'Refreshing Image...' : 'Refresh Artist Image'}</span>
-              </button>
-              <button
-                onClick={() => handleRefreshArtist(selectedArtist.id, undefined, true)}
-                disabled={refreshingArtistId === selectedArtist.id}
-                className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50"
-                title="Search MusicBrainz and choose or change matched artist"
-              >
-                <span>Change MusicBrainz Match</span>
-              </button>
+
             </div>
           </div>
         </div>
@@ -1526,7 +1427,7 @@ export default function Library() {
                           <img
                             src={
                               item.type === 'artist'
-                                ? `/api/artists/${item.id}/artwork?v=${encodeURIComponent(item.artworkPath || 'none')}`
+                                ? `/api/artists/${item.id}/artwork`
                                 : item.type === 'album'
                                 ? `/api/albums/${item.id}/artwork`
                                 : `/api/songs/${item.id}/artwork`
@@ -1616,20 +1517,6 @@ export default function Library() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {/* Library sections are navigated from the app sidebar. Keep artist tools available without duplicating navigation. */}
-      {tab === 'artists' && (
-        <div className="flex justify-end">
-          <button
-            onClick={handleRefreshAllArtists}
-            disabled={refreshingAll}
-            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 shrink-0"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshingAll ? 'animate-spin text-[#F472B6]' : ''}`} />
-            <span>{refreshingAll ? 'Refreshing All Artists...' : 'Refresh All Artist Images'}</span>
-          </button>
         </div>
       )}
 
@@ -1781,16 +1668,13 @@ export default function Library() {
                           className="yk-artist-carousel-card group flex flex-col items-center shrink-0 w-28 snap-start text-center transition hover:opacity-90 cursor-pointer"
                         >
                           <div className="relative mb-2.5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#F472B6]/40 transition-colors shadow-md">
-                            {artist.hasArtwork ? (
-                              <img
-                                src={'/api/artists/' + artist.id + '/artwork?v=' + encodeURIComponent(artist.artworkPath || 'none')}
-                                alt={artist.name}
-                                className="h-full w-full object-cover yk-artwork-image yk-artwork-image"
-                                onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                              />
-                            ) : (
-                              <Mic className="h-8 w-8 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
-                            )}
+                            <Mic className="absolute h-8 w-8 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
+                            <img
+                              src={'/api/artists/' + artist.id + '/artwork'}
+                              alt={artist.name}
+                              className="relative z-10 h-full w-full object-cover yk-artwork-image"
+                              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
                           </div>
                           <span className="w-full truncate text-xs font-semibold text-white group-hover:text-[#F472B6] transition-colors">{artist.name}</span>
                           <span className="mt-0.5 text-[11px] text-zinc-500">{artist.songCount || 0} songs</span>
@@ -2006,7 +1890,7 @@ export default function Library() {
                   <div className="relative mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/50">
                     <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#F472B6] transition-colors absolute" />
                     <img
-                      src={`/api/artists/${artist.id}/artwork?v=${encodeURIComponent(artist.artworkPath || 'none')}`}
+                      src={`/api/artists/${artist.id}/artwork`}
                       alt={artist.name}
                       className="relative z-10 h-full w-full object-cover yk-artwork-image yk-artwork-image"
                       onError={(e) => {
@@ -2166,103 +2050,6 @@ export default function Library() {
             />
           )}
         </>
-      )}
-
-      {artistMatchPrompt && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="artist-match-title">
-          <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-[#141622] p-5 shadow-2xl">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h2 id="artist-match-title" className="text-lg font-bold text-white">Choose the correct artist</h2>
-                <p className="mt-1 text-sm text-zinc-400">Match “{artistMatchPrompt.artistName}” with the correct MusicBrainz artist to fetch portraits.</p>
-              </div>
-              <button type="button" onClick={() => { setArtistMatchPrompt(null); setCustomSearchQuery(''); setCustomMbidInput(''); }} className="rounded-lg px-2 py-1 text-zinc-400 hover:bg-white/10 hover:text-white" aria-label="Close artist choices">✕</button>
-            </div>
-
-            {/* Custom search and direct MBID input */}
-            <div className="mb-4 space-y-2.5 rounded-xl bg-white/[0.02] p-3 border border-white/5">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Search another artist name on MusicBrainz…"
-                  value={customSearchQuery}
-                  onChange={e => setCustomSearchQuery(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSearchMusicBrainz(artistMatchPrompt.artistId, customSearchQuery || artistMatchPrompt.artistName); }}
-                  className="flex-1 rounded-lg bg-black/30 border border-white/10 px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6]"
-                />
-                <button
-                  type="button"
-                  disabled={isSearchingMb}
-                  onClick={() => handleSearchMusicBrainz(artistMatchPrompt.artistId, customSearchQuery || artistMatchPrompt.artistName)}
-                  className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50"
-                >
-                  {isSearchingMb ? 'Searching…' : 'Search'}
-                </button>
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Or paste MusicBrainz UUID directly…"
-                  value={customMbidInput}
-                  onChange={e => setCustomMbidInput(e.target.value)}
-                  className="flex-1 rounded-lg bg-black/30 border border-white/10 px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6]"
-                />
-                <button
-                  type="button"
-                  disabled={!customMbidInput.trim()}
-                  onClick={() => {
-                    const { artistId } = artistMatchPrompt;
-                    const mbid = customMbidInput.trim();
-                    setArtistMatchPrompt(null);
-                    setCustomMbidInput('');
-                    setCustomSearchQuery('');
-                    void handleRefreshArtist(artistId, mbid);
-                  }}
-                  className="rounded-lg bg-[#F472B6] hover:bg-[#DB2777] px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50"
-                >
-                  Save ID
-                </button>
-              </div>
-            </div>
-
-            <div className="max-h-[45vh] space-y-2 overflow-y-auto">
-              {artistMatchPrompt.candidates.length === 0 ? (
-                <div className="p-4 text-center text-xs text-zinc-400">No candidates found for this query. Try searching with a different variation or paste the MusicBrainz ID directly.</div>
-              ) : (
-                artistMatchPrompt.candidates.map(candidate => (
-                  <button
-                    key={candidate.id}
-                    type="button"
-                    disabled={refreshingArtistId === artistMatchPrompt.artistId}
-                    onClick={() => {
-                      const { artistId } = artistMatchPrompt;
-                      setArtistMatchPrompt(null);
-                      setCustomSearchQuery('');
-                      setCustomMbidInput('');
-                      void handleRefreshArtist(artistId, candidate.id);
-                    }}
-                    className="flex w-full items-start justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:border-[#F472B6]/50 hover:bg-[#F472B6]/10 disabled:opacity-50"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-semibold text-white">{candidate.name}</span>
-                      <span className="mt-0.5 block text-xs text-zinc-400">
-                        {[candidate.disambiguation, candidate.type, candidate.country].filter(Boolean).join(' · ') || 'No additional identifying details'}
-                      </span>
-                      <span className="mt-1 block font-mono text-[11px] text-pink-300/80 truncate">
-                        ID: {candidate.id}
-                      </span>
-                    </span>
-                    <span className="shrink-0 pt-1 text-xs text-[#F472B6] font-semibold">Select</span>
-                  </button>
-                ))
-              )}
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button type="button" onClick={() => { setArtistMatchPrompt(null); setCustomSearchQuery(''); setCustomMbidInput(''); }} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-white/5">Cancel</button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Global Modals for Playlists Tab */}
