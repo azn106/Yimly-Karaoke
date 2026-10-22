@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { artists, albums, songs, lyrics, songArtists, libraries } from '../db/schema.js';
-import { eq, sql, isNotNull, and, or, inArray } from 'drizzle-orm';
+import { eq, sql, isNotNull, and, or, inArray, asc } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 import { formatArtistDisplay } from '../lib/artist-utils.js';
 import { getSongArtistsMap } from './songs.js';
@@ -35,7 +35,11 @@ function getArtistFolder(libraryPath: string, audioPath: string): string | null 
 
 router.get('/', async (req, res) => {
   try {
-    const allArtists = await db.select({
+    const paginated = req.query.limit !== undefined || req.query.offset !== undefined;
+    const limit = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit ?? '40'), 10) || 40));
+    const offset = Math.max(0, Number.parseInt(String(req.query.offset ?? '0'), 10) || 0);
+    const totalResult = paginated ? await db.select({ total: sql<number>`count(*)` }).from(artists) : null;
+    const artistQuery = db.select({
       id: artists.id,
       name: artists.name,
       artworkPath: artists.artworkPath,
@@ -45,7 +49,9 @@ router.get('/', async (req, res) => {
         where s.artist_id = artists.id or sa.artist_id = artists.id
       )`,
       albumCount: sql<number>`(select count(*) from albums where albums.artist_id = artists.id)`,
-    }).from(artists);
+    }).from(artists).orderBy(asc(artists.name));
+    const allArtists = paginated ? await artistQuery.limit(limit).offset(offset) : await artistQuery;
+    const pageArtistIds = allArtists.map(artist => artist.id);
 
     // Discover local portraits in one pass so the UI doesn't request missing images
     // individually for every artist. No external metadata or artwork services are used.
@@ -53,19 +59,19 @@ router.get('/', async (req, res) => {
     const libraryPaths = new Map(allLibraries.filter(l => l.path).map(l => [l.id, path.resolve(l.path!)]));
     const foldersByArtist = new Map<number, Set<string>>();
 
-    const primarySongs = await db.select({
+    const primarySongs = pageArtistIds.length ? await db.select({
       artistId: songs.artistId,
       mainAudioPath: songs.mainAudioPath,
       instrumentalAudioPath: songs.instrumentalAudioPath,
       libraryId: songs.libraryId,
-    }).from(songs);
+    }).from(songs).where(inArray(songs.artistId, pageArtistIds)) : [];
 
-    const secondarySongs = await db.select({
+    const secondarySongs = pageArtistIds.length ? await db.select({
       artistId: songArtists.artistId,
       mainAudioPath: songs.mainAudioPath,
       instrumentalAudioPath: songs.instrumentalAudioPath,
       libraryId: songs.libraryId,
-    }).from(songArtists).innerJoin(songs, eq(songArtists.songId, songs.id));
+    }).from(songArtists).innerJoin(songs, eq(songArtists.songId, songs.id)).where(inArray(songArtists.artistId, pageArtistIds)) : [];
 
     for (const song of [...primarySongs, ...secondarySongs]) {
       const audioPath = song.mainAudioPath || song.instrumentalAudioPath;
@@ -78,10 +84,17 @@ router.get('/', async (req, res) => {
       foldersByArtist.set(song.artistId, folders);
     }
 
-    res.json(allArtists.map(artist => ({
+    const page = allArtists.map(artist => ({
       ...artist,
       hasArtwork: [...(foldersByArtist.get(artist.id) || [])].some(hasLocalPortrait),
-    })));
+    }));
+    res.json(paginated ? {
+      artists: page,
+      total: Number(totalResult?.[0]?.total || 0),
+      offset,
+      limit,
+      hasMore: offset + page.length < Number(totalResult?.[0]?.total || 0),
+    } : page);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch artists' });
   }
