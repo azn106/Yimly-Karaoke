@@ -122,6 +122,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
   // Single HTML Audio element ref
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Keep the ended-event listener pointed at the latest transition logic.
+  // The audio engine effect intentionally mounts once, so its closure would otherwise go stale.
+  const handleTrackEndedRef = useRef<() => void>(() => {});
 
   // Ref to track latest state for BroadcastChannel handlers without stale closures
   const stateRef = useRef({
@@ -342,7 +345,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
     const onEnded = () => {
       if (leaderTabIdRef.current === tabId) {
-        handleTrackEnded();
+        handleTrackEndedRef.current();
       }
     };
 
@@ -759,6 +762,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     }
     next();
   }, [broadcastSync, next]);
+
+  // Update the callback ref every render; the long-lived audio listener reads this ref.
+  handleTrackEndedRef.current = handleTrackEnded;
 
   const setVolume = useCallback((vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
