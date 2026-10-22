@@ -920,13 +920,38 @@ export async function refreshArtistProfileImage(
       error: 'No suitable portrait available',
     };
   } catch (err: any) {
-    return {
-      artistId,
-      artistName: 'Unknown',
-      status: 'failed',
-      provider: 'none',
-      error: err?.message || 'Unexpected error',
-    };
+    // A metadata-provider outage must never make a valid saved portrait disappear
+    // or report the artist as failed when the current artwork is still usable.
+    try {
+      const [existing] = await db.select({
+        name: artists.name,
+        artworkPath: artists.artworkPath,
+      }).from(artists).where(eq(artists.id, artistId)).limit(1);
+      if (existing?.artworkPath) {
+        return {
+          artistId,
+          artistName: existing.name,
+          status: 'unchanged',
+          provider: 'none',
+          error: `Metadata lookup failed; preserved existing portrait: ${err?.message || 'Unexpected error'}`,
+        };
+      }
+      return {
+        artistId,
+        artistName: existing?.name || 'Unknown',
+        status: 'failed',
+        provider: 'none',
+        error: err?.message || 'Unexpected error',
+      };
+    } catch {
+      return {
+        artistId,
+        artistName: 'Unknown',
+        status: 'failed',
+        provider: 'none',
+        error: err?.message || 'Unexpected error',
+      };
+    }
   } finally {
     activeArtistRefreshes.delete(artistId);
   }
