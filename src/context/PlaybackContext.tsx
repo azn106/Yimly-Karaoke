@@ -120,8 +120,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
   const [isLeader, setIsLeader] = useState<boolean>(true);
   const leaderTabIdRef = useRef<string>(tabId);
 
-  // Single HTML Audio element ref
+  // Single HTML Audio element ref and its optional analysis context.
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   // Ref to track latest state for BroadcastChannel handlers without stale closures
   const stateRef = useRef({
@@ -228,6 +229,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
         audioContext = new AudioContextClass();
+        audioContextRef.current = audioContext;
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 1024;
         analyser.smoothingTimeConstant = 0.72;
@@ -241,6 +243,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       // Keep playback unaffected on browsers that cannot provide Web Audio analysis.
       console.warn('[PlaybackContext] Bass visualizer unavailable:', error);
       audioContext = null;
+      audioContextRef.current = null;
       analyser = null;
       frequencyData = null;
     }
@@ -313,8 +316,26 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    const resumeAnalysisContext = () => {
+      // Web Audio may be suspended by a mobile browser while backgrounded.
+      // Resume only the analysis context; the HTMLAudioElement remains the source of truth.
+      const context = audioContextRef.current;
+      if (context?.state === 'suspended') {
+        context.resume().catch(() => {
+          // Some browsers require a fresh user gesture before resuming Web Audio.
+        });
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden && !audio.paused) resumeAnalysisContext();
+    };
+    const onPageShow = () => {
+      if (!audio.paused) resumeAnalysisContext();
+    };
+
     const onPlay = () => {
-      if (audioContext?.state === 'suspended') audioContext.resume().catch(() => {});
+      resumeAnalysisContext();
       if (analyser && !animationFrame) animationFrame = requestAnimationFrame(sampleBass);
       setIsPlaying(true);
       setPlaybackError(null);
@@ -333,7 +354,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
     const onError = () => {
       const err = audio.error?.message || 'Error streaming audio file';
-      setPlaybackError(err);
+      setPlaybackError(err || 'Audio stream failed. Check the connection and try again.');
       setIsPlaying(false);
       if (leaderTabIdRef.current === tabId) {
         broadcastSync({ isPlaying: false });
@@ -346,6 +367,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('focus', onPageShow);
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('play', onPlay);
@@ -354,6 +378,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     audio.addEventListener('ended', onEnded);
 
     return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('focus', onPageShow);
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('play', onPlay);
@@ -362,6 +389,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener('ended', onEnded);
       stopBassSampling();
       if (audioContext) audioContext.close().catch(() => {});
+      audioContextRef.current = null;
       try {
         audio.pause();
         audio.src = '';
@@ -578,6 +606,10 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     const audioUrl = `/api/songs/${song.id}/audio`;
     audio.src = audioUrl;
     audio.currentTime = 0;
+    // Attempt to wake Web Audio before starting playback. Audio playback itself
+    // still uses the HTMLAudioElement and does not depend on the visualiser loop.
+    const context = audioContextRef.current;
+    if (context?.state === 'suspended') context.resume().catch(() => {});
     audio.play().then(() => {
       setIsPlaying(true);
       broadcastSync({
@@ -588,7 +620,9 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         queueIndex: updatedIndex,
       });
     }).catch(err => {
+      const message = err instanceof Error ? err.message : 'Unable to start audio playback';
       console.warn('[PlaybackContext] Audio play was blocked or failed:', err);
+      setPlaybackError(message);
       setIsPlaying(false);
       broadcastSync({ currentSong: song, isPlaying: false });
     });
@@ -619,12 +653,18 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         audio.src = `/api/songs/${currentSong.id}/audio`;
       }
 
+      const context = audioContextRef.current;
+      if (context?.state === 'suspended') context.resume().catch(() => {});
       audio.play().then(() => {
         setIsPlaying(true);
+        setPlaybackError(null);
         broadcastSync({ isPlaying: true });
       }).catch(err => {
+        const message = err instanceof Error ? err.message : 'Unable to resume audio playback';
         console.warn('[PlaybackContext] Resume failed:', err);
+        setPlaybackError(message);
         setIsPlaying(false);
+        broadcastSync({ isPlaying: false });
       });
     });
   }, [broadcastSync, currentSong, dispatchOrExecute, playSong, queue, queueIndex]);
@@ -728,7 +768,17 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       const audio = audioRef.current;
       if (audio) {
         audio.currentTime = 0;
-        audio.play().catch(() => {});
+        const context = audioContextRef.current;
+        if (context?.state === 'suspended') context.resume().catch(() => {});
+        audio.play().then(() => {
+          setIsPlaying(true);
+          setPlaybackError(null);
+        }).catch(err => {
+          const message = err instanceof Error ? err.message : 'Unable to replay current track';
+          setPlaybackError(message);
+          setIsPlaying(false);
+          broadcastSync({ isPlaying: false });
+        });
         setCurrentTime(0);
         broadcastSync({ currentTime: 0, isPlaying: true });
       }
