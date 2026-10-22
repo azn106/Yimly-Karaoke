@@ -765,6 +765,16 @@ export async function refreshArtistProfileImage(
           candidates,
         };
       }
+      if (candidates.length === 0 && forceArtistChoice) {
+        return {
+          artistId,
+          artistName,
+          status: 'unavailable',
+          provider: 'none',
+          error: 'No MusicBrainz matches were found for the new search. The previously saved match was not used.',
+          candidates: [],
+        };
+      }
       if (candidates.length === 1) knownMbid = candidates[0].id;
       if (knownMbid) {
         await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
@@ -777,6 +787,29 @@ export async function refreshArtistProfileImage(
     let localArtPath: string | null = null;
     if (artistDirInfo) {
       localArtPath = findLocalArtistArtwork(artistDirInfo.artistDir);
+    }
+
+    // Music Assistant's source priority: an explicit local artist portrait wins.
+    // Never replace it with a remote image, and avoid needless provider requests.
+    if (localArtPath) {
+      const alreadySelected = artist.artworkPath === localArtPath;
+      if (!alreadySelected || artist.artworkSource !== 'local') {
+        await db.update(artists)
+          .set({
+            artworkPath: localArtPath,
+            artworkSource: 'local',
+            artworkVerified: 1,
+            musicbrainzId: knownMbid || undefined,
+          })
+          .where(eq(artists.id, artistId));
+      }
+      return {
+        artistId,
+        artistName,
+        status: alreadySelected ? 'unchanged' : 'updated',
+        provider: 'none',
+        artworkUrl: localArtPath,
+      };
     }
 
     const fanartApiKey = getFanartTvApiKey();
@@ -908,27 +941,6 @@ export async function refreshAllArtists(
 
   const allArtists = await db.select().from(artists);
   const total = allArtists.length;
-
-  const fanartApiKey = getFanartTvApiKey();
-  if (!fanartApiKey) {
-    const errorMsg = 'Fanart.tv API key not configured.';
-    return {
-      total,
-      updated: 0,
-      unchanged: 0,
-      unavailable: 0,
-      ambiguous: 0,
-      failed: total,
-      error: errorMsg,
-      details: allArtists.map(a => ({
-        artistId: a.id,
-        artistName: a.name,
-        status: 'failed',
-        provider: 'none',
-        error: errorMsg,
-      })),
-    };
-  }
 
   let updated = 0;
   let unchanged = 0;
