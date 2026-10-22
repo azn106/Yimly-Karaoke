@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { db } from '../db/index.js';
 import { songs, artists, albums, lyrics, songArtists, playlistSongs, favorites, queueItems, sessions } from '../db/schema.js';
-import { eq, like, or, inArray, asc, and } from 'drizzle-orm';
+import { eq, like, or, inArray, asc, and, sql } from 'drizzle-orm';
 import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import { formatArtistDisplay, cleanupOrphanedRecords } from '../lib/artist-utils.js';
 import { broadcastSongOffsetToRooms } from '../ws/index.js';
@@ -42,7 +42,13 @@ export async function getSongArtistsMap(songIds: number[]) {
 
 router.get('/', async (req, res) => {
   try {
-    const allSongs = await db.select({
+    const hasPagination = req.query.limit !== undefined || req.query.offset !== undefined;
+    const requestedLimit = Number.parseInt(String(req.query.limit ?? '50'), 10);
+    const requestedOffset = Number.parseInt(String(req.query.offset ?? '0'), 10);
+    const pageLimit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
+    const pageOffset = Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0;
+
+    const songsQuery = db.select({
       id: songs.id,
       title: songs.title,
       artist: artists.name,
@@ -61,6 +67,13 @@ router.get('/', async (req, res) => {
     .from(songs)
     .leftJoin(artists, eq(songs.artistId, artists.id))
     .leftJoin(albums, eq(songs.albumId, albums.id));
+
+    const [allSongs, totalResult] = hasPagination
+      ? await Promise.all([
+          songsQuery.orderBy(asc(songs.id)).limit(pageLimit).offset(pageOffset),
+          db.select({ total: sql<number>`count(*)` }).from(songs),
+        ])
+      : [await songsQuery, [] as { total: number }[]];
 
     const songIds = allSongs.map(s => s.id);
     const artistsMap = await getSongArtistsMap(songIds);
@@ -90,6 +103,17 @@ router.get('/', async (req, res) => {
         hasElrc: l.hasElrc
       };
     });
+
+    if (hasPagination) {
+      const total = Number(totalResult[0]?.total ?? 0);
+      return res.json({
+        songs: formatted,
+        total,
+        offset: pageOffset,
+        limit: pageLimit,
+        hasMore: pageOffset + formatted.length < total,
+      });
+    }
 
     res.json(formatted);
   } catch (error) {
