@@ -48,7 +48,13 @@ export default function Library() {
   const ALBUMS_PAGE_SIZE = 40;
   const [activeJumpLetter, setActiveJumpLetter] = useState('#');
   const [songs, setSongs] = useState<any[]>([]);
-  const [songsSort, setSongsSort] = useState<'artist' | 'title' | 'album' | 'recent' | 'oldest' | 'duration' | 'track'>('artist');
+  const [songsSort, setSongsSort] = useState<'artist' | 'title' | 'album' | 'recent' | 'oldest' | 'duration' | 'track'>(() => {
+    const savedSort = window.localStorage.getItem('yimly-songs-sort');
+    const validSorts = ['artist', 'title', 'album', 'recent', 'oldest', 'duration', 'track'] as const;
+    return validSorts.includes(savedSort as (typeof validSorts)[number])
+      ? savedSort as (typeof validSorts)[number]
+      : 'artist';
+  });
   const [hasMoreSongs, setHasMoreSongs] = useState(false);
   const [loadingMoreSongs, setLoadingMoreSongs] = useState(false);
   const songsLoadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -2093,7 +2099,9 @@ export default function Library() {
                   <select
                     value={songsSort}
                     onChange={e => {
-                      setSongsSort(e.target.value as typeof songsSort);
+                      const nextSort = e.target.value as typeof songsSort;
+                      window.localStorage.setItem('yimly-songs-sort', nextSort);
+                      setSongsSort(nextSort);
                       document.querySelector('main')?.scrollTo({ top: 0, behavior: 'auto' });
                     }}
                     className="rounded-xl border border-white/10 bg-[#141622] px-3 py-2 text-sm text-white outline-none transition focus:border-[#F472B6]"
