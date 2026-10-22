@@ -123,10 +123,14 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
       assert.strictEqual(res.status, 'failed');
       assert.ok(res.error?.includes('API key not configured'), 'Should explain missing API key');
 
-      // Bulk refresh
+      // Bulk refresh now processes each artist independently so existing/local
+      // artwork can be preserved even when Fanart.tv is not configured.
       const bulk = await refreshAllArtists();
-      assert.strictEqual(bulk.failed, bulk.total);
-      assert.ok(bulk.error?.includes('API key not configured'), 'Bulk summary should explain missing API key');
+      const targetResult = bulk.details.find(detail => detail.artistId === art.id);
+      assert.ok(targetResult, 'Bulk summary should include the artist being tested');
+      assert.strictEqual(targetResult.status, 'failed');
+      assert.ok(targetResult.error?.includes('API key not configured'), 'Artist result should explain missing API key');
+      assert.ok(bulk.failed >= 1, 'Bulk summary should count artists that cannot be refreshed');
     } finally {
       await db.delete(artists).where(eq(artists.id, art.id));
     }
