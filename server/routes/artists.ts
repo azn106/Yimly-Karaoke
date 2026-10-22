@@ -198,7 +198,9 @@ router.get('/:id/musicbrainz/search', async (req, res) => {
 
     const query = typeof req.query.q === 'string' && req.query.q.trim() ? req.query.q.trim() : artist[0].name;
     const { searchMusicBrainzArtists } = await import('../lib/artist-image-refresher.js');
-    const candidates = await searchMusicBrainzArtists(query);
+    // The manual search box must show MusicBrainz's relevant partial-query results;
+    // automatic ID resolution continues to use strict normalized-name matching.
+    const candidates = await searchMusicBrainzArtists(query, 8000, undefined, true);
     res.json({ artistId, query, candidates });
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Failed to search MusicBrainz' });
