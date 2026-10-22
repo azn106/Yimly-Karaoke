@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { Search, Play, Pause, Music, Disc, Mic, Calendar, FileText, ChevronRight, ChevronLeft, ArrowLeft, ListMusic, Trash2, Plus, Heart } from 'lucide-react';
+import { Search, Play, Pause, Music, Disc, Mic, RefreshCw, Calendar, FileText, ChevronRight, ChevronLeft, ArrowLeft, AlertCircle, ListMusic, Trash2, Plus, Heart } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../types';
 import CreatePlaylistModal from '../components/playlist/CreatePlaylistModal';
 import EditPlaylistModal from '../components/playlist/EditPlaylistModal';
@@ -1020,12 +1020,6 @@ export default function Library() {
             <p className="text-sm text-zinc-400 font-medium mb-2">
               {selectedArtist.albums?.length || 0} Albums • {selectedArtist.songs?.length || 0} Songs
             </p>
-            {selectedArtist.musicbrainzId && (
-              <p className="text-xs text-zinc-400 font-mono mb-4 flex items-center gap-1.5 flex-wrap">
-                <span>MBID:</span>
-                <span className="text-[#F9A8D4] select-all">{selectedArtist.musicbrainzId}</span>
-              </p>
-            )}
             <div className="flex flex-wrap items-center gap-3">
               {selectedArtist.songs?.length > 0 && (
                 <button
