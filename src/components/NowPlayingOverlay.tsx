@@ -427,7 +427,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               ) : lyricsUnavailable ? (
                 <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
               ) : (
-                <div key={'fullscreen-active-lyric-' + (lyricsLines[activeLyricIndex]?.id || 'before-start')} className="min-h-full flex flex-col justify-start items-stretch gap-8 pt-[30vh] pb-8" style={{ animation: 'ykLyricsFadeIn 320ms ease-out both' }}>
+                <div key={'fullscreen-active-lyric-' + (lyricsLines[activeLyricIndex]?.id || 'before-start')} className="min-h-full flex flex-col justify-start items-stretch gap-8 pt-[20vh] pb-8" style={{ animation: 'ykLyricsFadeIn 320ms ease-out both' }}>
                   {visibleLyrics.map((line) => {
                     const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
                     const active = index === activeLyricIndex;
