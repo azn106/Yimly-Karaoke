@@ -237,8 +237,14 @@ export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8
             }
           }
         }
-        const songMatchedCandidates = candidates.filter(candidate => matchedArtistIds.has(candidate.id));
-        if (songMatchedCandidates.length > 0) return songMatchedCandidates;
+        if (matchedArtistIds.size > 0) {
+          // Rank corroborated candidates first, but keep alternatives visible so
+          // a cover version or imperfect library tag cannot hide the correct artist.
+          return candidates.sort((a, b) =>
+            Number(matchedArtistIds.has(b.id)) - Number(matchedArtistIds.has(a.id)) ||
+            (b.score || 0) - (a.score || 0)
+          );
+        }
       }
     } catch {
       // A recording lookup is supplemental; keep name-based candidates on failure.
