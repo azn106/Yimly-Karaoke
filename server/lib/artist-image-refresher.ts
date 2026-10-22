@@ -593,6 +593,7 @@ export async function refreshAllArtists(
       if (res.status === 'updated') updated++;
       else if (res.status === 'unchanged') unchanged++;
       else if (res.status === 'unavailable') unavailable++;
+      else if (res.status === 'ambiguous') ambiguous++;
       else if (res.status === 'failed') failed++;
 
       completed++;
@@ -611,7 +612,7 @@ export async function refreshAllArtists(
   await Promise.all(workers);
 
   activeBulkAbortController = null;
-  return { total, updated, unchanged, unavailable, ambiguous: 0, failed, details };
+  return { total, updated, unchanged, unavailable, ambiguous, failed, details };
 }
 
 export function cancelBulkRefresh(): void {
