@@ -1514,60 +1514,6 @@ export default function Library() {
         </div>
       )}
 
-      {/* Refresh Summary Modal */}
-      {refreshSummary && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#141622] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-              <h3 className="text-lg font-bold text-white">Artist Images Refresh Summary</h3>
-              <button 
-                onClick={() => setRefreshSummary(null)}
-                className="text-zinc-400 hover:text-white p-2 rounded-xl bg-white/5 hover:bg-white/10"
-              >
-                ✕
-              </button>
-            </div>
-            {refreshSummary.error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-xs p-3 rounded-xl flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-                <span>{refreshSummary.error}</span>
-              </div>
-            )}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
-                <div className="text-xl font-black text-emerald-400">{refreshSummary.updated || 0}</div>
-                <div className="text-xs text-zinc-400 mt-1">Updated</div>
-              </div>
-              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
-                <div className="text-xl font-black text-blue-400">{refreshSummary.unchanged || 0}</div>
-                <div className="text-xs text-zinc-400 mt-1">Unchanged</div>
-              </div>
-              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
-                <div className="text-xl font-black text-amber-400">{refreshSummary.unavailable || 0}</div>
-                <div className="text-xs text-zinc-400 mt-1">Unavailable</div>
-              </div>
-              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
-                <div className="text-xl font-black text-purple-400">{refreshSummary.ambiguous || 0}</div>
-                <div className="text-xs text-zinc-400 mt-1">Ambiguous</div>
-              </div>
-              <div className="bg-[#1C1E2D] p-3 rounded-2xl border border-white/5">
-                <div className="text-xl font-black text-red-400">{refreshSummary.failed || 0}</div>
-                <div className="text-xs text-zinc-400 mt-1">Failed</div>
-              </div>
-            </div>
-            <p className="text-xs text-zinc-400 text-center">
-              Total artists processed: {refreshSummary.total}
-            </p>
-            <button
-              onClick={() => setRefreshSummary(null)}
-              className="w-full py-3 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#F472B6]/25"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-
       {!loading && !error && (
 
         <>
