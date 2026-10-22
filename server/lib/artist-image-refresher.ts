@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { db } from '../db/index.js';
-import { artists, songs } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { artists, songs, libraries, songArtists } from '../db/schema.js';
+import { eq, or, and, isNull } from 'drizzle-orm';
 import { saveArtworkBuffer } from './scanner.js';
 
 const activeArtistRefreshes = new Set<number>();
@@ -227,8 +227,9 @@ export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8
             const credits = Array.isArray(recording?.['artist-credit']) ? recording['artist-credit'] : [];
             for (const credit of credits) {
               const creditedArtist = credit?.artist;
-              if (creditedArtist?.id) matchedArtistIds.add(String(creditedArtist.id));
-              if (typeof creditedArtist?.name === 'string') {
+              if (creditedArtist?.id) {
+                matchedArtistIds.add(String(creditedArtist.id));
+              } else if (typeof creditedArtist?.name === 'string') {
                 const creditedName = normalizeArtistNameForMatching(creditedArtist.name);
                 for (const candidate of candidates) {
                   if (normalizeArtistNameForMatching(candidate.name) === creditedName) matchedArtistIds.add(candidate.id);
@@ -238,8 +239,6 @@ export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8
           }
         }
         if (matchedArtistIds.size > 0) {
-          // Rank corroborated candidates first, but keep alternatives visible so
-          // a cover version or imperfect library tag cannot hide the correct artist.
           return candidates.sort((a, b) =>
             Number(matchedArtistIds.has(b.id)) - Number(matchedArtistIds.has(a.id)) ||
             (b.score || 0) - (a.score || 0)
@@ -252,6 +251,58 @@ export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8
   }
 
   return candidates;
+}
+
+/**
+ * Validates a MusicBrainz artist ID against MusicBrainz API.
+ */
+export async function validateMusicBrainzArtistId(
+  mbid: string,
+  timeoutMs = 8000
+): Promise<{ valid: boolean; artist?: MusicBrainzArtistCandidate; error?: string }> {
+  const cleanMbid = (mbid || '').trim();
+  if (!cleanMbid || cleanMbid.length < 8) {
+    return { valid: false, error: 'Invalid MusicBrainz ID format' };
+  }
+
+  try {
+    const url = `https://musicbrainz.org/ws/2/artist/${encodeURIComponent(cleanMbid)}?fmt=json`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'YimlyKaraoke/1.0 (contact: info@yimly.local)',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (res.status === 404) {
+      return { valid: false, error: 'Artist not found on MusicBrainz' };
+    }
+    if (!res.ok) {
+      return { valid: false, error: `MusicBrainz returned HTTP ${res.status}` };
+    }
+
+    const data = await res.json().catch(() => null);
+    if (!data) {
+      return { valid: false, error: 'Malformed response from MusicBrainz' };
+    }
+
+    return {
+      valid: true,
+      artist: {
+        id: data.id || cleanMbid,
+        name: data.name || cleanMbid,
+        disambiguation: data.disambiguation,
+        country: data.country,
+        type: data.type,
+      },
+    };
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      return { valid: false, error: 'MusicBrainz request timed out' };
+    }
+    return { valid: false, error: err?.message || 'Error validating MusicBrainz ID' };
+  }
 }
 
 export async function resolveMusicBrainzId(artistName: string, timeoutMs = 8000): Promise<string | null> {
@@ -359,6 +410,158 @@ export async function queryFanartTvArtist(
 }
 
 /**
+ * Resolves the verified filesystem directory where an artist's music is organized.
+ * Strictly checks that candidate directories reside within their configured library path
+ * to completely eliminate directory traversal risks and never derives paths from raw artist names.
+ */
+export async function resolveArtistDirectory(artistId: number): Promise<{ artistDir: string; libraryPath: string } | null> {
+  const directSongs = await db.select({
+    mainAudioPath: songs.mainAudioPath,
+    instrumentalAudioPath: songs.instrumentalAudioPath,
+    libraryId: songs.libraryId,
+  })
+  .from(songs)
+  .where(eq(songs.artistId, artistId));
+
+  const candidateSongPaths: Array<{ audioPath: string; libraryId: number }> = [];
+  for (const s of directSongs) {
+    const p = s.mainAudioPath || s.instrumentalAudioPath;
+    if (p && s.libraryId) {
+      candidateSongPaths.push({ audioPath: p, libraryId: s.libraryId });
+    }
+  }
+
+  if (candidateSongPaths.length === 0) {
+    const joinedSongs = await db.select({
+      mainAudioPath: songs.mainAudioPath,
+      instrumentalAudioPath: songs.instrumentalAudioPath,
+      libraryId: songs.libraryId,
+    })
+    .from(songArtists)
+    .innerJoin(songs, eq(songArtists.songId, songs.id))
+    .where(eq(songArtists.artistId, artistId));
+
+    for (const s of joinedSongs) {
+      const p = s.mainAudioPath || s.instrumentalAudioPath;
+      if (p && s.libraryId) {
+        candidateSongPaths.push({ audioPath: p, libraryId: s.libraryId });
+      }
+    }
+  }
+
+  if (candidateSongPaths.length === 0) return null;
+
+  const allLibs = await db.select().from(libraries);
+  const libMap = new Map<number, string>();
+  for (const lib of allLibs) {
+    if (lib.path) {
+      libMap.set(lib.id, path.resolve(lib.path));
+    }
+  }
+
+  const dirCounts = new Map<string, { count: number; libraryPath: string }>();
+
+  for (const { audioPath, libraryId } of candidateSongPaths) {
+    const libPath = libMap.get(libraryId);
+    if (!libPath) continue;
+
+    const resolvedAudio = path.resolve(audioPath);
+    if (!resolvedAudio.startsWith(libPath + path.sep)) continue;
+
+    const rel = path.relative(libPath, resolvedAudio);
+    const parts = rel.split(path.sep);
+
+    if (parts.length >= 2) {
+      const candidateArtistDir = path.resolve(libPath, parts[0]);
+      if (candidateArtistDir.startsWith(libPath + path.sep)) {
+        try {
+          if (fs.existsSync(candidateArtistDir) && fs.statSync(candidateArtistDir).isDirectory()) {
+            const current = dirCounts.get(candidateArtistDir) || { count: 0, libraryPath: libPath };
+            current.count++;
+            dirCounts.set(candidateArtistDir, current);
+          }
+        } catch {
+          // ignore stat check errors
+        }
+      }
+    }
+  }
+
+  if (dirCounts.size === 0) return null;
+
+  let bestDir: string | null = null;
+  let bestCount = -1;
+  let bestLibPath = '';
+
+  for (const [dir, data] of dirCounts.entries()) {
+    if (data.count > bestCount) {
+      bestCount = data.count;
+      bestDir = dir;
+      bestLibPath = data.libraryPath;
+    }
+  }
+
+  if (!bestDir) return null;
+  return { artistDir: bestDir, libraryPath: bestLibPath };
+}
+
+/**
+ * Searches for valid local artist artwork (artist.jpg, artist.png, artist.jpeg, artist.webp)
+ * within an artist's folder, following Music Assistant metadata conventions.
+ */
+export function findLocalArtistArtwork(artistDir: string): string | null {
+  const candidates = ['artist.jpg', 'artist.jpeg', 'artist.png', 'artist.webp'];
+  for (const name of candidates) {
+    const fullPath = path.join(artistDir, name);
+    try {
+      if (fs.existsSync(fullPath)) {
+        const stat = fs.statSync(fullPath);
+        if (stat.isFile() && stat.size >= 1024) {
+          const buf = Buffer.alloc(16);
+          const fd = fs.openSync(fullPath, 'r');
+          fs.readSync(fd, buf, 0, 16, 0);
+          fs.closeSync(fd);
+          if (validateImageMagicBytes(buf)) {
+            return fullPath;
+          }
+        }
+      }
+    } catch {
+      // ignore read errors
+    }
+  }
+  return null;
+}
+
+/**
+ * Saves artist portrait to the artist's verified actual folder as artist.jpg if available and writable.
+ * If the artist folder cannot be written to or is not found, falls back safely to the cached artwork directory.
+ */
+export async function saveArtistImage(
+  artistId: number,
+  imgBuf: Buffer,
+  contentType: string
+): Promise<{ savedPath: string; isLocalFolder: boolean }> {
+  const artistDirInfo = await resolveArtistDirectory(artistId);
+  if (artistDirInfo) {
+    const { artistDir } = artistDirInfo;
+    const targetFile = path.join(artistDir, 'artist.jpg');
+    try {
+      await fs.promises.writeFile(targetFile, imgBuf);
+      if (fs.existsSync(targetFile)) {
+        return { savedPath: targetFile, isLocalFolder: true };
+      }
+    } catch (writeErr) {
+      console.warn(`[ArtistImage] Unable to write artist.jpg to ${artistDir}, falling back to cache directory:`, writeErr);
+    }
+  }
+
+  // Fallback to dataDir/artwork
+  const filename = await saveArtworkBuffer(imgBuf, contentType);
+  return { savedPath: filename, isLocalFolder: false };
+}
+
+/**
  * Downloads, validates, and stores an artist portrait buffer.
  */
 async function downloadAndPersistArtistImage(
@@ -426,10 +629,10 @@ async function downloadAndPersistArtistImage(
     return { artistId, artistName, status: 'failed', provider: 'fanart_tv', error: 'Invalid image format' };
   }
 
-  const newFilename = await saveArtworkBuffer(imgBuf, contentType);
+  const { savedPath } = await saveArtistImage(artistId, imgBuf, contentType);
 
   // If unchanged, keep existing artwork and avoid redundant disk writes
-  if (currentArtworkPath && currentArtworkPath === newFilename) {
+  if (currentArtworkPath && (currentArtworkPath === savedPath || (path.isAbsolute(currentArtworkPath) && currentArtworkPath === path.resolve(savedPath)))) {
     await db.update(artists)
       .set({
         artworkSource: 'fanart_tv',
@@ -445,7 +648,7 @@ async function downloadAndPersistArtistImage(
   // Update database with verified provider portrait
   await db.update(artists)
     .set({
-      artworkPath: newFilename,
+      artworkPath: savedPath,
       artworkSource: 'fanart_tv',
       artworkSourceUrl: imageUrl,
       artworkVerified: 1,
@@ -457,9 +660,13 @@ async function downloadAndPersistArtistImage(
 }
 
 /**
- * Refreshes the profile portrait image for an individual artist using Fanart.tv.
+ * Refreshes the profile portrait image for an individual artist using Fanart.tv and local artist folder artwork.
  */
-export async function refreshArtistProfileImage(artistId: number, selectedMusicBrainzId?: string, forceArtistChoice = false): Promise<ArtistRefreshResult> {
+export async function refreshArtistProfileImage(
+  artistId: number,
+  selectedMusicBrainzId?: string,
+  forceArtistChoice = false
+): Promise<ArtistRefreshResult> {
   if (activeArtistRefreshes.has(artistId)) {
     return { artistId, artistName: 'Unknown', status: 'failed', error: 'Refresh already in progress' };
   }
@@ -481,25 +688,36 @@ export async function refreshArtistProfileImage(artistId: number, selectedMusicB
       .limit(1);
     const firstSongTitle = firstSong[0]?.title?.trim() || undefined;
 
-    // Use the artist's first available library song to help disambiguate common names.
-    // The title is supporting evidence only; if it does not confirm a candidate,
-    // the manual artist picker remains available.
+    // 1. MusicBrainz Resolution / Validation
     if (selectedMusicBrainzId) {
-      const candidates = await searchMusicBrainzArtists(artistName, 8000, firstSongTitle);
-      const selected = candidates.find(candidate => candidate.id === selectedMusicBrainzId);
-      if (!selected) {
-        return {
-          artistId, artistName, status: 'failed', provider: 'none',
-          error: 'The selected MusicBrainz artist could not be verified for this name. Please search again.',
-        };
+      const validation = await validateMusicBrainzArtistId(selectedMusicBrainzId);
+      if (validation.valid && validation.artist) {
+        knownMbid = validation.artist.id;
+        await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
+      } else {
+        const candidates = await searchMusicBrainzArtists(artistName, 8000, firstSongTitle);
+        const selected = candidates.find(candidate => candidate.id === selectedMusicBrainzId);
+        if (selected) {
+          knownMbid = selected.id;
+          await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
+        } else {
+          return {
+            artistId,
+            artistName,
+            status: 'failed',
+            provider: 'none',
+            error: validation.error || 'The selected MusicBrainz artist could not be verified for this name. Please search again.',
+          };
+        }
       }
-      knownMbid = selected.id;
-      await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
     } else if (!knownMbid || forceArtistChoice) {
       const candidates = await searchMusicBrainzArtists(artistName, 8000, firstSongTitle);
       if (candidates.length > 1) {
         return {
-          artistId, artistName, status: 'ambiguous', provider: 'none',
+          artistId,
+          artistName,
+          status: 'ambiguous',
+          provider: 'none',
           error: 'Multiple artists match this name. Choose the correct artist to continue.',
           candidates,
         };
@@ -509,47 +727,91 @@ export async function refreshArtistProfileImage(artistId: number, selectedMusicB
         await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
       }
     }
+    // If knownMbid is already present and !forceArtistChoice, it is reused directly without querying MusicBrainz!
+
+    // Check for valid local portrait in the artist's library folder
+    const artistDirInfo = await resolveArtistDirectory(artistId);
+    let localArtPath: string | null = null;
+    if (artistDirInfo) {
+      localArtPath = findLocalArtistArtwork(artistDirInfo.artistDir);
+    }
 
     const fanartApiKey = getFanartTvApiKey();
     if (!fanartApiKey) {
+      if (localArtPath && artist.artworkPath !== localArtPath) {
+        await db.update(artists)
+          .set({ artworkPath: localArtPath, artworkSource: 'local', artworkVerified: 1, musicbrainzId: knownMbid || undefined })
+          .where(eq(artists.id, artistId));
+        return { artistId, artistName, status: 'updated', provider: 'none', artworkUrl: localArtPath };
+      }
+      if (artist.artworkPath) {
         return {
-            artistId,
-            artistName,
-            status: 'failed',
-            provider: 'none',
-            error: 'Fanart.tv API key not configured.',
+          artistId,
+          artistName,
+          status: 'unchanged',
+          provider: 'none',
+          error: 'Fanart.tv API key not configured; preserved existing portrait',
         };
+      }
+      return {
+        artistId,
+        artistName,
+        status: 'failed',
+        provider: 'none',
+        error: 'Fanart.tv API key not configured.',
+      };
     }
 
     // 2. Query Fanart.tv if we have an MBID
     if (knownMbid) {
-        const fanartResult = await queryFanartTvArtist(knownMbid);
-        
-        if (fanartResult.status === 'updated' && fanartResult.imageUrl) {
-            const downloadResult = await downloadAndPersistArtistImage(
-                artistId,
-                artistName,
-                fanartResult.imageUrl.trim(),
-                knownMbid,
-                artist.artworkPath
-            );
-            return downloadResult;
-        }
+      const fanartResult = await queryFanartTvArtist(knownMbid);
 
-        // Handle explicit provider failures
-        if (fanartResult.status === 'failed') {
-             return { 
-                artistId, 
-                artistName, 
-                status: 'failed', 
-                provider: 'fanart_tv', 
-                error: fanartResult.error || 'Fanart.tv query failed' 
-             };
+      if (fanartResult.status === 'updated' && fanartResult.imageUrl) {
+        const downloadResult = await downloadAndPersistArtistImage(
+          artistId,
+          artistName,
+          fanartResult.imageUrl.trim(),
+          knownMbid,
+          artist.artworkPath
+        );
+        return downloadResult;
+      }
+
+      // Handle explicit provider failures
+      if (fanartResult.status === 'failed') {
+        if (localArtPath && (!artist.artworkPath || artist.artworkPath !== localArtPath)) {
+          await db.update(artists)
+            .set({ artworkPath: localArtPath, artworkSource: 'local', artworkVerified: 1, musicbrainzId: knownMbid })
+            .where(eq(artists.id, artistId));
+          return { artistId, artistName, status: 'updated', provider: 'none', artworkUrl: localArtPath };
         }
-        // If 'unavailable', fall through to return 'unchanged' or 'unavailable'
+        if (artist.artworkPath) {
+          return {
+            artistId,
+            artistName,
+            status: 'unchanged',
+            provider: 'fanart_tv',
+            error: fanartResult.error || 'Fanart.tv query failed; preserved existing portrait',
+          };
+        }
+        return {
+          artistId,
+          artistName,
+          status: 'failed',
+          provider: 'fanart_tv',
+          error: fanartResult.error || 'Fanart.tv query failed',
+        };
+      }
     }
 
-    // 3. Fallback logic: Preserve existing image if available
+    // 3. Fallback logic: check local portrait first, then preserve existing image
+    if (localArtPath && (!artist.artworkPath || artist.artworkPath !== localArtPath)) {
+      await db.update(artists)
+        .set({ artworkPath: localArtPath, artworkSource: 'local', artworkVerified: 1, musicbrainzId: knownMbid || undefined })
+        .where(eq(artists.id, artistId));
+      return { artistId, artistName, status: 'updated', provider: 'none', artworkUrl: localArtPath };
+    }
+
     if (artist.artworkPath) {
       return {
         artistId,

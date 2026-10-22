@@ -20,6 +20,10 @@ import {
   queryFanartTvArtist,
   resolveMusicBrainzId,
   searchMusicBrainzArtists,
+  resolveArtistDirectory,
+  findLocalArtistArtwork,
+  saveArtistImage,
+  validateMusicBrainzArtistId,
 } from '../lib/artist-image-refresher.js';
 import { getOrCreateArtist } from '../lib/artist-utils.js';
 
@@ -454,6 +458,333 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
         assert.strictEqual(check.musicbrainzId, 'target-mbid-1234', 'MBID must be persisted');
     } finally {
         await db.delete(artists).where(eq(artists.id, art.id));
+    }
+  });
+
+  await t.test('12. MusicBrainz search returns ambiguous candidates without guessing', async () => {
+    const artistName = `Ambiguous Artist ${Date.now()}`;
+    const [art] = await db.insert(artists).values({ name: artistName }).returning();
+
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      const urlStr = String(input);
+      if (urlStr.includes('musicbrainz.org/ws/2/artist')) {
+        return new Response(JSON.stringify({
+          artists: [
+            { id: 'candidate-uuid-1', name: artistName, disambiguation: 'Rock band from UK', country: 'GB', type: 'Group', score: 100 },
+            { id: 'candidate-uuid-2', name: artistName, disambiguation: 'Electronic producer', country: 'US', type: 'Person', score: 90 },
+          ],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('Not Found', { status: 404 });
+    };
+
+    try {
+      const res = await refreshArtistProfileImage(art.id, undefined, true);
+      assert.strictEqual(res.status, 'ambiguous', 'Must report ambiguous match');
+      assert.strictEqual(res.candidates?.length, 2, 'Must return all matching candidates');
+      assert.strictEqual(res.candidates![0].id, 'candidate-uuid-1');
+      assert.strictEqual(res.candidates![0].disambiguation, 'Rock band from UK');
+      assert.strictEqual(res.candidates![0].country, 'GB');
+      assert.strictEqual(res.candidates![0].type, 'Group');
+
+      // Verify artist record was NOT mutated with an uncertain match
+      const [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check.musicbrainzId, null, 'Must not silently guess an uncertain candidate');
+    } finally {
+      await db.delete(artists).where(eq(artists.id, art.id));
+    }
+  });
+
+  await t.test('13. Manually selecting and changing an artist ID with validation', async () => {
+    process.env.FANART_TV_API_KEY = 'mock_fanart_key';
+    const artistName = `Manual Match Artist ${Date.now()}`;
+    const [art] = await db.insert(artists).values({ name: artistName }).returning();
+
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      const urlStr = String(input);
+      if (urlStr.includes('musicbrainz.org/ws/2/artist/target-first-uuid')) {
+        return new Response(JSON.stringify({
+          id: 'target-first-uuid',
+          name: artistName,
+          type: 'Group',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (urlStr.includes('musicbrainz.org/ws/2/artist/target-second-uuid')) {
+        return new Response(JSON.stringify({
+          id: 'target-second-uuid',
+          name: artistName,
+          type: 'Person',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (urlStr.includes('musicbrainz.org/ws/2/artist/invalid-mbid')) {
+        return new Response('Not Found', { status: 404 });
+      }
+      if (urlStr.includes('fanart.tv')) {
+        return new Response('Not Found', { status: 404 });
+      }
+      return new Response('Not Found', { status: 404 });
+    };
+
+    try {
+      // 1. Manually set to target-first-uuid
+      await refreshArtistProfileImage(art.id, 'target-first-uuid');
+      let [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check.musicbrainzId, 'target-first-uuid', 'Must save first selected MBID');
+
+      // 2. Change to target-second-uuid
+      await refreshArtistProfileImage(art.id, 'target-second-uuid');
+      [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check.musicbrainzId, 'target-second-uuid', 'Must update to newly selected MBID');
+
+      // 3. Reject invalid MBID
+      const invalidRes = await refreshArtistProfileImage(art.id, 'invalid-mbid');
+      assert.strictEqual(invalidRes.status, 'failed');
+      [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check.musicbrainzId, 'target-second-uuid', 'Must preserve previous valid MBID on validation failure');
+    } finally {
+      await db.delete(artists).where(eq(artists.id, art.id));
+    }
+  });
+
+  await t.test('14. Persisting and reusing the selected ID avoids unnecessary MusicBrainz requests', async () => {
+    process.env.FANART_TV_API_KEY = 'mock_fanart_key';
+    const persistedMbid = 'persisted-authoritative-mbid-9999';
+    const artistName = `Reuse MBID Artist ${Date.now()}`;
+    const [art] = await db.insert(artists).values({
+      name: artistName,
+      musicbrainzId: persistedMbid,
+    }).returning();
+
+    let musicBrainzSearchCalled = false;
+    let fanartQueryMbid = '';
+
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      const urlStr = String(input);
+      if (urlStr.includes('musicbrainz.org/ws/2/artist')) {
+        musicBrainzSearchCalled = true;
+        return new Response('Error', { status: 500 });
+      }
+      if (urlStr.includes('/v3/music/')) {
+        const parts = urlStr.split('/v3/music/');
+        fanartQueryMbid = decodeURIComponent(parts[1] || '');
+        return new Response('Not Found', { status: 404 });
+      }
+      return new Response('Not Found', { status: 404 });
+    };
+
+    try {
+      await refreshArtistProfileImage(art.id);
+      assert.strictEqual(musicBrainzSearchCalled, false, 'Must not search MusicBrainz when an ID is already saved');
+      assert.strictEqual(fanartQueryMbid, persistedMbid, 'Must query Fanart.tv directly with the saved MBID');
+    } finally {
+      await db.delete(artists).where(eq(artists.id, art.id));
+    }
+  });
+
+  await t.test('15. Saving downloaded artwork to the artist\'s actual folder as artist.jpg', async () => {
+    process.env.FANART_TV_API_KEY = 'mock_fanart_key';
+    const artistName = `Local Folder Artist ${Date.now()}`;
+    const testMbid = 'mbid-local-folder-uuid-5555';
+
+    // Create a real directory structure within testDataDir
+    const testLibDir = path.join(testDataDir, 'test_library_' + Date.now());
+    const artistDir = path.join(testLibDir, 'Queen');
+    fs.mkdirSync(artistDir, { recursive: true });
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'Local Folder Test Library',
+      path: testLibDir,
+    }).returning();
+
+    const [art] = await db.insert(artists).values({
+      name: artistName,
+      musicbrainzId: testMbid,
+      artworkPath: null,
+    }).returning();
+
+    const fakeAudioPath = path.join(artistDir, 'bohemian.mp3');
+    fs.writeFileSync(fakeAudioPath, 'fake-audio-content');
+
+    const [song] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: art.id,
+      title: 'Bohemian Rhapsody',
+      mainAudioPath: fakeAudioPath,
+    }).returning();
+
+    const mockJpeg = createMockJpegBuffer();
+
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      const urlStr = String(input);
+      if (urlStr.includes(`/v3/music/${testMbid}`)) {
+        return new Response(JSON.stringify({
+          name: artistName,
+          artistthumb: [{ id: '10', url: 'https://assets.fanart.tv/fanart/music/queen-thumb.jpg', likes: '100' }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (urlStr === 'https://assets.fanart.tv/fanart/music/queen-thumb.jpg') {
+        return new Response(mockJpeg, { status: 200, headers: { 'Content-Type': 'image/jpeg' } });
+      }
+      return new Response('Not Found', { status: 404 });
+    };
+
+    try {
+      const res = await refreshArtistProfileImage(art.id);
+      assert.strictEqual(res.status, 'updated');
+
+      const expectedArtistJpg = path.join(artistDir, 'artist.jpg');
+      assert.strictEqual(fs.existsSync(expectedArtistJpg), true, 'artist.jpg must be saved in the artist folder');
+
+      const [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check.artworkPath, expectedArtistJpg, 'Database artworkPath must point to the saved artist.jpg');
+      assert.strictEqual(check.artworkSource, 'fanart_tv');
+    } finally {
+      await db.delete(songs).where(eq(songs.id, song.id));
+      await db.delete(artists).where(eq(artists.id, art.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('16. Safe filesystem path handling and unwritable folders fallback', async () => {
+    process.env.FANART_TV_API_KEY = 'mock_fanart_key';
+    const artistName = `Unwritable Folder Artist ${Date.now()}`;
+    const testMbid = 'mbid-unwritable-uuid-6666';
+
+    const testLibDir = path.join(testDataDir, 'test_lib_ro_' + Date.now());
+    const artistDir = path.join(testLibDir, 'ReadOnlyArtist');
+    fs.mkdirSync(artistDir, { recursive: true });
+
+    // Create artist.jpg as a directory so writing to it as a file throws an error on all platforms
+    const blockerDir = path.join(artistDir, 'artist.jpg');
+    fs.mkdirSync(blockerDir, { recursive: true });
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'RO Test Library',
+      path: testLibDir,
+    }).returning();
+
+    const [art] = await db.insert(artists).values({
+      name: artistName,
+      musicbrainzId: testMbid,
+      artworkPath: null,
+    }).returning();
+
+    const fakeAudioPath = path.join(artistDir, 'track.mp3');
+    fs.writeFileSync(fakeAudioPath, 'audio-data');
+
+    const [song] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: art.id,
+      title: 'RO Track',
+      mainAudioPath: fakeAudioPath,
+    }).returning();
+
+    const mockJpeg = createMockJpegBuffer();
+
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      const urlStr = String(input);
+      if (urlStr.includes(`/v3/music/${testMbid}`)) {
+        return new Response(JSON.stringify({
+          name: artistName,
+          artistthumb: [{ id: '11', url: 'https://assets.fanart.tv/fanart/music/ro-thumb.jpg', likes: '10' }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (urlStr === 'https://assets.fanart.tv/fanart/music/ro-thumb.jpg') {
+        return new Response(mockJpeg, { status: 200, headers: { 'Content-Type': 'image/jpeg' } });
+      }
+      return new Response('Not Found', { status: 404 });
+    };
+
+    try {
+      const res = await refreshArtistProfileImage(art.id);
+      assert.strictEqual(res.status, 'updated');
+
+      const [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.ok(check.artworkPath, 'Must fall back to saved cache filename');
+      const fallbackFile = path.join(testDataDir, 'artwork', path.basename(check.artworkPath));
+      assert.strictEqual(fs.existsSync(fallbackFile), true, 'Fallback file must exist in cached artwork directory');
+    } finally {
+      await db.delete(songs).where(eq(songs.id, song.id));
+      await db.delete(artists).where(eq(artists.id, art.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('17. Path traversal prevention in artist directory resolution', async () => {
+    const testLibDir = path.join(testDataDir, 'test_traversal_lib');
+    fs.mkdirSync(testLibDir, { recursive: true });
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'Traversal Test Library',
+      path: testLibDir,
+    }).returning();
+
+    const [art] = await db.insert(artists).values({ name: `Traversal Artist ${Date.now()}` }).returning();
+
+    // Malicious audio path outside library root
+    const outsideAudio = '/etc/passwd';
+    const [song] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: art.id,
+      title: 'Malicious Track',
+      mainAudioPath: outsideAudio,
+    }).returning();
+
+    try {
+      const dirInfo = await resolveArtistDirectory(art.id);
+      assert.strictEqual(dirInfo, null, 'Must reject paths outside library root');
+    } finally {
+      await db.delete(songs).where(eq(songs.id, song.id));
+      await db.delete(artists).where(eq(artists.id, art.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('18. Prefer valid local artist artwork when available', async () => {
+    const artistName = `Local Art Artist ${Date.now()}`;
+    const testLibDir = path.join(testDataDir, 'test_local_art_lib_' + Date.now());
+    const artistDir = path.join(testLibDir, 'TheBeatles');
+    fs.mkdirSync(artistDir, { recursive: true });
+
+    // Place genuine artist.jpg in artist directory
+    const localArtistJpg = path.join(artistDir, 'artist.jpg');
+    fs.writeFileSync(localArtistJpg, createMockJpegBuffer());
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'Local Art Library',
+      path: testLibDir,
+    }).returning();
+
+    const [art] = await db.insert(artists).values({
+      name: artistName,
+      artworkPath: null,
+    }).returning();
+
+    const [song] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: art.id,
+      title: 'Yesterday',
+      mainAudioPath: path.join(artistDir, 'yesterday.mp3'),
+    }).returning();
+
+    delete process.env.FANART_TV_API_KEY;
+
+    try {
+      const res = await refreshArtistProfileImage(art.id);
+      assert.strictEqual(res.status, 'updated');
+
+      const [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check.artworkPath, localArtistJpg);
+      assert.strictEqual(check.artworkSource, 'local');
+      assert.strictEqual(check.artworkVerified, 1);
+    } finally {
+      await db.delete(songs).where(eq(songs.id, song.id));
+      await db.delete(artists).where(eq(artists.id, art.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      fs.rmSync(testLibDir, { recursive: true, force: true });
     }
   });
 });

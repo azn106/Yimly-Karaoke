@@ -11,8 +11,10 @@ export { parseArtists, getOrCreateArtist, syncSongArtists, normalizeMultiArtists
 import { isLrcContentValid } from './lyrics.js';
 
 // Setup artwork cache directory
-const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
-const artworkDir = path.join(dataDir, 'artwork');
+export function getArtworkDir(): string {
+  const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
+  return path.join(dataDir, 'artwork');
+}
 
 /**
  * Selects the best front-cover image from embedded ID3/metadata pictures.
@@ -43,6 +45,7 @@ export function selectFrontCover(pictures?: mm.IPicture[]): mm.IPicture | null {
  * Returns the cached filename (e.g. hash.jpg or hash.png).
  */
 export async function saveArtworkBuffer(data: Buffer | Uint8Array, format?: string): Promise<string> {
+  const artworkDir = getArtworkDir();
   if (!fsSync.existsSync(artworkDir)) {
     await fs.mkdir(artworkDir, { recursive: true });
   }
@@ -928,14 +931,9 @@ export async function importSingleAudioFile(
       }
     }
 
-    // 6. Backfill artwork for album/artists if newly acquired
-    if (metadata.artworkPath) {
-      if (albumId) {
-        await db.update(albums).set({ artworkPath: metadata.artworkPath }).where(and(eq(albums.id, albumId), isNull(albums.artworkPath)));
-      }
-      for (const aId of artistIds) {
-        await db.update(artists).set({ artworkPath: metadata.artworkPath }).where(and(eq(artists.id, aId), isNull(artists.artworkPath)));
-      }
+    // 6. Backfill artwork for album if newly acquired (never populate artist portrait with track artwork)
+    if (metadata.artworkPath && albumId) {
+      await db.update(albums).set({ artworkPath: metadata.artworkPath }).where(and(eq(albums.id, albumId), isNull(albums.artworkPath)));
     }
 
     return await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
@@ -1525,27 +1523,25 @@ export async function scanLibrary(libraryId: number, dirPath: string) {
     }
   }
 
-  // Backfill artists without artwork
-  const artistsWithoutArtwork = await db.select().from(artists).where(isNull(artists.artworkPath));
-  for (const art of artistsWithoutArtwork) {
-    const songArtistMatch = await db.select({ artworkPath: songs.artworkPath })
-      .from(songArtists)
-      .innerJoin(songs, eq(songArtists.songId, songs.id))
-      .where(and(eq(songArtists.artistId, art.id), isNotNull(songs.artworkPath)))
-      .limit(1);
-
-    if (songArtistMatch.length > 0 && songArtistMatch[0].artworkPath) {
-      await db.update(artists).set({ artworkPath: songArtistMatch[0].artworkPath }).where(eq(artists.id, art.id));
-      continue;
+  // Detect genuine local artist portraits (e.g. artist.jpg, artist.png) in the artist's library folder
+  try {
+    const { resolveArtistDirectory, findLocalArtistArtwork } = await import('./artist-image-refresher.js');
+    const artistsForLocalScan = await db.select().from(artists).where(or(isNull(artists.artworkPath), eq(artists.artworkSource, 'local')));
+    for (const art of artistsForLocalScan) {
+      const dirInfo = await resolveArtistDirectory(art.id);
+      if (dirInfo) {
+        const localArt = findLocalArtistArtwork(dirInfo.artistDir);
+        if (localArt) {
+          await db.update(artists).set({
+            artworkPath: localArt,
+            artworkSource: 'local',
+            artworkVerified: 1,
+          }).where(eq(artists.id, art.id));
+        }
+      }
     }
-
-    const directSongMatch = await db.select({ artworkPath: songs.artworkPath })
-      .from(songs)
-      .where(and(eq(songs.artistId, art.id), isNotNull(songs.artworkPath)))
-      .limit(1);
-    if (directSongMatch.length > 0 && directSongMatch[0].artworkPath) {
-      await db.update(artists).set({ artworkPath: directSongMatch[0].artworkPath }).where(eq(artists.id, art.id));
-    }
+  } catch (scanErr) {
+    console.warn('[Scanner] Local artist artwork detection notice:', scanErr);
   }
 
   await db.update(libraries).set({ lastScan: new Date() }).where(eq(libraries.id, libraryId));

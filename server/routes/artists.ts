@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { artists, albums, songs, lyrics, songArtists } from '../db/schema.js';
+import { artists, albums, songs, lyrics, songArtists, libraries } from '../db/schema.js';
 import { eq, sql, isNotNull, and, or, inArray } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 import { formatArtistDisplay } from '../lib/artist-utils.js';
@@ -140,14 +140,26 @@ router.get('/:id/artwork', async (req, res) => {
     }
 
     const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
-    const safeFilename = path.basename(artworkFilename);
-    const filePath = path.join(dataDir, 'artwork', safeFilename);
+    let filePath: string;
+
+    if (path.isAbsolute(artworkFilename)) {
+      filePath = path.resolve(artworkFilename);
+      const isInDataDir = filePath.startsWith(dataDir + path.sep);
+      const allLibs = await db.select({ path: libraries.path }).from(libraries);
+      const isInLibrary = allLibs.some(l => l.path && filePath.startsWith(path.resolve(l.path) + path.sep));
+      if (!isInDataDir && !isInLibrary) {
+        return res.status(403).json({ error: 'Access denied to artwork path' });
+      }
+    } else {
+      const safeFilename = path.basename(artworkFilename);
+      filePath = path.join(dataDir, 'artwork', safeFilename);
+    }
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Cached artwork file not found on disk' });
     }
 
-    const ext = path.extname(safeFilename).toLowerCase();
+    const ext = path.extname(filePath).toLowerCase();
     const contentType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
 
     res.setHeader('Content-Type', contentType);
@@ -164,12 +176,67 @@ router.post('/:id/refresh', async (req, res) => {
     if (isNaN(artistId)) return res.status(400).json({ error: 'Invalid artist ID' });
 
     const { refreshArtistProfileImage } = await import('../lib/artist-image-refresher.js');
-    const selectedMusicBrainzId = typeof req.body?.musicbrainzId === 'string' ? req.body.musicbrainzId : undefined;
-    const forceArtistChoice = req.query.chooseArtist === 'true';
+    const selectedMusicBrainzId = typeof req.body?.musicbrainzId === 'string' && req.body.musicbrainzId.trim()
+      ? req.body.musicbrainzId.trim()
+      : undefined;
+    const forceArtistChoice = req.query.chooseArtist === 'true' || req.query.forceSearch === 'true';
     const result = await refreshArtistProfileImage(artistId, selectedMusicBrainzId, forceArtistChoice);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Failed to refresh artist image' });
+  }
+});
+
+// Search MusicBrainz candidates for an artist
+router.get('/:id/musicbrainz/search', async (req, res) => {
+  try {
+    const artistId = parseInt(req.params.id);
+    if (isNaN(artistId)) return res.status(400).json({ error: 'Invalid artist ID' });
+
+    const artist = await db.select().from(artists).where(eq(artists.id, artistId)).limit(1);
+    if (artist.length === 0) return res.status(404).json({ error: 'Artist not found' });
+
+    const query = typeof req.query.q === 'string' && req.query.q.trim() ? req.query.q.trim() : artist[0].name;
+    const { searchMusicBrainzArtists } = await import('../lib/artist-image-refresher.js');
+    const candidates = await searchMusicBrainzArtists(query);
+    res.json({ artistId, query, candidates });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to search MusicBrainz' });
+  }
+});
+
+// Manually update/validate MusicBrainz ID for an artist
+router.put('/:id/musicbrainz', async (req, res) => {
+  try {
+    const artistId = parseInt(req.params.id);
+    if (isNaN(artistId)) return res.status(400).json({ error: 'Invalid artist ID' });
+
+    const { musicbrainzId } = req.body;
+    if (!musicbrainzId || typeof musicbrainzId !== 'string') {
+      return res.status(400).json({ error: 'Missing musicbrainzId' });
+    }
+
+    const artist = await db.select().from(artists).where(eq(artists.id, artistId)).limit(1);
+    if (artist.length === 0) return res.status(404).json({ error: 'Artist not found' });
+
+    const { validateMusicBrainzArtistId } = await import('../lib/artist-image-refresher.js');
+    const validation = await validateMusicBrainzArtistId(musicbrainzId.trim());
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error || 'Invalid MusicBrainz ID' });
+    }
+
+    await db.update(artists)
+      .set({ musicbrainzId: musicbrainzId.trim() })
+      .where(eq(artists.id, artistId));
+
+    res.json({
+      success: true,
+      artistId,
+      musicbrainzId: musicbrainzId.trim(),
+      artist: validation.artist,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to update MusicBrainz ID' });
   }
 });
 
