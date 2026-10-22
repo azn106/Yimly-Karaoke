@@ -2069,7 +2069,7 @@ export default function Library() {
 
 
           {(tab === 'artists' || tab === 'albums') && (
-            <nav aria-label="Jump to artist or album letter" className="fixed right-1 top-1/2 z-30 flex max-h-[78vh] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full border border-white/10 bg-[#11121c]/90 px-1 py-2 shadow-lg backdrop-blur sm:right-3 sm:px-1.5">
+            <nav aria-label="Jump to artist or album letter" className="fixed right-1 top-1/2 z-30 flex max-h-[78vh] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full border border-white/10 bg-[#11121c]/90 px-1 py-2 shadow-lg backdrop-blur sm:right-3 sm:px-1.5 xl:right-[354px]">
               {['#', ...["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"]].map(letter => (
                 <button key={letter} type="button" onClick={() => jumpToLetter(letter)}
                   disabled={!jumpGroups.has(letter) && !(tab === 'artists' ? hasMoreArtists : hasMoreAlbums)}
