@@ -365,6 +365,7 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
         headers: { Authorization: `Bearer ${token}` },
       });
       assert.strictEqual(res.status, 404, 'Must return 404 instead of falling back to album or song cover');
+      assert.match(res.headers.get('cache-control') || '', /no-store/, 'Artist artwork responses must not be cached');
     } finally {
       server.close();
       await db.delete(songs).where(eq(songs.id, song.id));
