@@ -164,7 +164,8 @@ router.post('/:id/refresh', async (req, res) => {
     if (isNaN(artistId)) return res.status(400).json({ error: 'Invalid artist ID' });
 
     const { refreshArtistProfileImage } = await import('../lib/artist-image-refresher.js');
-    const result = await refreshArtistProfileImage(artistId);
+    const selectedMusicBrainzId = typeof req.body?.musicbrainzId === 'string' ? req.body.musicbrainzId : undefined;
+    const result = await refreshArtistProfileImage(artistId, selectedMusicBrainzId);
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Failed to refresh artist image' });
