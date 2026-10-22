@@ -319,8 +319,8 @@ export default function NowPlayingOverlay() {
                     <>
                       <style>{'@keyframes ykLyricsFadeIn { from { opacity: 0; } to { opacity: 1; } }'}</style>
                       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden" style={{ animation: 'ykLyricsFadeIn 650ms ease-out both' }}>
-                        {currentSong?.hasArtwork && <img key={currentSong.id + '-lyrics-bg'} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'blur(13px)', transform: 'scale(1.16)', opacity: 0.72 }} onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
-                        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(17,18,26,0.54) 0%, rgba(45,16,36,0.68) 54%, rgba(17,18,26,0.82) 100%)' }} />
+                        {currentSong?.hasArtwork && <img key={currentSong.id + '-lyrics-bg'} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(190,24,93,0.42) 0%, rgba(157,23,77,0.52) 54%, rgba(35,12,29,0.66) 100%)' }} />
                       </div>
                       <div
                       className="absolute inset-0 z-20 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 text-center"
