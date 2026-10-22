@@ -48,6 +48,7 @@ export default function Library() {
   const ALBUMS_PAGE_SIZE = 40;
   const [activeJumpLetter, setActiveJumpLetter] = useState('#');
   const [songs, setSongs] = useState<any[]>([]);
+  const [songsSort, setSongsSort] = useState<'artist' | 'title' | 'album' | 'recent' | 'oldest' | 'duration' | 'track'>('artist');
   const [hasMoreSongs, setHasMoreSongs] = useState(false);
   const [loadingMoreSongs, setLoadingMoreSongs] = useState(false);
   const songsLoadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -235,7 +236,7 @@ export default function Library() {
 
   useEffect(() => {
     loadAllData();
-  }, [tab]);
+  }, [tab, songsSort]);
 
   const loadAllData = async () => {
     setLoading(true);
@@ -313,7 +314,7 @@ export default function Library() {
         const endpoint = 
           tab === 'artists' ? `/api/artists?limit=${ARTISTS_PAGE_SIZE}&offset=0` : 
           tab === 'albums' ? `/api/albums?limit=${ALBUMS_PAGE_SIZE}&offset=0` : 
-          tab === 'songs' ? `/api/songs?limit=${SONGS_PAGE_SIZE}&offset=0` : 
+          tab === 'songs' ? `/api/songs?limit=${SONGS_PAGE_SIZE}&offset=0&sort=${songsSort}` : 
           '/api/playlists';
 
         const dataRes = await fetchWithRetry(endpoint, 2, 500);
@@ -384,7 +385,7 @@ export default function Library() {
     const offset = songsRequestOffsetRef.current;
 
     try {
-      const response = await fetch(`/api/songs?limit=${SONGS_PAGE_SIZE}&offset=${offset}`, { credentials: 'same-origin' });
+      const response = await fetch(`/api/songs?limit=${SONGS_PAGE_SIZE}&offset=${offset}&sort=${songsSort}`, { credentials: 'same-origin' });
       if (!response.ok) throw new Error(`Failed to load more songs (${response.status})`);
       const payload = await response.json();
       const nextPage = Array.isArray(payload) ? payload : (Array.isArray(payload?.songs) ? payload.songs : []);
@@ -2082,6 +2083,32 @@ export default function Library() {
           {/* Songs List — clean, borderless styling matching the Jukebox rows */}
           {tab === 'songs' && (
             <div className="min-w-0">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-white">All Songs</h2>
+                  <p className="mt-0.5 text-xs text-zinc-500">Sorted across the full catalogue before loading each page.</p>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-zinc-400">
+                  <span>Sort by</span>
+                  <select
+                    value={songsSort}
+                    onChange={e => {
+                      setSongsSort(e.target.value as typeof songsSort);
+                      document.querySelector('main')?.scrollTo({ top: 0, behavior: 'auto' });
+                    }}
+                    className="rounded-xl border border-white/10 bg-[#141622] px-3 py-2 text-sm text-white outline-none transition focus:border-[#F472B6]"
+                    aria-label="Sort songs"
+                  >
+                    <option value="artist">Artist A–Z</option>
+                    <option value="title">Title A–Z</option>
+                    <option value="album">Album</option>
+                    <option value="recent">Recently added</option>
+                    <option value="oldest">Oldest added</option>
+                    <option value="duration">Duration</option>
+                    <option value="track">Track number</option>
+                  </select>
+                </label>
+              </div>
               <div className="divide-y divide-white/[0.04]">
                 {songs.map((song, idx) => {
                   const isCurrent = jukeboxCurrentSong?.id === song.id;
