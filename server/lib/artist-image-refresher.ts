@@ -193,17 +193,24 @@ export async function searchMusicBrainzArtists(
   const variations = [...new Set([normalizeArtistNameForMatching(cleanName), cleanName].filter(Boolean))];
   const targetNorm = normalizeArtistNameForMatching(cleanName);
   const matches = new Map<string, MusicBrainzArtistCandidate>();
+  let successfulSearchResponse = false;
+  let lastSearchFailure = '';
 
   for (const name of variations) {
     try {
       const searchUrl = `https://musicbrainz.org/ws/2/artist?query=artist:${encodeURIComponent(name)}&fmt=json`;
       const res = await fetchMusicBrainz(searchUrl, timeoutMs);
       if (!res.ok) {
+        lastSearchFailure = `HTTP ${res.status}`;
         console.warn(`[MusicBrainz] Artist search returned HTTP ${res.status}`);
         continue;
       }
       const data = await res.json().catch(() => null);
-      if (!data || !Array.isArray(data.artists)) continue;
+      if (!data || !Array.isArray(data.artists)) {
+        lastSearchFailure = 'invalid response';
+        continue;
+      }
+      successfulSearchResponse = true;
 
       for (const artist of data.artists) {
         if (!artist?.id) continue;
@@ -219,9 +226,16 @@ export async function searchMusicBrainzArtists(
           ...(typeof artist.score === 'number' ? { score: artist.score } : {}),
         });
       }
-    } catch {
-      // MusicBrainz can be temporarily unavailable; try the next query variation.
+    } catch (err: any) {
+      lastSearchFailure = err?.name === 'TimeoutError' || err?.name === 'AbortError'
+        ? 'request timed out'
+        : 'network request failed';
+      // Try the next query variation; report an error only if every search failed.
     }
+  }
+
+  if (!successfulSearchResponse) {
+    throw new Error(`MusicBrainz search failed (${lastSearchFailure || 'no valid response'}). Please try again shortly.`);
   }
 
   const candidates = [...matches.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
