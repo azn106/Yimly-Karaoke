@@ -132,8 +132,9 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   }, []);
 
   useEffect(() => {
-    setShowLyrics(false);
-    setIsLyricsFullscreen(false);
+    // Keep the current player view when the track changes. In particular, if
+    // the user is reading full-screen lyrics, load the next track's lyrics
+    // without closing fullscreen or returning to the artwork/player view.
     setLyricsLines([]);
     setLyricsUnavailable(false);
   }, [currentSong?.id]);
