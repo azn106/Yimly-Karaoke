@@ -33,6 +33,12 @@ export default function Library() {
   const [stats, setStats] = useState({ artists: 0, albums: 0, songs: 0, playlists: 0 });
   
   const [artists, setArtists] = useState<any[]>([]);
+  const [hasMoreArtists, setHasMoreArtists] = useState(false);
+  const [loadingMoreArtists, setLoadingMoreArtists] = useState(false);
+  const artistsLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const artistsRequestOffsetRef = useRef(0);
+  const loadingMoreArtistsRef = useRef(false);
+  const ARTISTS_PAGE_SIZE = 40;
   const [albums, setAlbums] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
   const [hasMoreSongs, setHasMoreSongs] = useState(false);
@@ -228,6 +234,10 @@ export default function Library() {
     setLoading(true);
     setError(null);
     setHasMoreSongs(false);
+    setHasMoreArtists(false);
+    setLoadingMoreArtists(false);
+    loadingMoreArtistsRef.current = false;
+    artistsRequestOffsetRef.current = 0;
     setLoadingMoreSongs(false);
     loadingMoreSongsRef.current = false;
     songsRequestOffsetRef.current = 0;
@@ -290,7 +300,7 @@ export default function Library() {
         }
       } else {
         const endpoint = 
-          tab === 'artists' ? '/api/artists' : 
+          tab === 'artists' ? `/api/artists?limit=${ARTISTS_PAGE_SIZE}&offset=0` : 
           tab === 'albums' ? '/api/albums' : 
           tab === 'songs' ? `/api/songs?limit=${SONGS_PAGE_SIZE}&offset=0` : 
           '/api/playlists';
@@ -317,7 +327,12 @@ export default function Library() {
 
         const data = await dataRes.json();
 
-        if (tab === 'artists') setArtists(Array.isArray(data) ? data : []);
+        if (tab === 'artists') {
+          const firstPage = Array.isArray(data) ? data : (Array.isArray(data?.artists) ? data.artists : []);
+          setArtists(firstPage);
+          setHasMoreArtists(Boolean(data?.hasMore));
+          artistsRequestOffsetRef.current = firstPage.length;
+        }
         else if (tab === 'albums') setAlbums(Array.isArray(data) ? data : []);
         else if (tab === 'songs') {
           const firstPage = Array.isArray(data) ? data : (Array.isArray(data?.songs) ? data.songs : []);
@@ -384,6 +399,42 @@ export default function Library() {
     observer.observe(target);
     return () => observer.disconnect();
   }, [tab, hasMoreSongs, loading, loadingMoreSongs, search, songs.length]);
+
+
+  const loadMoreArtists = async () => {
+    if (tab !== 'artists' || !hasMoreArtists || loadingMoreArtistsRef.current || loading) return;
+    loadingMoreArtistsRef.current = true;
+    setLoadingMoreArtists(true);
+    const offset = artistsRequestOffsetRef.current;
+    try {
+      const response = await fetch(`/api/artists?limit=${ARTISTS_PAGE_SIZE}&offset=${offset}`, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`Failed to load more artists (${response.status})`);
+      const payload = await response.json();
+      const nextPage = Array.isArray(payload) ? payload : (Array.isArray(payload?.artists) ? payload.artists : []);
+      setArtists(previous => {
+        const knownIds = new Set(previous.map(artist => artist.id));
+        return [...previous, ...nextPage.filter((artist: any) => !knownIds.has(artist.id))];
+      });
+      artistsRequestOffsetRef.current = offset + nextPage.length;
+      setHasMoreArtists(Boolean(payload?.hasMore));
+    } catch (loadError) {
+      console.error('Failed to load more artists:', loadError);
+    } finally {
+      loadingMoreArtistsRef.current = false;
+      setLoadingMoreArtists(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab !== 'artists' || !hasMoreArtists || loading) return;
+    const target = artistsLoadMoreRef.current;
+    if (!target || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadMoreArtists();
+    }, { rootMargin: '500px 0px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [tab, hasMoreArtists, loading, loadingMoreArtists, artists.length]);
 
   const handleDeleteSong = async (song: any) => {
     const songTitle = song.title || 'this song';
@@ -1891,6 +1942,8 @@ export default function Library() {
                       <img
                         src={`/api/artists/${artist.id}/artwork`}
                         alt={artist.name}
+                        loading="lazy"
+                        decoding="async"
                         className="relative z-10 h-full w-full object-cover yk-artwork-image"
                         onError={(e) => {
                           (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -1902,12 +1955,20 @@ export default function Library() {
                   <p className="text-xs text-zinc-400 mt-1">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>
                 </div>
               ))}
-              {artists.length === 0 && (
+              {artists.length === 0 && !loading && (
                 <div className="col-span-full py-16 text-center text-zinc-500">
                   No artists found. Run a library scan or configure a directory in Settings.
                 </div>
               )}
             </div>
+          )}
+          {tab === 'artists' && hasMoreArtists && (
+            <div ref={artistsLoadMoreRef} className="flex min-h-16 items-center justify-center py-5 text-sm text-zinc-500" aria-live="polite">
+              {loadingMoreArtists ? 'Loading more artists…' : 'Scroll for more artists'}
+            </div>
+          )}
+          {tab === 'artists' && !hasMoreArtists && artists.length > 0 && (
+            <div className="py-5 text-center text-xs text-zinc-600">All artists loaded</div>
           )}
 
           {/* Albums Grid */}
