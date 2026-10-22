@@ -348,7 +348,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                             const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
                             const active = index === activeLyricIndex;
                             const nearby = Math.abs(index - activeLyricIndex) <= 2;
-                            return <div key={line.id} ref={active ? activeLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#FFB9E0] text-lg sm:text-xl font-bold tracking-wide scale-[1.02]' : nearby ? 'text-[#C6B1C4] text-sm sm:text-base font-medium' : 'text-[#9D8A9C] text-sm font-normal')} aria-current={active ? 'true' : undefined} style={{ textTransform: 'capitalize' }}>{line.text}</div>;
+                            return <div key={line.id} ref={active ? activeLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#F09ACB] text-lg sm:text-xl font-bold tracking-wide scale-[1.02]' : nearby ? 'text-[#C6B1C4] text-sm sm:text-base font-medium' : 'text-[#9D8A9C] text-sm font-normal')} aria-current={active ? 'true' : undefined}>{line.text}</div>;
                           })}
                         </div>
                       )}
@@ -432,7 +432,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                     const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
                     const active = index === activeLyricIndex;
                     const nearby = Math.abs(index - activeLyricIndex) <= 2;
-                    return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#FFB9E0] text-lg sm:text-xl font-bold tracking-wide leading-snug scale-[1.02]' : nearby ? 'text-[#C6B1C4] text-lg sm:text-xl font-medium' : 'text-[#9D8A9C] text-base sm:text-lg font-normal')} style={{ textTransform: 'capitalize' }}>{line.text}</div>;
+                    return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#F09ACB] text-lg sm:text-xl font-bold tracking-wide leading-snug scale-[1.02]' : nearby ? 'text-[#C6B1C4] text-lg sm:text-xl font-medium' : 'text-[#9D8A9C] text-base sm:text-lg font-normal')}>{line.text}</div>;
                   })}
                 </div>
               )}
