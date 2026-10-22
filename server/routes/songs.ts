@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { db } from '../db/index.js';
 import { songs, artists, albums, lyrics, songArtists, playlistSongs, favorites, queueItems, sessions } from '../db/schema.js';
-import { eq, like, or, inArray, asc, and, sql } from 'drizzle-orm';
+import { eq, like, or, inArray, asc, desc, and, sql } from 'drizzle-orm';
 import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import { formatArtistDisplay, cleanupOrphanedRecords } from '../lib/artist-utils.js';
 import { broadcastSongOffsetToRooms } from '../ws/index.js';
@@ -48,6 +48,11 @@ router.get('/', async (req, res) => {
     const pageLimit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
     const pageOffset = Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0;
 
+    const requestedSort = String(req.query.sort ?? 'artist');
+    const sort = ['artist', 'title', 'album', 'recent', 'oldest', 'duration', 'track'].includes(requestedSort)
+      ? requestedSort
+      : 'artist';
+
     const songsQuery = db.select({
       id: songs.id,
       title: songs.title,
@@ -68,12 +73,35 @@ router.get('/', async (req, res) => {
     .leftJoin(artists, eq(songs.artistId, artists.id))
     .leftJoin(albums, eq(songs.albumId, albums.id));
 
+    // Sort in SQL before applying limit/offset so every progressively loaded page
+    // continues the same catalogue order. Song IDs provide stable tie-breaks and
+    // insertion-order fallbacks for libraries without a song-created timestamp.
+    const orderedSongsQuery = (() => {
+      switch (sort) {
+        case 'title':
+          return songsQuery.orderBy(asc(songs.title), asc(songs.id));
+        case 'album':
+          return songsQuery.orderBy(asc(albums.title), asc(artists.name), asc(songs.trackNumber), asc(songs.id));
+        case 'recent':
+          return songsQuery.orderBy(desc(songs.id));
+        case 'oldest':
+          return songsQuery.orderBy(asc(songs.id));
+        case 'duration':
+          return songsQuery.orderBy(asc(songs.duration), asc(songs.id));
+        case 'track':
+          return songsQuery.orderBy(asc(albums.title), asc(songs.discNumber), asc(songs.trackNumber), asc(songs.title), asc(songs.id));
+        case 'artist':
+        default:
+          return songsQuery.orderBy(asc(artists.name), asc(albums.title), asc(songs.discNumber), asc(songs.trackNumber), asc(songs.id));
+      }
+    })();
+
     const [allSongs, totalResult] = hasPagination
       ? await Promise.all([
-          songsQuery.orderBy(asc(songs.id)).limit(pageLimit).offset(pageOffset),
+          orderedSongsQuery.limit(pageLimit).offset(pageOffset),
           db.select({ total: sql<number>`count(*)` }).from(songs),
         ])
-      : [await songsQuery, [] as { total: number }[]];
+      : [await orderedSongsQuery, [] as { total: number }[]];
 
     const songIds = allSongs.map(s => s.id);
     const artistsMap = await getSongArtistsMap(songIds);
