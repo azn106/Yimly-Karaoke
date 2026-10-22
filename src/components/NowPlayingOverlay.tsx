@@ -5,27 +5,6 @@ import EqualizerIndicator from './EqualizerIndicator';
 
 type TimedLyricLine = { time: number; text: string; id: string };
 
-function groupLyricsIntoSections(lines: TimedLyricLine[]): TimedLyricLine[][] {
-  const sections: TimedLyricLine[][] = [];
-  let section: TimedLyricLine[] = [];
-
-  lines.forEach((line, index) => {
-    const previous = lines[index - 1];
-    const startsNewSection = section.length > 0 && (
-      line.time - previous.time >= 4.5 ||
-      section.length >= 6
-    );
-    if (startsNewSection) {
-      sections.push(section);
-      section = [];
-    }
-    section.push(line);
-  });
-
-  if (section.length > 0) sections.push(section);
-  return sections;
-}
-
 function parseLrcLyrics(content: string): TimedLyricLine[] {
   const parsed: TimedLyricLine[] = [];
   const timestampPattern = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
@@ -194,12 +173,8 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   const activeLyricIndex = lyricsLines.reduce((active, line, index) => (
     line.time <= currentTime ? index : active
   ), -1);
-  const lyricSections = groupLyricsIntoSections(lyricsLines);
-  const activeSectionIndex = activeLyricIndex < 0
-    ? 0
-    : lyricSections.findIndex(section => section.some(line => line.id === lyricsLines[activeLyricIndex]?.id));
-  const visibleSectionIndex = Math.max(0, activeSectionIndex);
-  const visibleLyricSection = lyricSections[visibleSectionIndex] || [];
+  // Keep the active lyric as the first rendered line; future lines flow beneath it.
+  const visibleLyrics = lyricsLines.slice(Math.max(0, activeLyricIndex));
 
   useEffect(() => {
     if (mode === 'panel' || !isExpanded) return;
@@ -368,8 +343,8 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                       ) : lyricsUnavailable ? (
                         <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
                       ) : (
-                        <div key={'compact-lyric-section-' + visibleSectionIndex} className="min-h-full flex flex-col justify-start gap-4 pt-4" style={{ animation: 'ykLyricsFadeIn 280ms ease-out both' }}>
-                          {visibleLyricSection.map((line) => {
+                        <div key={'compact-active-lyric-' + (lyricsLines[activeLyricIndex]?.id || 'before-start')} className="min-h-full flex flex-col justify-start gap-4 pt-4" style={{ animation: 'ykLyricsFadeIn 280ms ease-out both' }}>
+                          {visibleLyrics.map((line) => {
                             const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
                             const active = index === activeLyricIndex;
                             const nearby = Math.abs(index - activeLyricIndex) <= 2;
@@ -452,8 +427,8 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               ) : lyricsUnavailable ? (
                 <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
               ) : (
-                <div key={'fullscreen-lyric-section-' + visibleSectionIndex} className="min-h-full flex flex-col justify-start items-stretch gap-8 pt-[18vh] pb-8" style={{ animation: 'ykLyricsFadeIn 320ms ease-out both' }}>
-                  {visibleLyricSection.map((line) => {
+                <div key={'fullscreen-active-lyric-' + (lyricsLines[activeLyricIndex]?.id || 'before-start')} className="min-h-full flex flex-col justify-start items-stretch gap-8 pt-[30vh] pb-8" style={{ animation: 'ykLyricsFadeIn 320ms ease-out both' }}>
+                  {visibleLyrics.map((line) => {
                     const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
                     const active = index === activeLyricIndex;
                     const nearby = Math.abs(index - activeLyricIndex) <= 2;
