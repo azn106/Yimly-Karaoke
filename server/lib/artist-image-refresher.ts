@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { db } from '../db/index.js';
-import { artists } from '../db/schema.js';
+import { artists, songs } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { saveArtworkBuffer } from './scanner.js';
 
@@ -158,7 +158,7 @@ export function validateImageMagicBytes(buf: Buffer): boolean {
 /**
  * Resolves an authoritative MusicBrainz artist ID by querying MusicBrainz with strict validation.
  */
-export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8000): Promise<MusicBrainzArtistCandidate[]> {
+export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8000, songTitle?: string): Promise<MusicBrainzArtistCandidate[]> {
   const cleanName = artistName.trim();
   if (!cleanName || cleanName.toLowerCase() === 'unknown artist') return [];
 
@@ -199,7 +199,53 @@ export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8
     }
   }
 
-  return [...matches.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const candidates = [...matches.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  // When a library song title is available, use MusicBrainz recording credits as
+  // corroborating evidence for ambiguous artist names. If the recording search
+  // cannot confidently connect the title to one of these candidates, preserve
+  // the original name-based candidate list rather than guessing.
+  const cleanSongTitle = songTitle?.trim();
+  if (cleanSongTitle && candidates.length > 1) {
+    try {
+      const recordingQuery = `recording:"${cleanSongTitle.replace(/["\\\\]/g, ' ')}" AND artist:"${cleanName.replace(/["\\\\]/g, ' ')}"`;
+      const recordingUrl = `https://musicbrainz.org/ws/2/recording?query=${encodeURIComponent(recordingQuery)}&fmt=json&limit=100`;
+      const recordingRes = await fetch(recordingUrl, {
+        headers: {
+          'User-Agent': 'YimlyKaraoke/1.0 (contact: info@yimly.local)',
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (recordingRes.ok) {
+        const recordingData = await recordingRes.json().catch(() => null);
+        const matchedArtistIds = new Set<string>();
+        const targetTitle = normalizeArtistNameForMatching(cleanSongTitle);
+        if (Array.isArray(recordingData?.recordings)) {
+          for (const recording of recordingData.recordings) {
+            if (normalizeArtistNameForMatching(String(recording?.title || '')) !== targetTitle) continue;
+            const credits = Array.isArray(recording?.['artist-credit']) ? recording['artist-credit'] : [];
+            for (const credit of credits) {
+              const creditedArtist = credit?.artist;
+              if (creditedArtist?.id) matchedArtistIds.add(String(creditedArtist.id));
+              if (typeof creditedArtist?.name === 'string') {
+                const creditedName = normalizeArtistNameForMatching(creditedArtist.name);
+                for (const candidate of candidates) {
+                  if (normalizeArtistNameForMatching(candidate.name) === creditedName) matchedArtistIds.add(candidate.id);
+                }
+              }
+            }
+          }
+        }
+        const songMatchedCandidates = candidates.filter(candidate => matchedArtistIds.has(candidate.id));
+        if (songMatchedCandidates.length > 0) return songMatchedCandidates;
+      }
+    } catch {
+      // A recording lookup is supplemental; keep name-based candidates on failure.
+    }
+  }
+
+  return candidates;
 }
 
 export async function resolveMusicBrainzId(artistName: string, timeoutMs = 8000): Promise<string | null> {
@@ -422,10 +468,18 @@ export async function refreshArtistProfileImage(artistId: number, selectedMusicB
     const artist = artistRec[0];
     const artistName = artist.name;
     let knownMbid: string | null = artist.musicbrainzId || null;
+    const firstSong = await db.select({ title: songs.title })
+      .from(songs)
+      .where(eq(songs.artistId, artistId))
+      .orderBy(songs.id)
+      .limit(1);
+    const firstSongTitle = firstSong[0]?.title?.trim() || undefined;
 
-    // Resolve the artist explicitly when MusicBrainz returns multiple exact name matches.
+    // Use the artist's first available library song to help disambiguate common names.
+    // The title is supporting evidence only; if it does not confirm a candidate,
+    // the manual artist picker remains available.
     if (selectedMusicBrainzId) {
-      const candidates = await searchMusicBrainzArtists(artistName);
+      const candidates = await searchMusicBrainzArtists(artistName, 8000, firstSongTitle);
       const selected = candidates.find(candidate => candidate.id === selectedMusicBrainzId);
       if (!selected) {
         return {
@@ -436,7 +490,7 @@ export async function refreshArtistProfileImage(artistId: number, selectedMusicB
       knownMbid = selected.id;
       await db.update(artists).set({ musicbrainzId: knownMbid }).where(eq(artists.id, artistId));
     } else if (!knownMbid || forceArtistChoice) {
-      const candidates = await searchMusicBrainzArtists(artistName);
+      const candidates = await searchMusicBrainzArtists(artistName, 8000, firstSongTitle);
       if (candidates.length > 1) {
         return {
           artistId, artistName, status: 'ambiguous', provider: 'none',
