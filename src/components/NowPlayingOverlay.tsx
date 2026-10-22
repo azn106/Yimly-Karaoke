@@ -351,7 +351,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                           {lyricsLines.map((line, index) => {
                             const active = index === activeLyricIndex;
                             const nearby = Math.abs(index - activeLyricIndex) <= 2;
-                            return <div key={line.id} ref={active ? activeLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-white text-lg sm:text-xl font-semibold tracking-wide scale-[1.02]' : nearby ? 'text-white/75 text-sm sm:text-base font-medium' : 'text-white/40 text-sm font-normal')} aria-current={active ? 'true' : undefined} style={{ textTransform: 'capitalize', ...(active ? { textShadow: '1px 0 0 #F9A8D4, -1px 0 0 #F9A8D4, 0 1px 0 #F9A8D4, 0 -1px 0 #F9A8D4, 1px 1px 0 #F9A8D4, -1px -1px 0 #F9A8D4, 1px -1px 0 #F9A8D4, -1px 1px 0 #F9A8D4' } : {}) }}>{line.text}</div>;
+                            return <div key={line.id} ref={active ? activeLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#FFB9E0] text-lg sm:text-xl font-bold tracking-wide scale-[1.02] border border-[#9D527D] rounded-lg px-2 py-1' : nearby ? 'text-[#C6B1C4] text-sm sm:text-base font-medium' : 'text-[#9D8A9C] text-sm font-normal')} aria-current={active ? 'true' : undefined} style={{ textTransform: 'capitalize' }}>{line.text}</div>;
                           })}
                         </div>
                       )}
@@ -430,11 +430,11 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               ) : lyricsUnavailable ? (
                 <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
               ) : (
-                <div className="min-h-full flex flex-col justify-center gap-6 py-[30vh]">
+                <div className="min-h-full flex flex-col justify-center gap-8 py-[30vh]">
                   {lyricsLines.map((line, index) => {
                     const active = index === activeLyricIndex;
                     const nearby = Math.abs(index - activeLyricIndex) <= 2;
-                    return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-white text-2xl sm:text-3xl font-semibold tracking-wide leading-snug scale-[1.02]' : nearby ? 'text-white/75 text-lg sm:text-xl font-medium' : 'text-white/40 text-base sm:text-lg font-normal')} style={{ textTransform: 'capitalize', ...(active ? { textShadow: '1px 0 0 #F9A8D4, -1px 0 0 #F9A8D4, 0 1px 0 #F9A8D4, 0 -1px 0 #F9A8D4, 1px 1px 0 #F9A8D4, -1px -1px 0 #F9A8D4, 1px -1px 0 #F9A8D4, -1px 1px 0 #F9A8D4' } : {}) }}>{line.text}</div>;
+                    return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#FFB9E0] text-[32px] sm:text-[32px] font-bold tracking-wide leading-snug scale-[1.02] border border-[#9D527D] rounded-xl px-4 py-3' : nearby ? 'text-[#C6B1C4] text-lg sm:text-xl font-medium' : 'text-[#9D8A9C] text-base sm:text-lg font-normal')} style={{ textTransform: 'capitalize' }}>{line.text}</div>;
                   })}
                 </div>
               )}
