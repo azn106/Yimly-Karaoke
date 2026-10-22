@@ -14,21 +14,43 @@ let musicBrainzQueue: Promise<void> = Promise.resolve();
 let musicBrainzNextRequestAt = 0;
 
 async function fetchMusicBrainz(url: string, timeoutMs: number): Promise<Response> {
-  const slot = musicBrainzQueue.then(async () => {
-    const waitMs = Math.max(0, musicBrainzNextRequestAt - Date.now());
-    if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs));
-    musicBrainzNextRequestAt = Date.now() + 1100;
-  });
-  musicBrainzQueue = slot.catch(() => undefined);
-  await slot;
+  const headers = {
+    'User-Agent': 'YimlyKaraoke/1.0 (https://github.com/azn106/Yimly-Karaoke)',
+    'Accept': 'application/json',
+  };
+  const retryableStatuses = new Set([429, 500, 502, 503, 504]);
+  const maxRetries = 2;
 
-  return fetch(url, {
-    headers: {
-      'User-Agent': 'YimlyKaraoke/1.0 (https://github.com/azn106/Yimly-Karaoke)',
-      'Accept': 'application/json',
-    },
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  for (let attempt = 0; ; attempt++) {
+    // Keep every attempt, including retries, behind the same global rate limit.
+    const slot = musicBrainzQueue.then(async () => {
+      const waitMs = Math.max(0, musicBrainzNextRequestAt - Date.now());
+      if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs));
+      musicBrainzNextRequestAt = Date.now() + 1100;
+    });
+    musicBrainzQueue = slot.catch(() => undefined);
+    await slot;
+
+    const response = await fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!retryableStatuses.has(response.status) || attempt >= maxRetries) {
+      return response;
+    }
+
+    const retryAfterHeader = response.headers.get('retry-after');
+    const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
+    const retryDelayMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
+      ? Math.min(retryAfterSeconds * 1000, 5000)
+      : 1200 * (attempt + 1);
+
+    console.warn(`[MusicBrainz] HTTP ${response.status}; retrying in ${retryDelayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+    // Consume/cancel the response before retrying to release the connection.
+    await response.body?.cancel().catch(() => undefined);
+    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+  }
 }
 
 export interface MusicBrainzArtistCandidate {
