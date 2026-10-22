@@ -247,7 +247,7 @@ export default function Library() {
     if (refreshingArtistId === artistId) return;
     setRefreshingArtistId(artistId);
     try {
-      const res = await fetch(`/api/artists/${artistId}/refresh`, {
+      const res = await fetch(`/api/artists/${artistId}/refresh${musicbrainzId ? '' : '?chooseArtist=true'}`, {
         method: 'POST',
         headers: musicbrainzId ? { 'Content-Type': 'application/json' } : undefined,
         body: musicbrainzId ? JSON.stringify({ musicbrainzId }) : undefined,
