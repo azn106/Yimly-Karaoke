@@ -71,6 +71,11 @@ export default function Library() {
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshingArtistId, setRefreshingArtistId] = useState<number | null>(null);
   const [refreshSummary, setRefreshSummary] = useState<any | null>(null);
+  const [artistMatchPrompt, setArtistMatchPrompt] = useState<{
+    artistId: number;
+    artistName: string;
+    candidates: Array<{ id: string; name: string; disambiguation?: string; country?: string; type?: string; score?: number }>;
+  } | null>(null);
 
   // Horizontal featured-playlist rail. Cards are sized to roughly twice an album card.
   const playlistRailRef = useRef<HTMLDivElement | null>(null);
@@ -238,13 +243,21 @@ export default function Library() {
     }
   };
 
-  const handleRefreshArtist = async (artistId: number) => {
+  const handleRefreshArtist = async (artistId: number, musicbrainzId?: string) => {
     if (refreshingArtistId === artistId) return;
     setRefreshingArtistId(artistId);
     try {
-      const res = await fetch(`/api/artists/${artistId}/refresh`, { method: 'POST' });
+      const res = await fetch(`/api/artists/${artistId}/refresh`, {
+        method: 'POST',
+        headers: musicbrainzId ? { 'Content-Type': 'application/json' } : undefined,
+        body: musicbrainzId ? JSON.stringify({ musicbrainzId }) : undefined,
+      });
       const result = await res.json().catch(() => null);
       if (res.ok && result) {
+        if (result.status === 'ambiguous' && Array.isArray(result.candidates)) {
+          setArtistMatchPrompt({ artistId, artistName: result.artistName || 'Artist', candidates: result.candidates });
+          return;
+        }
         const msg = `Artist refresh: ${result.status}${result.error ? ` (${result.error})` : ''}`;
         alert(msg);
         loadAllData();
@@ -2117,6 +2130,46 @@ export default function Library() {
             />
           )}
         </>
+      )}
+
+      {artistMatchPrompt && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="artist-match-title">
+          <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-[#141622] p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="artist-match-title" className="text-lg font-bold text-white">Choose the correct artist</h2>
+                <p className="mt-1 text-sm text-zinc-400">More than one MusicBrainz artist matches “{artistMatchPrompt.artistName}”. Select the right person or group before refreshing artwork.</p>
+              </div>
+              <button type="button" onClick={() => setArtistMatchPrompt(null)} className="rounded-lg px-2 py-1 text-zinc-400 hover:bg-white/10 hover:text-white" aria-label="Close artist choices">✕</button>
+            </div>
+            <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+              {artistMatchPrompt.candidates.map(candidate => (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  disabled={refreshingArtistId === artistMatchPrompt.artistId}
+                  onClick={() => {
+                    const { artistId } = artistMatchPrompt;
+                    setArtistMatchPrompt(null);
+                    void handleRefreshArtist(artistId, candidate.id);
+                  }}
+                  className="flex w-full items-start justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:border-[#F472B6]/50 hover:bg-[#F472B6]/10 disabled:opacity-50"
+                >
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-white">{candidate.name}</span>
+                    <span className="mt-1 block text-xs text-zinc-400">
+                      {[candidate.disambiguation, candidate.type, candidate.country].filter(Boolean).join(' · ') || 'No additional identifying details'}
+                    </span>
+                  </span>
+                  <span className="shrink-0 pt-1 text-xs text-[#F472B6]">Select</span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button type="button" onClick={() => setArtistMatchPrompt(null)} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-white/5">Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Global Modals for Playlists Tab */}
