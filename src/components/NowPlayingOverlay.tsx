@@ -5,6 +5,27 @@ import EqualizerIndicator from './EqualizerIndicator';
 
 type TimedLyricLine = { time: number; text: string; id: string };
 
+function groupLyricsIntoSections(lines: TimedLyricLine[]): TimedLyricLine[][] {
+  const sections: TimedLyricLine[][] = [];
+  let section: TimedLyricLine[] = [];
+
+  lines.forEach((line, index) => {
+    const previous = lines[index - 1];
+    const startsNewSection = section.length > 0 && (
+      line.time - previous.time >= 4.5 ||
+      section.length >= 6
+    );
+    if (startsNewSection) {
+      sections.push(section);
+      section = [];
+    }
+    section.push(line);
+  });
+
+  if (section.length > 0) sections.push(section);
+  return sections;
+}
+
 function parseLrcLyrics(content: string): TimedLyricLine[] {
   const parsed: TimedLyricLine[] = [];
   const timestampPattern = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
@@ -173,12 +194,12 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   const activeLyricIndex = lyricsLines.reduce((active, line, index) => (
     line.time <= currentTime ? index : active
   ), -1);
-
-  useEffect(() => {
-    if (!showLyrics || activeLyricIndex < 0) return;
-    const target = isLyricsFullscreen ? fullscreenActiveLyricRef.current : activeLyricRef.current;
-    target?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-  }, [showLyrics, isLyricsFullscreen, activeLyricIndex]);
+  const lyricSections = groupLyricsIntoSections(lyricsLines);
+  const activeSectionIndex = activeLyricIndex < 0
+    ? 0
+    : lyricSections.findIndex(section => section.some(line => line.id === lyricsLines[activeLyricIndex]?.id));
+  const visibleSectionIndex = Math.max(0, activeSectionIndex);
+  const visibleLyricSection = lyricSections[visibleSectionIndex] || [];
 
   useEffect(() => {
     if (mode === 'panel' || !isExpanded) return;
@@ -347,8 +368,9 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                       ) : lyricsUnavailable ? (
                         <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
                       ) : (
-                        <div className="min-h-full flex flex-col justify-center gap-4">
-                          {lyricsLines.map((line, index) => {
+                        <div key={'compact-lyric-section-' + visibleSectionIndex} className="min-h-full flex flex-col justify-start gap-4 pt-4" style={{ animation: 'ykLyricsFadeIn 280ms ease-out both' }}>
+                          {visibleLyricSection.map((line) => {
+                            const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
                             const active = index === activeLyricIndex;
                             const nearby = Math.abs(index - activeLyricIndex) <= 2;
                             return <div key={line.id} ref={active ? activeLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#FFB9E0] text-lg sm:text-xl font-bold tracking-wide scale-[1.02] border border-[#9D527D] rounded-lg px-2 py-1' : nearby ? 'text-[#C6B1C4] text-sm sm:text-base font-medium' : 'text-[#9D8A9C] text-sm font-normal')} aria-current={active ? 'true' : undefined} style={{ textTransform: 'capitalize' }}>{line.text}</div>;
@@ -430,8 +452,9 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               ) : lyricsUnavailable ? (
                 <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
               ) : (
-                <div className="min-h-full flex flex-col justify-center gap-8 py-[30vh]">
-                  {lyricsLines.map((line, index) => {
+                <div key={'fullscreen-lyric-section-' + visibleSectionIndex} className="min-h-full flex flex-col justify-start items-stretch gap-8 pt-[18vh] pb-8" style={{ animation: 'ykLyricsFadeIn 320ms ease-out both' }}>
+                  {visibleLyricSection.map((line) => {
+                    const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
                     const active = index === activeLyricIndex;
                     const nearby = Math.abs(index - activeLyricIndex) <= 2;
                     return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#FFB9E0] text-[32px] sm:text-[32px] font-bold tracking-wide leading-snug scale-[1.02] border border-[#9D527D] rounded-xl px-4 py-3' : nearby ? 'text-[#C6B1C4] text-lg sm:text-xl font-medium' : 'text-[#9D8A9C] text-base sm:text-lg font-normal')} style={{ textTransform: 'capitalize' }}>{line.text}</div>;
