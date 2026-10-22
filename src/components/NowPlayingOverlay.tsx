@@ -351,7 +351,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                           {lyricsLines.map((line, index) => {
                             const active = index === activeLyricIndex;
                             const nearby = Math.abs(index - activeLyricIndex) <= 2;
-                            return <div key={line.id} ref={active ? activeLyricRef : null} className={'transition-all duration-300 ease-out text-balance ' + (active ? 'text-white text-lg sm:text-xl font-bold scale-[1.02] drop-shadow-[0_1px_8px_rgba(244,114,182,0.45)]' : nearby ? 'text-white/70 text-sm sm:text-base font-medium' : 'text-white/35 text-sm')} aria-current={active ? 'true' : undefined} style={{ textTransform: 'capitalize', ...(active ? { textShadow: '1px 0 0 #F9A8D4, -1px 0 0 #F9A8D4, 0 1px 0 #F9A8D4, 0 -1px 0 #F9A8D4, 1px 1px 0 #F9A8D4, -1px -1px 0 #F9A8D4, 1px -1px 0 #F9A8D4, -1px 1px 0 #F9A8D4' } : {}) }} style={{ textTransform: 'capitalize', ...(active ? { textShadow: '1px 0 0 #F9A8D4, -1px 0 0 #F9A8D4, 0 1px 0 #F9A8D4, 0 -1px 0 #F9A8D4, 1px 1px 0 #F9A8D4, -1px -1px 0 #F9A8D4, 1px -1px 0 #F9A8D4, -1px 1px 0 #F9A8D4' } : {}) }}>{line.text}</div>;
+                            return <div key={line.id} ref={active ? activeLyricRef : null} className={'transition-all duration-300 ease-out text-balance ' + (active ? 'text-white text-lg sm:text-xl font-bold scale-[1.02] drop-shadow-[0_1px_8px_rgba(244,114,182,0.45)]' : nearby ? 'text-white/70 text-sm sm:text-base font-medium' : 'text-white/35 text-sm')} aria-current={active ? 'true' : undefined} style={{ textTransform: 'capitalize', ...(active ? { textShadow: '1px 0 0 #F9A8D4, -1px 0 0 #F9A8D4, 0 1px 0 #F9A8D4, 0 -1px 0 #F9A8D4, 1px 1px 0 #F9A8D4, -1px -1px 0 #F9A8D4, 1px -1px 0 #F9A8D4, -1px 1px 0 #F9A8D4' } : {}) }}>{line.text}</div>;
                           })}
                         </div>
                       )}
@@ -434,7 +434,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                   {lyricsLines.map((line, index) => {
                     const active = index === activeLyricIndex;
                     const nearby = Math.abs(index - activeLyricIndex) <= 2;
-                    return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className={'transition-all duration-300 ease-out text-balance ' + (active ? 'text-white text-2xl sm:text-3xl font-bold scale-[1.02] drop-shadow-[0_1px_12px_rgba(244,114,182,0.55)]' : nearby ? 'text-white/70 text-lg sm:text-xl font-medium' : 'text-white/35 text-base sm:text-lg')}>{line.text}</div>;
+                    return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className={'transition-all duration-300 ease-out text-balance ' + (active ? 'text-white text-2xl sm:text-3xl font-bold scale-[1.02] drop-shadow-[0_1px_12px_rgba(244,114,182,0.55)]' : nearby ? 'text-white/70 text-lg sm:text-xl font-medium' : 'text-white/35 text-base sm:text-lg')} style={{ textTransform: 'capitalize', ...(active ? { textShadow: '1px 0 0 #F9A8D4, -1px 0 0 #F9A8D4, 0 1px 0 #F9A8D4, 0 -1px 0 #F9A8D4, 1px 1px 0 #F9A8D4, -1px -1px 0 #F9A8D4, 1px -1px 0 #F9A8D4, -1px 1px 0 #F9A8D4' } : {}) }}>{line.text}</div>;
                   })}
                 </div>
               )}
