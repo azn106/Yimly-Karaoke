@@ -40,6 +40,13 @@ export default function Library() {
   const loadingMoreArtistsRef = useRef(false);
   const ARTISTS_PAGE_SIZE = 40;
   const [albums, setAlbums] = useState<any[]>([]);
+  const [hasMoreAlbums, setHasMoreAlbums] = useState(false);
+  const [loadingMoreAlbums, setLoadingMoreAlbums] = useState(false);
+  const albumsLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const albumsRequestOffsetRef = useRef(0);
+  const loadingMoreAlbumsRef = useRef(false);
+  const ALBUMS_PAGE_SIZE = 40;
+  const [activeJumpLetter, setActiveJumpLetter] = useState('#');
   const [songs, setSongs] = useState<any[]>([]);
   const [hasMoreSongs, setHasMoreSongs] = useState(false);
   const [loadingMoreSongs, setLoadingMoreSongs] = useState(false);
@@ -235,6 +242,10 @@ export default function Library() {
     setError(null);
     setHasMoreSongs(false);
     setHasMoreArtists(false);
+    setHasMoreAlbums(false);
+    setLoadingMoreAlbums(false);
+    loadingMoreAlbumsRef.current = false;
+    albumsRequestOffsetRef.current = 0;
     setLoadingMoreArtists(false);
     loadingMoreArtistsRef.current = false;
     artistsRequestOffsetRef.current = 0;
@@ -301,7 +312,7 @@ export default function Library() {
       } else {
         const endpoint = 
           tab === 'artists' ? `/api/artists?limit=${ARTISTS_PAGE_SIZE}&offset=0` : 
-          tab === 'albums' ? '/api/albums' : 
+          tab === 'albums' ? `/api/albums?limit=${ALBUMS_PAGE_SIZE}&offset=0` : 
           tab === 'songs' ? `/api/songs?limit=${SONGS_PAGE_SIZE}&offset=0` : 
           '/api/playlists';
 
@@ -333,7 +344,12 @@ export default function Library() {
           setHasMoreArtists(Boolean(data?.hasMore));
           artistsRequestOffsetRef.current = firstPage.length;
         }
-        else if (tab === 'albums') setAlbums(Array.isArray(data) ? data : []);
+        else if (tab === 'albums') {
+          const firstPage = Array.isArray(data) ? data : (Array.isArray(data?.albums) ? data.albums : []);
+          setAlbums(firstPage);
+          setHasMoreAlbums(Boolean(data?.hasMore));
+          albumsRequestOffsetRef.current = firstPage.length;
+        }
         else if (tab === 'songs') {
           const firstPage = Array.isArray(data) ? data : (Array.isArray(data?.songs) ? data.songs : []);
           setSongs(firstPage);
@@ -435,6 +451,58 @@ export default function Library() {
     observer.observe(target);
     return () => observer.disconnect();
   }, [tab, hasMoreArtists, loading, loadingMoreArtists, artists.length]);
+
+
+  const loadMoreAlbums = async () => {
+    if (tab !== 'albums' || !hasMoreAlbums || loadingMoreAlbumsRef.current || loading) return;
+    loadingMoreAlbumsRef.current = true;
+    setLoadingMoreAlbums(true);
+    const offset = albumsRequestOffsetRef.current;
+    try {
+      const response = await fetch(`/api/albums?limit=${ALBUMS_PAGE_SIZE}&offset=${offset}`, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`Failed to load more albums (${response.status})`);
+      const payload = await response.json();
+      const nextPage = Array.isArray(payload) ? payload : (Array.isArray(payload?.albums) ? payload.albums : []);
+      setAlbums(previous => {
+        const knownIds = new Set(previous.map(album => album.id));
+        return [...previous, ...nextPage.filter((album: any) => !knownIds.has(album.id))];
+      });
+      albumsRequestOffsetRef.current = offset + nextPage.length;
+      setHasMoreAlbums(Boolean(payload?.hasMore));
+    } catch (loadError) {
+      console.error('Failed to load more albums:', loadError);
+    } finally {
+      loadingMoreAlbumsRef.current = false;
+      setLoadingMoreAlbums(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab !== 'albums' || !hasMoreAlbums || loading) return;
+    const target = albumsLoadMoreRef.current;
+    if (!target || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadMoreAlbums();
+    }, { rootMargin: '500px 0px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [tab, hasMoreAlbums, loading, loadingMoreAlbums, albums.length]);
+
+  const jumpKey = (name: string) => {
+    const first = name.trim().charAt(0).toLocaleUpperCase();
+    return /^[A-Z]$/.test(first) ? first : '#';
+  };
+  const jumpItems = tab === 'artists' ? artists : albums;
+  const jumpGroups = new Set(jumpItems.map(item => jumpKey(tab === 'artists' ? item.name : item.title)));
+  const jumpToLetter = (letter: string) => {
+    setActiveJumpLetter(letter);
+    const target = document.getElementById(`library-jump-${tab}-${letter}`);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else {
+      const item = jumpItems.find(entry => jumpKey(tab === 'artists' ? entry.name : entry.title) >= letter);
+      if (item) document.getElementById(`library-card-${tab}-${item.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const handleDeleteSong = async (song: any) => {
     const songTitle = song.title || 'this song';
@@ -1927,84 +1995,55 @@ export default function Library() {
             );
           })()}
 
-          {/* Artists Grid */}
+          {/* Artists Grid: responsive, vertically scrolling catalogue */}
           {tab === 'artists' && (
-            <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,180px))] justify-center gap-4 pb-4">
               {artists.map(artist => (
-                <div 
-                  key={artist.id}
-                  onClick={() => openArtist(artist.id)}
-                  className="group flex w-32 shrink-0 snap-start cursor-pointer flex-col items-center rounded-2xl border border-white/5 bg-[#141622] p-4 text-center transition hover:border-[#F472B6]/30 hover:bg-[#1A1C2C]"
-                >
+                <div id={`library-card-artists-${artist.id}`} key={artist.id} onClick={() => openArtist(artist.id)}
+                  className="group flex min-w-0 cursor-pointer flex-col items-center rounded-2xl border border-white/5 bg-[#141622] p-4 text-center transition hover:border-[#F472B6]/30 hover:bg-[#1A1C2C]">
                   <div className="relative mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/50">
-                    <Mic className="w-10 h-10 text-zinc-500 group-hover:text-[#F472B6] transition-colors absolute" />
-                    {artist.hasArtwork && (
-                      <img
-                        src={`/api/artists/${artist.id}/artwork`}
-                        alt={artist.name}
-                        loading="lazy"
-                        decoding="async"
-                        className="relative z-10 h-full w-full object-cover yk-artwork-image"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    )}
+                    <Mic className="absolute h-10 w-10 text-zinc-500 transition-colors group-hover:text-[#F472B6]" />
+                    {artist.hasArtwork && <img src={`/api/artists/${artist.id}/artwork`} alt={artist.name} loading="lazy" decoding="async" className="yk-artwork-image relative z-10 h-full w-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />}
                   </div>
                   <h3 className="w-full truncate text-sm font-semibold text-white transition-colors group-hover:text-[#F472B6]">{artist.name}</h3>
-                  <p className="text-xs text-zinc-400 mt-1">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>
+                  <p className="mt-1 text-xs text-zinc-400">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>
                 </div>
               ))}
-              {artists.length === 0 && !loading && (
-                <div className="col-span-full py-16 text-center text-zinc-500">
-                  No artists found. Run a library scan or configure a directory in Settings.
-                </div>
-              )}
+              {artists.length === 0 && !loading && <div className="col-span-full py-16 text-center text-zinc-500">No artists found. Run a library scan or configure a directory in Settings.</div>}
             </div>
           )}
-          {tab === 'artists' && hasMoreArtists && (
-            <div ref={artistsLoadMoreRef} className="flex min-h-16 items-center justify-center py-5 text-sm text-zinc-500" aria-live="polite">
-              {loadingMoreArtists ? 'Loading more artists…' : 'Scroll for more artists'}
-            </div>
-          )}
-          {tab === 'artists' && !hasMoreArtists && artists.length > 0 && (
-            <div className="py-5 text-center text-xs text-zinc-600">All artists loaded</div>
-          )}
+          {tab === 'artists' && hasMoreArtists && <div ref={artistsLoadMoreRef} className="flex min-h-16 items-center justify-center py-5 text-sm text-zinc-500" aria-live="polite">{loadingMoreArtists ? 'Loading more artists…' : 'Scroll for more artists'}</div>}
+          {tab === 'artists' && !hasMoreArtists && artists.length > 0 && <div className="py-5 text-center text-xs text-zinc-600">All artists loaded</div>}
 
-          {/* Albums Grid */}
+          {/* Albums Grid: responsive, vertically scrolling catalogue */}
           {tab === 'albums' && (
-            <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,180px))] justify-center gap-4 pb-4">
               {albums.map(album => (
-                <div 
-                  key={album.id}
-                  onClick={() => openAlbum(album.id)}
-                  className="group w-[6.3rem] shrink-0 cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]"
-                >
+                <div id={`library-card-albums-${album.id}`} key={album.id} onClick={() => openAlbum(album.id)} className="group min-w-0 cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]">
                   <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
-                    {album.hasArtwork ? (
-                      <img
-                        src={`/api/albums/${album.id}/artwork`}
-                        alt={album.title}
-                        className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <Disc className="w-12 h-12 text-zinc-500 group-hover:text-[#F472B6] transition-colors" />
-                    )}
+                    {album.hasArtwork ? <img src={`/api/albums/${album.id}/artwork`} alt={album.title} loading="lazy" decoding="async" className="yk-artwork-image h-full w-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} /> : <Disc className="h-12 w-12 text-zinc-500 transition-colors group-hover:text-[#F472B6]" />}
                   </div>
-                  <h3 className="font-semibold text-sm text-white truncate group-hover:text-[#F472B6] transition-colors">{album.title}</h3>
-                  <p className="text-xs text-zinc-400 truncate mt-0.5">{album.artist || 'Unknown Artist'}</p>
-                  <p className="text-[11px] text-zinc-500 mt-1">{album.year || 'Album'} • {album.songCount || 0} Tracks</p>
+                  <h3 className="truncate text-sm font-semibold text-white transition-colors group-hover:text-[#F472B6]">{album.title}</h3>
+                  <p className="mt-0.5 truncate text-xs text-zinc-400">{album.artist || 'Unknown Artist'}</p>
+                  <p className="mt-1 text-[11px] text-zinc-500">{album.year || 'Album'} • {album.songCount || 0} Tracks</p>
                 </div>
               ))}
-              {albums.length === 0 && (
-                <div className="col-span-full py-16 text-center text-zinc-500">
-                  No albums found in media library.
-                </div>
-              )}
+              {albums.length === 0 && !loading && <div className="col-span-full py-16 text-center text-zinc-500">No albums found in media library.</div>}
             </div>
+          )}
+          {tab === 'albums' && hasMoreAlbums && <div ref={albumsLoadMoreRef} className="flex min-h-16 items-center justify-center py-5 text-sm text-zinc-500" aria-live="polite">{loadingMoreAlbums ? 'Loading more albums…' : 'Scroll for more albums'}</div>}
+          {tab === 'albums' && !hasMoreAlbums && albums.length > 0 && <div className="py-5 text-center text-xs text-zinc-600">All albums loaded</div>}
+
+
+          {(tab === 'artists' || tab === 'albums') && (
+            <nav aria-label="Jump to artist or album letter" className="fixed right-1 top-1/2 z-30 flex max-h-[78vh] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full border border-white/10 bg-[#11121c]/90 px-1 py-2 shadow-lg backdrop-blur sm:right-3 sm:px-1.5">
+              {['#', ...["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"]].map(letter => (
+                <button key={letter} type="button" onClick={() => jumpToLetter(letter)}
+                  disabled={!jumpGroups.has(letter)}
+                  className={`flex h-[clamp(15px,2.15vh,22px)] w-5 items-center justify-center rounded-full text-[10px] font-semibold transition-colors sm:w-6 sm:text-[11px] ${activeJumpLetter === letter ? 'bg-[#F472B6] text-[#17121b]' : jumpGroups.has(letter) ? 'text-zinc-300 hover:bg-white/10 hover:text-white' : 'cursor-default text-zinc-700'}`}
+                  aria-label={`Jump to ${letter === '#' ? 'numbers and symbols' : letter}`}>{letter}</button>
+              ))}
+            </nav>
           )}
 
           {/* Songs List — clean, borderless styling matching the Jukebox rows */}
