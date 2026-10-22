@@ -8,6 +8,29 @@ import { saveArtworkBuffer } from './scanner.js';
 const activeArtistRefreshes = new Set<number>();
 let activeBulkAbortController: AbortController | null = null;
 
+// MusicBrainz asks clients to keep requests at or below one request per second.
+// Share one queue across artist searches, ID validation, and recording lookups.
+let musicBrainzQueue: Promise<void> = Promise.resolve();
+let musicBrainzNextRequestAt = 0;
+
+async function fetchMusicBrainz(url: string, timeoutMs: number): Promise<Response> {
+  const slot = musicBrainzQueue.then(async () => {
+    const waitMs = Math.max(0, musicBrainzNextRequestAt - Date.now());
+    if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs));
+    musicBrainzNextRequestAt = Date.now() + 1100;
+  });
+  musicBrainzQueue = slot.catch(() => undefined);
+  await slot;
+
+  return fetch(url, {
+    headers: {
+      'User-Agent': 'YimlyKaraoke/1.0 (https://github.com/azn106/Yimly-Karaoke)',
+      'Accept': 'application/json',
+    },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
 export interface MusicBrainzArtistCandidate {
   id: string;
   name: string;
@@ -158,7 +181,12 @@ export function validateImageMagicBytes(buf: Buffer): boolean {
 /**
  * Resolves an authoritative MusicBrainz artist ID by querying MusicBrainz with strict validation.
  */
-export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8000, songTitle?: string): Promise<MusicBrainzArtistCandidate[]> {
+export async function searchMusicBrainzArtists(
+  artistName: string,
+  timeoutMs = 8000,
+  songTitle?: string,
+  allowPartialMatches = false
+): Promise<MusicBrainzArtistCandidate[]> {
   const cleanName = artistName.trim();
   if (!cleanName || cleanName.toLowerCase() === 'unknown artist') return [];
 
@@ -169,14 +197,11 @@ export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8
   for (const name of variations) {
     try {
       const searchUrl = `https://musicbrainz.org/ws/2/artist?query=artist:${encodeURIComponent(name)}&fmt=json`;
-      const res = await fetch(searchUrl, {
-        headers: {
-          'User-Agent': 'YimlyKaraoke/1.0 (contact: info@yimly.local)',
-          'Accept': 'application/json',
-        },
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      if (!res.ok) continue;
+      const res = await fetchMusicBrainz(searchUrl, timeoutMs);
+      if (!res.ok) {
+        console.warn(`[MusicBrainz] Artist search returned HTTP ${res.status}`);
+        continue;
+      }
       const data = await res.json().catch(() => null);
       if (!data || !Array.isArray(data.artists)) continue;
 
@@ -184,7 +209,7 @@ export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8
         if (!artist?.id) continue;
         const names = [artist.name, artist.sortName, ...(Array.isArray(artist.aliases) ? artist.aliases.map((a: any) => a?.name) : [])]
           .filter((value): value is string => typeof value === 'string' && value.length > 0);
-        if (!names.some(value => normalizeArtistNameForMatching(value) === targetNorm)) continue;
+        if (!allowPartialMatches && !names.some(value => normalizeArtistNameForMatching(value) === targetNorm)) continue;
         matches.set(artist.id, {
           id: artist.id,
           name: artist.name || cleanName,
@@ -210,13 +235,7 @@ export async function searchMusicBrainzArtists(artistName: string, timeoutMs = 8
     try {
       const recordingQuery = `recording:"${cleanSongTitle.replace(/["\\\\]/g, ' ')}" AND artist:"${cleanName.replace(/["\\\\]/g, ' ')}"`;
       const recordingUrl = `https://musicbrainz.org/ws/2/recording?query=${encodeURIComponent(recordingQuery)}&fmt=json&limit=100`;
-      const recordingRes = await fetch(recordingUrl, {
-        headers: {
-          'User-Agent': 'YimlyKaraoke/1.0 (contact: info@yimly.local)',
-          'Accept': 'application/json',
-        },
-        signal: AbortSignal.timeout(timeoutMs),
-      });
+      const recordingRes = await fetchMusicBrainz(recordingUrl, timeoutMs);
       if (recordingRes.ok) {
         const recordingData = await recordingRes.json().catch(() => null);
         const matchedArtistIds = new Set<string>();
@@ -267,13 +286,7 @@ export async function validateMusicBrainzArtistId(
 
   try {
     const url = `https://musicbrainz.org/ws/2/artist/${encodeURIComponent(cleanMbid)}?fmt=json`;
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'YimlyKaraoke/1.0 (contact: info@yimly.local)',
-        'Accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    const res = await fetchMusicBrainz(url, timeoutMs);
 
     if (res.status === 404) {
       return { valid: false, error: 'Artist not found on MusicBrainz' };
@@ -510,7 +523,7 @@ export async function resolveArtistDirectory(artistId: number): Promise<{ artist
  * within an artist's folder, following Music Assistant metadata conventions.
  */
 export function findLocalArtistArtwork(artistDir: string): string | null {
-  const candidates = ['artist.jpg', 'artist.jpeg', 'artist.png', 'artist.webp'];
+  const candidates = ['artist.jpg', 'artist.jpeg', 'artist.png', 'artist.webp', 'artist.gif'];
   for (const name of candidates) {
     const fullPath = path.join(artistDir, name);
     try {
@@ -545,7 +558,15 @@ export async function saveArtistImage(
   const artistDirInfo = await resolveArtistDirectory(artistId);
   if (artistDirInfo) {
     const { artistDir } = artistDirInfo;
-    const targetFile = path.join(artistDir, 'artist.jpg');
+    const imageExtension =
+      imgBuf[0] === 0xff && imgBuf[1] === 0xd8 && imgBuf[2] === 0xff ? 'jpg' :
+      imgBuf[0] === 0x89 && imgBuf[1] === 0x50 && imgBuf[2] === 0x4e && imgBuf[3] === 0x47 ? 'png' :
+      imgBuf.length >= 12 && imgBuf.toString('ascii', 0, 4) === 'RIFF' && imgBuf.toString('ascii', 8, 12) === 'WEBP' ? 'webp' :
+      imgBuf.toString('ascii', 0, 3) === 'GIF' ? 'gif' : null;
+    if (!imageExtension) {
+      throw new Error('Unsupported image format for local artist artwork');
+    }
+    const targetFile = path.join(artistDir, `artist.${imageExtension}`);
     try {
       await fs.promises.writeFile(targetFile, imgBuf);
       if (fs.existsSync(targetFile)) {
@@ -616,13 +637,35 @@ async function downloadAndPersistArtistImage(
     };
   }
 
-  const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+  const maxSizeBytes = 15 * 1024 * 1024; // 15MB
+  const declaredLength = Number(imgRes.headers.get('content-length') || 0);
+  if (declaredLength > maxSizeBytes) {
+    return { artistId, artistName, status: 'failed', provider: 'fanart_tv', error: 'Image exceeds 15MB limit' };
+  }
+
+  let imgBuf: Buffer;
+  try {
+    if (!imgRes.body) throw new Error('Image response has no body');
+    const reader = imgRes.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxSizeBytes) {
+        await reader.cancel();
+        return { artistId, artistName, status: 'failed', provider: 'fanart_tv', error: 'Image exceeds 15MB limit' };
+      }
+      chunks.push(value);
+    }
+    imgBuf = Buffer.concat(chunks.map(chunk => Buffer.from(chunk)), totalBytes);
+  } catch (downloadErr: any) {
+    return { artistId, artistName, status: 'failed', provider: 'fanart_tv', error: downloadErr?.message || 'Failed to read image response' };
+  }
+
   if (imgBuf.length < 1024) {
     return { artistId, artistName, status: 'failed', provider: 'fanart_tv', error: 'Image file too small (<1KB)' };
-  }
-  const maxSizeBytes = 15 * 1024 * 1024; // 15MB
-  if (imgBuf.length > maxSizeBytes) {
-    return { artistId, artistName, status: 'failed', provider: 'fanart_tv', error: 'Image exceeds 15MB limit' };
   }
 
   if (!validateImageMagicBytes(imgBuf)) {
