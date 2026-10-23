@@ -26,6 +26,8 @@ interface ResolvedResult {
   query?: string;
   tracks: ResolvedTrack[];
   message?: string;
+  hasMore?: boolean;
+  nextOffset?: number;
 }
 
 interface ActiveTrackJob {
@@ -55,6 +57,7 @@ export default function DownloadMusic() {
   const { user } = useOutletContext<{ user: any }>() || {};
   const [inputVal, setInputVal] = useState('');
   const [resolving, setResolving] = useState(false);
+  const [loadingMoreResults, setLoadingMoreResults] = useState(false);
   const [resolveError, setResolveError] = useState('');
   const [result, setResult] = useState<ResolvedResult | null>(null);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -143,7 +146,7 @@ export default function DownloadMusic() {
       const res = await fetch('/api/downloader/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urlOrQuery: inputVal.trim() }),
+        body: JSON.stringify({ urlOrQuery: inputVal.trim(), offset: 0 }),
       });
 
       let data: any = {};
@@ -170,6 +173,47 @@ export default function DownloadMusic() {
       setResolveError(err.message || 'Failed to resolve input. Please check the URL or search term.');
     } finally {
       setResolving(false);
+    }
+  };
+
+  const handleLoadMoreResults = async () => {
+    if (!result || result.type !== 'search' || !result.hasMore || loadingMoreResults) return;
+
+    setLoadingMoreResults(true);
+    setResolveError('');
+    try {
+      const res = await fetch('/api/downloader/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urlOrQuery: result.query || inputVal.trim(), offset: result.nextOffset ?? result.tracks.length }),
+      });
+
+      const data: any = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to load more search results');
+
+      const existingKeys = new Set(result.tracks.map((track) => `${track.title.trim().toLowerCase()}|${track.artist.trim().toLowerCase()}`));
+      const newTracks: ResolvedTrack[] = (Array.isArray(data.tracks) ? data.tracks : []).filter((track: ResolvedTrack) => {
+        const key = `${(track.title || '').trim().toLowerCase()}|${(track.artist || '').trim().toLowerCase()}`;
+        if (existingKeys.has(key)) return false;
+        existingKeys.add(key);
+        return true;
+      });
+
+      setSelectedIndices((previous) => {
+        const next = new Set(previous);
+        newTracks.forEach((_, index) => next.add(result.tracks.length + index));
+        return next;
+      });
+      setResult((previous) => previous ? {
+        ...previous,
+        tracks: [...previous.tracks, ...newTracks],
+        hasMore: Boolean(data.hasMore),
+        nextOffset: typeof data.nextOffset === 'number' ? data.nextOffset : (previous.nextOffset ?? previous.tracks.length) + 20,
+      } : previous);
+    } catch (err: any) {
+      setResolveError(err.message || 'Failed to load more search results');
+    } finally {
+      setLoadingMoreResults(false);
     }
   };
 
@@ -551,6 +595,22 @@ export default function DownloadMusic() {
                 );
               })}
             </div>
+            {result.type === 'search' && result.hasMore && (
+              <div className="flex justify-center pt-3">
+                <button
+                  type="button"
+                  onClick={handleLoadMoreResults}
+                  disabled={loadingMoreResults || resolving}
+                  className="px-5 py-3 rounded-xl border border-[#F472B6]/40 bg-[#F472B6]/10 hover:bg-[#F472B6]/20 text-[#F472B6] text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {loadingMoreResults ? (
+                    <><RefreshCw className="w-4 h-4 animate-spin" /><span>Loading More Results...</span></>
+                  ) : (
+                    <><ArrowRight className="w-4 h-4" /><span>More Results</span></>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
