@@ -2076,11 +2076,11 @@ export default function Library() {
 
 
           {(tab === 'artists' || tab === 'albums') && (
-            <nav aria-label="Jump to artist or album letter" className="fixed right-1 top-1/2 z-30 flex max-h-[78vh] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full border border-white/10 bg-[#11121c]/90 px-1 py-2 shadow-lg backdrop-blur sm:right-3 sm:px-1.5 xl:right-[354px]">
+            <nav aria-label="Jump to artist or album letter" className="fixed right-1 top-[46%] z-30 flex max-h-[90vh] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full border border-white/10 bg-[#11121c]/90 px-1 py-1.5 shadow-lg backdrop-blur sm:right-3 sm:px-1.5 xl:right-[354px]">
               {['#', ...["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"]].map(letter => (
                 <button key={letter} type="button" onClick={() => jumpToLetter(letter)}
                   disabled={!jumpGroups.has(letter) && !(tab === 'artists' ? hasMoreArtists : hasMoreAlbums)}
-                  className={`flex h-[clamp(15px,2.15vh,22px)] w-5 items-center justify-center rounded-full text-[10px] font-semibold transition-colors sm:w-6 sm:text-[11px] ${activeJumpLetter === letter ? 'bg-[#F472B6] text-[#17121b]' : jumpGroups.has(letter) ? 'text-zinc-300 hover:bg-white/10 hover:text-white' : 'cursor-default text-zinc-700'}`}
+                  className={`flex h-[clamp(14px,1.85vh,20px)] w-5 items-center justify-center rounded-full text-[10px] font-semibold transition-colors sm:w-6 sm:text-[11px] ${activeJumpLetter === letter ? 'bg-[#F472B6] text-[#17121b]' : jumpGroups.has(letter) ? 'text-zinc-300 hover:bg-white/10 hover:text-white' : 'cursor-default text-zinc-700'}`}
                   aria-label={`Jump to ${letter === '#' ? 'numbers and symbols' : letter}`}>{letter}</button>
               ))}
             </nav>
