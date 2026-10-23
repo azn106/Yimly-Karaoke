@@ -410,7 +410,8 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   // Stage B: Fallback to YouTube Music & InnerTube if no exact target artist match found or results sparse
   const hasExactArtistMatch = cleanArtist ? collectedTracks.some(t => cleanString(t.artist).includes(cleanArtist)) : false;
 
-  if (!hasExactArtistMatch || collectedTracks.length < 5) {
+  // iTunes results are metadata-only; ensure source matching runs whenever no playable URL exists.
+  if (!hasExactArtistMatch || collectedTracks.length < 5 || !collectedTracks.some(t => t.sourceUrl)) {
     console.log(`[Search Flow Stage B] Fallback triggered: searching YouTube Music & InnerTube (hasExactArtistMatch=${hasExactArtistMatch}, count=${collectedTracks.length})...`);
     try {
       const candidatePool: YouTubeCandidate[] = [];
@@ -452,7 +453,19 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
         const cleanCTitle = cleanString(c.title);
         const cleanCArtist = cleanString(c.artist);
         const dedupKey = `${cleanCTitle}|${cleanCArtist}`;
-        if (seenTrackKeys.has(dedupKey)) continue;
+        if (seenTrackKeys.has(dedupKey)) {
+          // A catalogue match may already exist without a playable URL. Attach the matched
+          // YouTube Music source rather than dropping it as a duplicate.
+          const existing = collectedTracks.find(t =>
+            `${cleanString(t.title)}|${cleanString(t.artist)}` === dedupKey
+          );
+          if (existing && !existing.sourceUrl) {
+            existing.sourceUrl = c.url;
+            if ((!existing.duration || existing.duration <= 0) && c.duration > 0) existing.duration = c.duration;
+            if ((!existing.artworkUrl || existing.artworkUrl === '') && c.thumbnailUrl) existing.artworkUrl = c.thumbnailUrl;
+          }
+          continue;
+        }
         seenTrackKeys.add(dedupKey);
 
         collectedTracks.push({
@@ -471,6 +484,8 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   }
 
   if (collectedTracks.length > 0) {
+    // Put playable matches first; iTunes-only catalogue entries remain available after them.
+    collectedTracks.sort((a, b) => Number(Boolean(b.sourceUrl)) - Number(Boolean(a.sourceUrl)));
     console.log(`[Search Flow] Returning ${collectedTracks.length} tracks to frontend (Top: "${collectedTracks[0].title}" by "${collectedTracks[0].artist}")`);
     return {
       type: 'search',
