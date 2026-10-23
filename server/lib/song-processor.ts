@@ -15,6 +15,7 @@ export interface ProcessSongRequest {
   libraryId: number;
   title: string;
   artist: string;
+  artists?: string[];
   album?: string;
   duration?: number;
   trackNumber?: number;
@@ -133,6 +134,7 @@ export async function processDownloadedSong(req: ProcessSongRequest): Promise<vo
     const canonicalMeta = {
       title,
       artist,
+      artists: req.artists,
       album,
       duration,
       trackNumber: req.trackNumber,
