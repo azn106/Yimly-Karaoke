@@ -108,23 +108,10 @@ export function detectTrackIntent(title: string, artist: string): TrackIntent {
             effectiveArtist = rest;
           }
         } else {
-          // Pattern: Unsegmented words (e.g. "Superhuman Chris Brown" or "Superhuman Chris Brown Keri Hilson")
-          const words = effectiveTitle.split(/\s+/);
-          if (words.length === 3) {
-            // "Superhuman Chris Brown" -> Title: "Superhuman", Artist: "Chris Brown"
-            // "Chris Brown Superhuman" -> Artist: "Chris Brown", Title: "Superhuman"
-            if (words[0].toLowerCase() === 'chris' && words[1].toLowerCase() === 'brown') {
-              effectiveArtist = `${words[0]} ${words[1]}`;
-              effectiveTitle = words[2];
-            } else {
-              effectiveTitle = words[0];
-              effectiveArtist = `${words[1]} ${words[2]}`;
-            }
-          } else if (words.length >= 4) {
-            // "Superhuman Chris Brown Keri Hilson" -> Title: "Superhuman", Artist: "Chris Brown feat. Keri Hilson"
-            effectiveTitle = words[0];
-            effectiveArtist = `${words[1]} ${words[2]} feat. ${words.slice(3).join(' ')}`;
-          }
+          // Do not guess title/artist boundaries from arbitrary word positions.
+          // Queries such as "Ed Sheeran Shape of You" are ambiguous without a
+          // separator or a natural-language marker. Keep the full query as the
+          // title candidate and leave artist unknown so providers can resolve it.
         }
       }
     }
