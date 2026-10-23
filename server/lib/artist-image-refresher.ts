@@ -1,10 +1,14 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { db } from '../db/index.js';
 import { artists, songs, libraries, songArtists } from '../db/schema.js';
 import { eq, or, and, isNull } from 'drizzle-orm';
 import { saveArtworkBuffer, getArtworkDir } from './scanner.js';
 
+const execFileAsync = promisify(execFile);
 const activeArtistRefreshes = new Set<number>();
 let activeBulkAbortController: AbortController | null = null;
 
@@ -769,8 +773,11 @@ export async function refreshArtistLocalArtwork(artistId: number): Promise<Artis
 }
 
 /**
- * Saves artist portrait to the artist's verified actual folder as artist.jpg if available and writable.
- * If the artist folder cannot be written to or is not found, falls back safely to the cached artwork directory.
+ * Saves each artist portrait as a real WebP file named artist.webp in that artist's
+ * own library folder. FFmpeg is already part of the media-processing runtime; use
+ * a unique temporary directory so concurrent artist refreshes cannot collide.
+ * If conversion or local writing is unavailable, retain the validated original in
+ * the artwork cache rather than writing an incorrectly named file.
  */
 export async function saveArtistImage(
   artistId: number,
@@ -780,27 +787,47 @@ export async function saveArtistImage(
   const artistDirInfo = await resolveArtistDirectory(artistId);
   if (artistDirInfo) {
     const { artistDir } = artistDirInfo;
-    const imageExtension =
-      imgBuf[0] === 0xff && imgBuf[1] === 0xd8 && imgBuf[2] === 0xff ? 'jpg' :
-      imgBuf[0] === 0x89 && imgBuf[1] === 0x50 && imgBuf[2] === 0x4e && imgBuf[3] === 0x47 ? 'png' :
-      imgBuf.length >= 12 && imgBuf.toString('ascii', 0, 4) === 'RIFF' && imgBuf.toString('ascii', 8, 12) === 'WEBP' ? 'webp' :
-      imgBuf.toString('ascii', 0, 3) === 'GIF' ? 'gif' : null;
-    if (!imageExtension) {
+    const isSupportedImage =
+      (imgBuf[0] === 0xff && imgBuf[1] === 0xd8 && imgBuf[2] === 0xff) ||
+      (imgBuf[0] === 0x89 && imgBuf[1] === 0x50 && imgBuf[2] === 0x4e && imgBuf[3] === 0x47) ||
+      (imgBuf.length >= 12 && imgBuf.toString('ascii', 0, 4) === 'RIFF' && imgBuf.toString('ascii', 8, 12) === 'WEBP') ||
+      imgBuf.toString('ascii', 0, 3) === 'GIF';
+    if (!isSupportedImage) {
       throw new Error('Unsupported image format for local artist artwork');
     }
-    const targetFile = path.join(artistDir, `artist.${imageExtension}`);
+
+    let tempDir: string | null = null;
     try {
       await fs.promises.mkdir(artistDir, { recursive: true });
-      await fs.promises.writeFile(targetFile, imgBuf);
-      if (fs.existsSync(targetFile)) {
-        return { savedPath: targetFile, isLocalFolder: true };
+      tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'yimly-artist-art-'));
+      const inputFile = path.join(tempDir, 'source-image');
+      const convertedFile = path.join(tempDir, 'artist.webp');
+      await fs.promises.writeFile(inputFile, imgBuf);
+      await execFileAsync(process.env.FFMPEG_PATH || 'ffmpeg', [
+        '-hide_banner', '-loglevel', 'error', '-y',
+        '-i', inputFile,
+        '-frames:v', '1',
+        '-c:v', 'libwebp',
+        '-quality', '88',
+        convertedFile,
+      ], { timeout: 30000 });
+      const converted = await fs.promises.readFile(convertedFile);
+      if (converted.length < 12 || converted.toString('ascii', 0, 4) !== 'RIFF' || converted.toString('ascii', 8, 12) !== 'WEBP') {
+        throw new Error('FFmpeg did not produce a valid WebP image');
       }
+      const targetFile = path.join(artistDir, 'artist.webp');
+      await fs.promises.writeFile(targetFile, converted);
+      return { savedPath: targetFile, isLocalFolder: true };
     } catch (writeErr) {
-      console.warn(`[ArtistImage] Unable to write artist.jpg to ${artistDir}, falling back to cache directory:`, writeErr);
+      console.warn(`[ArtistImage] Unable to save artist.webp to ${artistDir}; falling back to artwork cache:`, writeErr);
+    } finally {
+      if (tempDir) {
+        await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+      }
     }
   }
 
-  // Fallback to dataDir/artwork
+  // Fallback to dataDir/artwork; keep original bytes and accurate format metadata.
   const filename = await saveArtworkBuffer(imgBuf, contentType);
   return { savedPath: filename, isLocalFolder: false };
 }
