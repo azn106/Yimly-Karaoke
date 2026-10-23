@@ -39,14 +39,17 @@ function createMockJpegBuffer(): Buffer {
 
 // Helper to construct a valid WebP image buffer (>1KB with RIFF...WEBP header)
 function createMockPngBuffer(): Buffer {
-  const png = new PNG({ width: 32, height: 32 });
+  // Use deterministic pixel noise so the fixture exceeds the production 1 KB minimum.
+  const png = new PNG({ width: 64, height: 64 });
   for (let i = 0; i < png.data.length; i += 4) {
-    png.data[i] = 190;
-    png.data[i + 1] = 70;
-    png.data[i + 2] = 130;
+    png.data[i] = (i * 37 + 19) % 256;
+    png.data[i + 1] = (i * 17 + 83) % 256;
+    png.data[i + 2] = (i * 29 + 151) % 256;
     png.data[i + 3] = 255;
   }
-  return PNG.sync.write(png);
+  const buffer = PNG.sync.write(png);
+  if (buffer.length < 1024) throw new Error('Mock PNG fixture must exceed 1 KB');
+  return buffer;
 }
 
 function createMockWebpBuffer(): Buffer {
@@ -642,7 +645,7 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
       mainAudioPath: fakeAudioPath,
     }).returning();
 
-        globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
       const urlStr = String(input);
       if (urlStr.includes(`/v3/music/${testMbid}`)) {
         return new Response(JSON.stringify({
