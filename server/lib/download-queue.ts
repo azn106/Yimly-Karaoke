@@ -932,9 +932,23 @@ export class DownloadQueueManager {
           return;
         }
 
-        // Ensure destination artist directory exists
-        if (!fs.existsSync(artistDir)) {
-          await fs.promises.mkdir(artistDir, { recursive: true });
+        // Ensure every credited artist has a folder, but keep the single audio file
+        // in the primary artist's folder. The scanner links this one song record to
+        // every credited artist through song_artists; collaborator folders are for
+        // their own artwork and must not receive duplicate audio files.
+        const artistFolders = new Set<string>([artistDir]);
+        for (const creditedArtist of creditedArtists) {
+          const safeCreditedArtist = sanitizeFilename(creditedArtist);
+          if (!safeCreditedArtist) continue;
+          const creditedArtistDir = path.resolve(job.libraryPath, safeCreditedArtist);
+          const libraryRoot = path.resolve(job.libraryPath);
+          if (creditedArtistDir === libraryRoot || !creditedArtistDir.startsWith(libraryRoot + path.sep)) {
+            continue;
+          }
+          artistFolders.add(creditedArtistDir);
+        }
+        for (const folder of artistFolders) {
+          await fs.promises.mkdir(folder, { recursive: true });
         }
 
         // Move to final library destination using asynchronous copy to prevent freezing the event loop
