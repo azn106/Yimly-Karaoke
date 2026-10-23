@@ -82,7 +82,9 @@ export async function searchSpotifyTracks(query: string, limit = 10): Promise<Sp
       ...Array.from(html.matchAll(/spotify:track:([A-Za-z0-9]{22})/g), m => m[1]),
       ...Array.from(html.matchAll(/open\.spotify\.com\/track\/([A-Za-z0-9]{22})/g), m => m[1]),
     ])).slice(0, Math.max(limit, 5));
-    const tracks = (await Promise.all(ids.map(id => resolveSpotifyTrack(id).catch(() => null))))
+    const resolved = await Promise.all(ids.map(id => resolveSpotifyTrack(id).catch(() => null)));
+    const tracks = resolved
+      .map(entity => entity?.tracks?.[0])
       .filter((track): track is SpotifyResolvedTrack => Boolean(track && track.title && track.artist));
     spotifyTextSearchCache.set(key, { at: Date.now(), tracks });
     return tracks.slice(0, limit);
