@@ -77,9 +77,17 @@ router.get('/', async (req, res) => {
       foldersByArtist.set(song.artistId, folders);
     }
 
+    const artistIdsWithAlbumArt = pageArtistIds.length
+      ? new Set((await db.select({ artistId: albums.artistId })
+          .from(albums)
+          .where(and(inArray(albums.artistId, pageArtistIds), isNotNull(albums.artworkPath))))
+          .map(album => album.artistId))
+      : new Set<number>();
+
     const page = allArtists.map(artist => ({
       ...artist,
-      hasArtwork: [...(foldersByArtist.get(artist.id) || [])].some(hasLocalPortrait),
+      hasArtwork: [...(foldersByArtist.get(artist.id) || [])].some(hasLocalPortrait)
+        || artistIdsWithAlbumArt.has(artist.id),
     }));
     res.json(paginated ? {
       artists: page,
@@ -152,7 +160,7 @@ router.get('/:id', async (req, res) => {
 
     res.json({
       ...artistRec[0],
-      hasArtwork: !!artistRec[0].artworkPath,
+      hasArtwork: !!artistRec[0].artworkPath || artistAlbums.some(alb => !!alb.artworkPath),
       albums: artistAlbums.map(alb => ({
         ...alb,
         hasArtwork: !!alb.artworkPath,
@@ -189,7 +197,41 @@ router.get('/:id/artwork', async (req, res) => {
     let filePath: string | null = null;
     const dirInfo = await resolveArtistDirectory(artistId);
     if (dirInfo?.artistDir) {
-      filePath = findLocalArtistArtwork(dirInfo.artistDir);
+      const localArtwork = findLocalArtistArtwork(dirInfo.artistDir);
+      // Always prefer the dedicated artist.webp portrait. If it is absent,
+      // prefer an album cover over older artist.jpg/png portrait files.
+      if (localArtwork && path.extname(localArtwork).toLowerCase() === '.webp') {
+        filePath = localArtwork;
+      }
+    }
+
+    // Fallback to a real album cover when artist.webp is unavailable.
+    // Album artwork is stored by filename in DATA_DIR/artwork.
+    if (!filePath) {
+      const albumWithArtwork = await db.select({ artworkPath: albums.artworkPath })
+        .from(albums)
+        .where(and(eq(albums.artistId, artistId), isNotNull(albums.artworkPath)))
+        .orderBy(asc(albums.title))
+        .limit(10);
+
+      const dataDir = process.env.DATA_DIR
+        ? path.resolve(process.env.DATA_DIR)
+        : path.resolve(process.cwd(), 'data');
+      for (const album of albumWithArtwork) {
+        if (!album.artworkPath) continue;
+        const safeFilename = path.basename(album.artworkPath);
+        const candidate = path.join(dataDir, 'artwork', safeFilename);
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+          filePath = candidate;
+          break;
+        }
+      }
+    }
+
+    // If no album cover is available, preserve support for artist.jpg/jpeg/png/gif.
+    if (!filePath && dirInfo?.artistDir) {
+      const localArtwork = findLocalArtistArtwork(dirInfo.artistDir);
+      if (localArtwork) filePath = localArtwork;
     }
 
     if (!filePath) {
