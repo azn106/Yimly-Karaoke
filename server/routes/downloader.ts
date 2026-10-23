@@ -406,7 +406,7 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
     }
   }
 
-  // Stage B: Fallback to YouTube Music & InnerTube if no exact target artist match found or results sp  if (collectedTracks.length > 0) {
+  if (collectedTracks.length > 0) {
     console.log(`[Search Flow] Returning ${collectedTracks.length} catalogue tracks to frontend (Top: "${collectedTracks[0].title}" by "${collectedTracks[0].artist}")`);
   } else {
     console.log(`[Search Flow] No catalogue matches found for "${trimmed}"; returning an empty result set (YouTube search is disabled).`);
