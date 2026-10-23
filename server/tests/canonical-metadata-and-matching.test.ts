@@ -449,6 +449,57 @@ describe('Search Expansion & Confidence Fallbacks', () => {
     assert.ok(officialScore.score >= 100);
   });
 
+  test('A matching VEVO channel is recognised even when its name uses CamelCase', () => {
+    const target = { title: 'Superhuman', artist: 'Chris Brown', duration: 218 };
+    const vevoCandidate: YouTubeCandidate = {
+      id: 'chris_brown_vevo_test',
+      url: 'https://www.youtube.com/watch?v=chris_brown_vevo_test',
+      title: 'Superhuman (Official Music Video)',
+      artist: 'ChrisBrownVEVO',
+      duration: 218,
+      isOfficial: true,
+    };
+    const unrelatedVevoCandidate: YouTubeCandidate = {
+      id: 'unrelated_vevo_test',
+      url: 'https://www.youtube.com/watch?v=unrelated_vevo_test',
+      title: 'Superhuman',
+      artist: 'UnrelatedArtistVEVO',
+      duration: 218,
+      isOfficial: false,
+    };
+
+    const matchingScore = scoreCandidate(target, vevoCandidate);
+    const unrelatedScore = scoreCandidate(target, unrelatedVevoCandidate);
+    assert.ok(matchingScore.score > unrelatedScore.score);
+  });
+
+  test('A duration mismatch greater than 30 seconds cannot win on official status alone', () => {
+    const target = { title: 'Superhuman', artist: 'Chris Brown', duration: 218 };
+    const closeCandidate: YouTubeCandidate = {
+      id: 'superhuman_close_duration',
+      url: 'https://www.youtube.com/watch?v=superhuman_close_duration',
+      title: 'Superhuman',
+      artist: 'Chris Brown - Topic',
+      duration: 220,
+      isTopic: true,
+      isOfficial: true,
+    };
+    const wrongRecording: YouTubeCandidate = {
+      id: 'superhuman_wrong_duration',
+      url: 'https://www.youtube.com/watch?v=superhuman_wrong_duration',
+      title: 'Superhuman',
+      artist: 'Chris Brown - Topic',
+      duration: 280,
+      isTopic: true,
+      isOfficial: true,
+    };
+
+    assert.ok(
+      scoreCandidate(target, closeCandidate).score > scoreCandidate(target, wrongRecording).score,
+      'A plausible duration match should beat a different-length recording'
+    );
+  });
+
   test('Query decomposition handles Superhuman queries in various formats', () => {
     const queries = [
       'Superhuman by Chris Brown featuring Keri Hilson',
