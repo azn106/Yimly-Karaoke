@@ -116,7 +116,8 @@ const KNOWN_OFFICIAL_LABELS = [
  * Checks whether a channel is an official artist channel or reputable record label.
  */
 function isOfficialArtistOrLabel(uploader: string, queryOrArtist: string): boolean {
-  const cleanUploader = cleanString(uploader);
+  // Split CamelCase channel names (e.g. ChrisBrownVEVO) before normalizing.
+  const cleanUploader = cleanString(uploader.replace(/([a-z])([A-Z])/g, '$1 $2'));
   const cleanTarget = cleanString(queryOrArtist);
 
   if (!cleanUploader) return false;
@@ -534,10 +535,21 @@ export function scoreCandidate(spotifyTrack: SpotifyTrackMeta, candidate: YouTub
       isCloseDuration = true;
     } else if (durationDiff <= 25) {
       score += 5;
-    } else if (durationDiff > 45 && durationDiff <= 90) {
-      score -= 50;
-    } else if (durationDiff > 90) {
-      score -= Math.min(250, 100 + Math.round((durationDiff - 90) * 1.5));
+    } else if (durationDiff <= 30) {
+      score -= 20;
+    } else {
+      // A large duration mismatch often means the same title but a different recording.
+      // Keep it far below a valid candidate, even when the channel looks official.
+      score -= 180;
+    }
+
+    // Album agreement is a useful tie-breaker when catalogue metadata is available.
+    if (spotifyTrack.album && candidate.album) {
+      const targetAlbum = cleanString(spotifyTrack.album);
+      const candidateAlbum = cleanString(candidate.album);
+      if (targetAlbum && candidateAlbum && targetAlbum === candidateAlbum) {
+        score += 20;
+      }
     }
   }
 
