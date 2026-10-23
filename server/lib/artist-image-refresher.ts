@@ -500,6 +500,25 @@ export async function resolveArtistDirectory(artistId: number): Promise<{ artist
 
   if (candidateSongPaths.length === 0) return null;
 
+  // Collaborators have no audio stored in their own folder by design. Resolve their
+  // artwork folder from the library root and artist name instead of the primary
+  // artist's audio directory.
+  if (directSongs.length === 0) {
+    const [artist] = await db.select().from(artists).where(eq(artists.id, artistId)).limit(1);
+    const linkedLibraryId = candidateSongPaths[0]?.libraryId;
+    const linkedLibrary = linkedLibraryId
+      ? await db.select().from(libraries).where(eq(libraries.id, linkedLibraryId)).limit(1)
+      : [];
+    const libraryPath = linkedLibrary[0]?.path ? path.resolve(linkedLibrary[0].path) : null;
+    if (artist?.name && libraryPath) {
+      const safeFolder = artist.name.replace(/[\\\\/?%*:|"<>]/g, '').trim().replace(/^\\.+|\\.+$/g, '') || 'Unknown';
+      const artistDir = path.resolve(libraryPath, safeFolder);
+      if (artistDir.startsWith(libraryPath + path.sep)) {
+        return { artistDir, libraryPath };
+      }
+    }
+  }
+
   const allLibs = await db.select().from(libraries);
   const libMap = new Map<number, string>();
   for (const lib of allLibs) {
@@ -771,6 +790,7 @@ export async function saveArtistImage(
     }
     const targetFile = path.join(artistDir, `artist.${imageExtension}`);
     try {
+      await fs.promises.mkdir(artistDir, { recursive: true });
       await fs.promises.writeFile(targetFile, imgBuf);
       if (fs.existsSync(targetFile)) {
         return { savedPath: targetFile, isLocalFolder: true };
