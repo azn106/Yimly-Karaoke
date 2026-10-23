@@ -753,6 +753,7 @@ export async function reconcileDuplicateSongs(libraryId: number, filterTitle?: s
 export interface CanonicalImportMetadata {
   title?: string;
   artist?: string;
+  artists?: string[];
   album?: string;
   duration?: number;
   trackNumber?: number;
@@ -781,7 +782,9 @@ export async function importSingleAudioFile(
     if (canonicalMeta.title) {
       metadata.title = cleanSongTitle(canonicalMeta.title);
     }
-    if (canonicalMeta.artist) {
+    if (canonicalMeta.artists?.length) {
+      metadata.artists = parseArtists(undefined, canonicalMeta.artists);
+    } else if (canonicalMeta.artist) {
       metadata.artists = parseArtists(canonicalMeta.artist);
     }
     if (canonicalMeta.album && !['spotify playlist', 'youtube playlist', 'unknown album', 'single'].includes(canonicalMeta.album.toLowerCase())) {
