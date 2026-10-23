@@ -3,14 +3,9 @@ import { artists, songs, songArtists, albums, lyrics } from '../db/schema.js';
 import { eq, sql, and, like, isNull, isNotNull, inArray } from 'drizzle-orm';
 
 /**
- * Splits and normalizes multiple artists from metadata or raw strings.
- * Rules:
- * - Separates artists on semicolons (;)
- * - Does NOT split on commas (commas can legitimately be in artist names)
- * - Does NOT split on & unless part of multi-artist tags
- * - Trims whitespace around each parsed artist
- * - Ignores empty values
- * - Deduplicates case-insensitively while preserving original capitalizations
+ * Splits common flattened multi-artist credits while preserving artist spelling.
+ * Prefer structured source arrays when available; this is a fallback for raw tags.
+ * Parenthetical name details such as "SOLTO (FR)" remain intact.
  */
 export function parseArtists(rawArtist?: string | null, rawArtists?: (string | null | undefined)[] | null): string[] {
   const result: string[] = [];
@@ -18,12 +13,13 @@ export function parseArtists(rawArtist?: string | null, rawArtists?: (string | n
 
   const processChunk = (chunk: string) => {
     if (!chunk) return;
-    // Split on semicolons ;
-    const parts = chunk.split(';');
-    for (let part of parts) {
-      part = part.trim();
+    // Sources commonly flatten artist credits with commas, semicolons, or spaced ampersands.
+    // Do not split on arbitrary punctuation or unspaced ampersands inside artist names.
+    const parts = chunk.split(/\\s*;\\s*|\\s*,\\s*|\\s+&\\s+|\\s+\\+\\s+|\\s+(?:feat(?:uring)?\\.?|ft\\.?)\\s+/i);
+    for (const rawPart of parts) {
+      const part = rawPart.trim();
       if (!part) continue;
-      const lower = part.toLowerCase();
+      const lower = part.toLocaleLowerCase();
       if (!seenLower.has(lower)) {
         seenLower.add(lower);
         result.push(part);
@@ -31,23 +27,14 @@ export function parseArtists(rawArtist?: string | null, rawArtists?: (string | n
     }
   };
 
-  if (rawArtists && Array.isArray(rawArtists)) {
-    for (const a of rawArtists) {
-      if (typeof a === 'string') {
-        processChunk(a);
-      }
+  if (Array.isArray(rawArtists)) {
+    for (const artist of rawArtists) {
+      if (typeof artist === 'string') processChunk(artist);
     }
   }
+  if (typeof rawArtist === 'string') processChunk(rawArtist);
 
-  if (rawArtist && typeof rawArtist === 'string') {
-    processChunk(rawArtist);
-  }
-
-  if (result.length === 0) {
-    result.push('Unknown Artist');
-  }
-
-  return result;
+  return result.length ? result : ['Unknown Artist'];
 }
 
 /**
