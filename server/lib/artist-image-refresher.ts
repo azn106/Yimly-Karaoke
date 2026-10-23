@@ -511,7 +511,7 @@ export async function resolveArtistDirectory(artistId: number): Promise<{ artist
       : [];
     const libraryPath = linkedLibrary[0]?.path ? path.resolve(linkedLibrary[0].path) : null;
     if (artist?.name && libraryPath) {
-      const safeFolder = artist.name.replace(/[\\\\/?%*:|"<>]/g, '').trim().replace(/^\\.+|\\.+$/g, '') || 'Unknown';
+      const safeFolder = artist.name.replace(/[/\\?%*:|"<>]/g, '').trim().replace(/^\.+|\.+$/g, '') || 'Unknown';
       const artistDir = path.resolve(libraryPath, safeFolder);
       if (artistDir.startsWith(libraryPath + path.sep)) {
         return { artistDir, libraryPath };
