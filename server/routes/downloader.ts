@@ -368,8 +368,16 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
         ) || cleanTTitle;
 
         const titleMatches = titleBase.includes(cleanCore) || cleanCore.includes(titleBase);
-        if (!titleMatches && cleanCore.length > 2) {
-          console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": title "${titleBase}" does not match core "${cleanCore}"`);
+        // Artist-only queries (for example, "Ed Sheeran") should return songs by
+        // that artist rather than being rejected because the artist name is not
+        // part of each song title.
+        const queryWords = cleanCore.split(/\\s+/).filter((word: string) => word.length > 1);
+        const queryMatchesArtist = Boolean(cleanCore) && (
+          cleanTArtist.includes(cleanCore) ||
+          (queryWords.length > 1 && queryWords.every((word: string) => cleanTArtist.includes(word)))
+        );
+        if (!titleMatches && !queryMatchesArtist && cleanCore.length > 2) {
+          console.log(`[Search Flow Stage A] Rejected "${trackTitle}" by "${trackArtist}": title "${titleBase}" does not match core "${cleanCore}" and query is not an artist match`);
           continue;
         }
 
