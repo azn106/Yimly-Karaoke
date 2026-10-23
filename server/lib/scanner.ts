@@ -1088,13 +1088,10 @@ export async function removeSingleFile(libraryId: number, filePath: string): Pro
       const instStillExists = curr.instrumentalAudioPath && curr.instrumentalAudioPath !== filePath && fsSync.existsSync(curr.instrumentalAudioPath);
 
       if (!mainStillExists && !instStillExists) {
-        // Complete removal of song
-        await db.delete(lyrics).where(eq(lyrics.songId, curr.id));
-        await db.delete(playlistSongs).where(eq(playlistSongs.songId, curr.id));
-        await db.delete(favorites).where(eq(favorites.songId, curr.id));
-        await db.delete(queueItems).where(eq(queueItems.songId, curr.id));
-        await db.delete(songArtists).where(eq(songArtists.songId, curr.id));
-        await db.delete(songs).where(eq(songs.id, curr.id));
+        // Missing or inaccessible media file is treated as potentially temporary (e.g. unmounted storage).
+        // Never permanently delete song records or playlist associations based solely on a failed file-existence check.
+        console.warn(`[Scanner] Audio file ${filePath} is inaccessible for song ID ${curr.id} ("${curr.title}"). Preserving song record and playlist associations.`);
+        return;
       } else if (!mainStillExists && instStillExists) {
         // Main removed, instrumental remains (never promote instrumental to mainAudioPath)
         await db.update(songs).set({
@@ -1118,6 +1115,24 @@ export async function removeSingleFile(libraryId: number, filePath: string): Pro
  * Full library rescan and reconciliation.
  */
 export async function scanLibrary(libraryId: number, dirPath: string) {
+  // Validate library root path before scanning or reconciliation.
+  // An unmounted, inaccessible, or non-directory root must never trigger destructive reconciliation.
+  if (!dirPath || typeof dirPath !== 'string' || !fsSync.existsSync(dirPath)) {
+    console.warn(`[Scanner] Library path does not exist or is unavailable: ${dirPath}. Preserving existing database records and playlists.`);
+    return;
+  }
+  let dirStat: fsSync.Stats;
+  try {
+    dirStat = fsSync.statSync(dirPath);
+  } catch (err) {
+    console.warn(`[Scanner] Failed to stat library path ${dirPath}:`, err);
+    return;
+  }
+  if (!dirStat.isDirectory()) {
+    console.warn(`[Scanner] Library path is not a directory: ${dirPath}. Preserving existing database records and playlists.`);
+    return;
+  }
+
   const songsMap = new Map<string, {
     artists: string[];
     albumArtist?: string;
@@ -1468,26 +1483,30 @@ export async function scanLibrary(libraryId: number, dirPath: string) {
     });
   }
 
-  // Reconcile deleted files
+  // Reconcile deleted files: validate scan results first to prevent accidental mass deletion
   const dbSongs = await db.select().from(songs).where(eq(songs.libraryId, libraryId));
+  if (songsMap.size === 0 && dbSongs.length > 0) {
+    console.warn(`[Scanner] Library scan discovered 0 audio files at ${dirPath}, but ${dbSongs.length} songs exist in database. Volume may be unmounted or unreadable. Preserving all existing song records and playlists.`);
+    return;
+  }
+
   for (const dbSong of dbSongs) {
     const mainExists = dbSong.mainAudioPath ? fsSync.existsSync(dbSong.mainAudioPath) : false;
     const instExists = dbSong.instrumentalAudioPath ? fsSync.existsSync(dbSong.instrumentalAudioPath) : false;
 
     if (!mainExists && !instExists) {
-      await db.delete(lyrics).where(eq(lyrics.songId, dbSong.id));
-      await db.delete(playlistSongs).where(eq(playlistSongs.songId, dbSong.id));
-      await db.delete(favorites).where(eq(favorites.songId, dbSong.id));
-      await db.delete(queueItems).where(eq(queueItems.songId, dbSong.id));
-      await db.delete(songArtists).where(eq(songArtists.songId, dbSong.id));
-      await db.delete(songs).where(eq(songs.id, dbSong.id));
+      // Inaccessible media files are treated as potentially temporary (e.g. unmounted volume or network share).
+      // Never permanently delete song records or playlist associations based solely on a failed file-existence check.
+      console.warn(`[Scanner] Media files for song ID ${dbSong.id} ("${dbSong.title}") are not accessible on disk. Preserving song record and playlist associations.`);
     } else if (!mainExists && instExists) {
+      // Main removed, instrumental remains
       await db.update(songs).set({
         mainAudioPath: null,
         instrumentalAudioPath: dbSong.instrumentalAudioPath,
         variant: 'instrumental',
       }).where(eq(songs.id, dbSong.id));
     } else if (mainExists && !instExists && dbSong.instrumentalAudioPath) {
+      // Instrumental removed, main remains
       await db.update(songs).set({
         instrumentalAudioPath: null,
       }).where(eq(songs.id, dbSong.id));

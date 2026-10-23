@@ -899,15 +899,16 @@ export default function Library() {
         }
       }
 
-      if (!targetSongs || targetSongs.length === 0) {
-        alert("This playlist has no songs to play.");
+      const playableSongs = (targetSongs || []).filter((s: any) => !s.isUnavailable && s.id > 0);
+      if (playableSongs.length === 0) {
+        alert("This playlist has no available songs to play.");
         setPlayingAll(false);
         return;
       }
 
-      // Add each song sequentially into room queue
+      // Add each available song sequentially into room queue
       let count = 0;
-      for (const s of targetSongs) {
+      for (const s of playableSongs) {
         await fetch(`/api/karaoke/sessions/${sessionId}/queue`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

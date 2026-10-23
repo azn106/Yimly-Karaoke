@@ -204,11 +204,12 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
       .where(eq(playlistSongs.playlistId, id));
     const associationCount = Number(associationCountRows[0]?.count ?? 0);
 
-    // Fetch songs in playlist
+    // Fetch songs in playlist using leftJoin so missing or unlinked song records do not hide other tracks
     const pSongs = await db.select({
       playlistSongId: playlistSongs.id,
       position: playlistSongs.position,
       addedAt: playlistSongs.addedAt,
+      rawSongId: playlistSongs.songId,
       id: songs.id,
       title: songs.title,
       artistId: songs.artistId,
@@ -223,23 +224,20 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
       instrumentalAudioPath: songs.instrumentalAudioPath,
     })
     .from(playlistSongs)
-    .innerJoin(songs, eq(playlistSongs.songId, songs.id))
+    .leftJoin(songs, eq(playlistSongs.songId, songs.id))
     .leftJoin(artists, eq(songs.artistId, artists.id))
     .leftJoin(albums, eq(songs.albumId, albums.id))
     .where(eq(playlistSongs.playlistId, id))
     .orderBy(asc(playlistSongs.position), asc(playlistSongs.addedAt));
 
     if (pSongs.length === 0) {
-      console.warn('[playlists] Playlist returned zero joined songs', {
+      console.warn('[playlists] Playlist returned zero songs', {
         playlistId: id,
         associationCount,
-        reason: associationCount === 0
-          ? 'no playlist_songs associations remain (possibly cleared or removed by song deletion)'
-          : 'playlist_songs rows exist but no matching songs were joined (check database integrity)',
       });
     }
 
-    const songIds = pSongs.map(s => s.id);
+    const songIds = pSongs.map(s => s.id).filter((id): id is number => typeof id === 'number' && id > 0);
     const artistsMap = await getSongArtistsMap(songIds);
 
     const lyricsList = songIds.length > 0
@@ -255,6 +253,27 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
     }
 
     const formattedSongs = pSongs.map(s => {
+      if (!s.id) {
+        return {
+          playlistSongId: s.playlistSongId,
+          position: s.position,
+          addedAt: s.addedAt,
+          id: s.rawSongId,
+          title: 'Unavailable Track',
+          artist: 'Unknown Artist',
+          artists: [],
+          album: null,
+          albumId: null,
+          duration: 0,
+          variant: 'original',
+          hasArtwork: false,
+          hasLrc: false,
+          hasElrc: false,
+          hasOriginal: false,
+          hasInstrumental: false,
+          isUnavailable: true,
+        };
+      }
       const trackArtists = artistsMap.get(s.id) || (s.artist ? [{ id: s.artistId, name: s.artist }] : []);
       const lyr = lyricsMap.get(s.id) || { hasLrc: false, hasElrc: false };
       const hasOriginal = !!(s.mainAudioPath && s.mainAudioPath.trim().length > 0) || (s.variant === 'original' && !s.instrumentalAudioPath);
@@ -276,6 +295,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
         hasElrc: lyr.hasElrc,
         hasOriginal,
         hasInstrumental,
+        isUnavailable: false,
       };
     });
 

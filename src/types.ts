@@ -31,6 +31,7 @@ export interface PlaylistSongItem {
   hasArtwork?: boolean;
   hasLrc?: boolean;
   hasElrc?: boolean;
+  isUnavailable?: boolean;
 }
 
 export interface PlaylistCollaborator {

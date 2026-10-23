@@ -155,8 +155,9 @@ export default function PlaylistDetailView({
   };
 
   const handlePlayAllInJukebox = () => {
-    if (songs.length === 0) return;
-    const formatted: PlaybackSong[] = songs.map(s => ({
+    const playableSongs = songs.filter(s => !s.isUnavailable && s.id > 0);
+    if (playableSongs.length === 0) return;
+    const formatted: PlaybackSong[] = playableSongs.map(s => ({
       id: s.id,
       title: s.title,
       artist: s.artist || 'Unknown Artist',
@@ -170,7 +171,8 @@ export default function PlaylistDetailView({
     playJukeboxQueue(formatted, 0);
   };
 
-  const handlePlaySongInJukebox = (song: PlaylistSongItem, idx: number) => {
+  const handlePlaySongInJukebox = (song: PlaylistSongItem, _idx: number) => {
+    if (song.isUnavailable) return;
     if (jukeboxCurrentSong?.id === song.id) {
       toggleJukeboxPlay();
       return;
@@ -186,7 +188,9 @@ export default function PlaylistDetailView({
       hasArtwork: song.hasArtwork,
       variant: song.variant,
     };
-    const formattedList: PlaybackSong[] = songs.map(s => ({
+    const playableSongs = songs.filter(s => !s.isUnavailable && s.id > 0);
+    const playableIndex = playableSongs.findIndex(s => s.playlistSongId === song.playlistSongId);
+    const formattedList: PlaybackSong[] = playableSongs.map(s => ({
       id: s.id,
       title: s.title,
       artist: s.artist || 'Unknown Artist',
@@ -197,7 +201,7 @@ export default function PlaylistDetailView({
       hasArtwork: s.hasArtwork,
       variant: s.variant,
     }));
-    playJukeboxSong(formatted, formattedList, idx);
+    playJukeboxSong(formatted, formattedList, playableIndex >= 0 ? playableIndex : 0);
   };
 
   const handleFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -528,9 +532,20 @@ export default function PlaylistDetailView({
                     <td className="px-4 py-3.5 font-medium text-white flex items-center gap-3">
                       <button
                         type="button"
+                        disabled={song.isUnavailable}
                         onClick={() => handlePlaySongInJukebox(song, idx)}
-                        className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden relative group/play cursor-pointer border border-white/5 hover:border-[#F472B6]/40 transition-colors"
-                        title={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'Pause' : 'Play in Jukebox'}
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 overflow-hidden relative border transition-colors ${
+                          song.isUnavailable
+                            ? 'bg-white/5 border-white/5 opacity-50 cursor-not-allowed'
+                            : 'bg-white/5 border-white/5 hover:border-[#F472B6]/40 cursor-pointer group/play'
+                        }`}
+                        title={
+                          song.isUnavailable
+                            ? 'Track unavailable'
+                            : jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying
+                            ? 'Pause'
+                            : 'Play in Jukebox'
+                        }
                       >
                         {song.hasArtwork ? (
                           <img
@@ -544,23 +559,32 @@ export default function PlaylistDetailView({
                         ) : (
                           <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
                         )}
-                        <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'opacity-100' : 'opacity-0 group-hover/play:opacity-100'}`}>
-                          {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? (
-                            <Pause className="w-4 h-4 text-[#F472B6] fill-current" />
-                          ) : (
-                            <Play className="w-4 h-4 text-white fill-current ml-0.5" />
-                          )}
-                        </div>
+                        {!song.isUnavailable && (
+                          <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'opacity-100' : 'opacity-0 group-hover/play:opacity-100'}`}>
+                            {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? (
+                              <Pause className="w-4 h-4 text-[#F472B6] fill-current" />
+                            ) : (
+                              <Play className="w-4 h-4 text-white fill-current ml-0.5" />
+                            )}
+                          </div>
+                        )}
                       </button>
 
                       <div className="min-w-0 flex items-center gap-2">
-                        <span className={`truncate block ${jukeboxCurrentSong?.id === song.id ? 'text-[#F472B6] font-semibold' : ''}`} title={song.title}>{song.title}</span>
+                        <span className={`truncate block ${song.isUnavailable ? 'text-zinc-500 italic' : jukeboxCurrentSong?.id === song.id ? 'text-[#F472B6] font-semibold' : ''}`} title={song.title}>{song.title}</span>
+                        {song.isUnavailable && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium shrink-0">
+                            Unavailable
+                          </span>
+                        )}
                         {jukeboxCurrentSong?.id === song.id && <EqualizerIndicator isPlaying={jukeboxIsPlaying} />}
-                        <LyricBadges
-                          hasLrc={song.hasLrc}
-                          hasElrc={song.hasElrc}
-                          onOpenLyrics={(format) => onOpenLyrics?.(song.id, song.title, format)}
-                        />
+                        {!song.isUnavailable && (
+                          <LyricBadges
+                            hasLrc={song.hasLrc}
+                            hasElrc={song.hasElrc}
+                            onOpenLyrics={(format) => onOpenLyrics?.(song.id, song.title, format)}
+                          />
+                        )}
                       </div>
                     </td>
 
@@ -613,13 +637,16 @@ export default function PlaylistDetailView({
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
+                          disabled={song.isUnavailable}
                           onClick={() => handlePlaySongInJukebox(song, idx)}
                           className={`p-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
-                            jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying
+                            song.isUnavailable
+                              ? 'opacity-30 cursor-not-allowed bg-white/5 text-zinc-500 border border-transparent'
+                              : jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying
                               ? 'bg-[#F472B6] text-white shadow-sm'
                               : 'bg-white/5 hover:bg-white/15 text-zinc-300 hover:text-white border border-white/5'
                           }`}
-                          title="Play in Jukebox"
+                          title={song.isUnavailable ? 'Track unavailable' : 'Play in Jukebox'}
                         >
                           {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? (
                             <Pause className="w-3.5 h-3.5 fill-current" />
@@ -630,13 +657,16 @@ export default function PlaylistDetailView({
 
                         <button
                           type="button"
+                          disabled={song.isUnavailable}
                           onClick={() => onAddToQueue(song.id)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
-                            isQueued
+                            song.isUnavailable
+                              ? 'opacity-30 cursor-not-allowed bg-white/5 text-zinc-500 border border-transparent'
+                              : isQueued
                               ? 'bg-[#F472B6] text-white'
                               : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
                           }`}
-                          title="Add song to active karaoke room queue"
+                          title={song.isUnavailable ? 'Track unavailable' : 'Add song to active karaoke room queue'}
                         >
                           {isQueued ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
                           <span className="hidden sm:inline">{isQueued ? 'Added' : 'Queue'}</span>
