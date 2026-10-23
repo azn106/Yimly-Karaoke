@@ -379,7 +379,7 @@ export function scoreCandidate(spotifyTrack: SpotifyTrackMeta, candidate: YouTub
   const cleanTargetCoreTitle = cleanString(targetIntent.coreTitle);
   const cleanCandCoreTitle = cleanString(candIntent.coreTitle);
   const cleanTargetArtist = cleanString(targetIntent.mainArtist);
-  const cleanCandArtist = cleanString(candidate.artist);
+  const cleanCandArtist = cleanString((candidate.artist || '').replace(/([a-z])([A-Z])/g, '$1 $2'));
   const cleanCandTitle = cleanString(candidate.title);
 
   // -------------------------------------------------------------------------
