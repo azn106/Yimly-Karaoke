@@ -121,13 +121,14 @@ function isOfficialArtistOrLabel(uploader: string, queryOrArtist: string): boole
 
   if (!cleanUploader) return false;
 
-  // VEVO channel: e.g. "ChrisBrownVEVO"
+  // VEVO is a strong signal only when the channel name matches the requested artist.
+  // Do not trust an unrelated channel merely because its name contains "VEVO".
   if (cleanUploader.includes('vevo')) {
-    const vevoBase = cleanUploader.replace(/\bvevo\b/g, '').trim();
-    if (!cleanTarget || !vevoBase || cleanTarget.includes(vevoBase) || vevoBase.includes(cleanTarget)) {
-      return true;
-    }
-    return true;
+    const vevoBase = cleanUploader.replace(/vevo/g, '').trim();
+    if (!cleanTarget || !vevoBase) return false;
+    const artistTokens = vevoBase.split(' ').filter(w => w.length > 2);
+    return cleanTarget.includes(vevoBase) ||
+      (artistTokens.length > 0 && artistTokens.every(token => cleanTarget.includes(token)));
   }
 
   // Major record labels
@@ -445,9 +446,15 @@ export function scoreCandidate(spotifyTrack: SpotifyTrackMeta, candidate: YouTub
     score += 20;
   }
 
-  // Official artist channel or verified record label
+  // Official artist channel or recognised label is a strong signal.
   if (candidate.isOfficial) {
     score += 35;
+  }
+
+  // Prefer matching VEVO releases over otherwise similar ordinary uploads.
+  // VEVO status is inferred from a matching channel name, not from title text alone.
+  if (candidate.isOfficial && cleanString(candidate.artist).includes('vevo')) {
+    score += 25;
   }
 
   // "Official Audio" in title is a useful secondary signal, but not definitive proof
