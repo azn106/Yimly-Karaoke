@@ -10,7 +10,7 @@ import {
   ActiveDownloadJob,
   TrackMetadata,
 } from '../lib/download-queue.js';
-import { resolveSpotifyEntity } from '../lib/spotify-resolver.js';
+import { resolveSpotifyEntity, searchSpotifyTracks } from '../lib/spotify-resolver.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { sanitizeLeadInMs, setCachedLeadInMs } from '../karaoke-sync-config.js';
@@ -321,8 +321,37 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   const cleanCore = cleanString(queryIntent.coreTitle || trimmed);
   const cleanArtist = (queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') ? cleanString(queryIntent.mainArtist) : '';
 
-  // Stage A: Apple iTunes Search with query expansion & strict artist/version relevance validation (run in parallel)
-  const itunesResults = await Promise.all(
+  // Stage A: Spotify is the preferred canonical metadata source. It never supplies audio;
+  // Yimly still resolves a playable source separately through YouTube Music.
+  const spotifyResults = await Promise.all(uniqueQueries.slice(0, 3).map(q => searchSpotifyTracks(q, 10)));
+  for (const items of spotifyResults) {
+    for (const item of items) {
+      const title = item.title || '';
+      const artist = item.artist || '';
+      const cleanTitle = cleanString(title);
+      const cleanTrackArtist = cleanString(artist);
+      if (!title || !artist) continue;
+      if (cleanCore.length > 2 && !cleanTitle.includes(cleanCore) && !cleanCore.includes(cleanTitle)) continue;
+      if (cleanArtist && !cleanTrackArtist.includes(cleanArtist) && !cleanArtist.includes(cleanTrackArtist)) continue;
+      const dedupKey = `${cleanTitle}|${cleanTrackArtist}`;
+      if (seenTrackKeys.has(dedupKey)) continue;
+      seenTrackKeys.add(dedupKey);
+      collectedTracks.push({
+        title, artist, album: item.album || 'Single',
+        trackNumber: item.trackNumber || collectedTracks.length + 1,
+        discNumber: item.discNumber || 1,
+        releaseYear: item.releaseYear,
+        artworkUrl: item.artworkUrl || '',
+        duration: item.duration || 0,
+        spotifyId: item.spotifyId,
+        sourceType: 'spotify',
+      });
+    }
+  }
+  console.log(`[Search Flow Stage A] Spotify returned ${collectedTracks.length} canonical metadata matches`);
+
+  // Use the existing iTunes catalogue only when Spotify search is unavailable or yields no relevant tracks.
+  const itunesResults = collectedTracks.length ? [] : await Promise.all(
     uniqueQueries.map(async (q) => {
       try {
         const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=15`;
@@ -410,24 +439,32 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   // Stage B: Fallback to YouTube Music & InnerTube if no exact target artist match found or results sparse
   const hasExactArtistMatch = cleanArtist ? collectedTracks.some(t => cleanString(t.artist).includes(cleanArtist)) : false;
 
-  if (!hasExactArtistMatch || collectedTracks.length < 5) {
+  // iTunes results are metadata-only; ensure source matching runs whenever no playable URL exists.
+  if (!hasExactArtistMatch || collectedTracks.length < 5 || !collectedTracks.some(t => t.sourceUrl)) {
     console.log(`[Search Flow Stage B] Fallback triggered: searching YouTube Music & InnerTube (hasExactArtistMatch=${hasExactArtistMatch}, count=${collectedTracks.length})...`);
     try {
-      const candidatePool: YouTubeCandidate[] = [];
-      const poolSeenIds = new Set<string>();
       const ytQueries = uniqueQueries.slice(0, 3);
-      const ytResults = await Promise.all(ytQueries.map(q => searchYouTubeCandidates(q)));
-
-      for (let idx = 0; idx < ytQueries.length; idx++) {
-        const q = ytQueries[idx];
-        const ytCandidates = ytResults[idx];
-        console.log(`[Search Flow Stage B] Query "${q}" returned ${ytCandidates.length} raw candidates`);
-        for (const c of ytCandidates) {
-          if (!poolSeenIds.has(c.id)) {
-            poolSeenIds.add(c.id);
-            candidatePool.push(c);
-          }
+      const collectCandidates = async (provider: 'music' | 'youtube') => {
+        const found: YouTubeCandidate[] = [];
+        const seen = new Set<string>();
+        const results = await Promise.all(ytQueries.map(q => searchYouTubeCandidates(q, provider)));
+        for (let idx = 0; idx < ytQueries.length; idx++) {
+          console.log(`[Search Flow Stage B] ${provider} query "${ytQueries[idx]}" returned ${results[idx].length} raw candidates`);
+          for (const c of results[idx]) if (!seen.has(c.id)) { seen.add(c.id); found.push(c); }
         }
+        return found;
+      };
+      // Search YouTube Music first. Regular YouTube is only queried if Music has no strong match.
+      let candidatePool = await collectCandidates('music');
+      const initialBest = candidatePool
+        .filter(c => c.duration <= 1200)
+        .map(c => scoreCandidate({ title: queryIntent.coreTitle || trimmed, artist: (queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') ? queryIntent.mainArtist : (queryIntent.coreTitle || trimmed) }, c))
+        .sort((a, b) => b.score - a.score)[0];
+      if (!initialBest || initialBest.score < 70) {
+        console.log(`[Search Flow Stage B] YouTube Music best score ${initialBest?.score ?? 'none'}; trying regular YouTube fallback`);
+        const regularCandidates = await collectCandidates('youtube');
+        const ids = new Set(candidatePool.map(c => c.id));
+        candidatePool.push(...regularCandidates.filter(c => !ids.has(c.id)));
       }
 
       // Score and rank candidates against the target query intent
@@ -447,12 +484,42 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
         console.log(`[Search Flow Stage B] Top candidate: "${scoredCandidates[0].candidate.title}" by "${scoredCandidates[0].candidate.artist}" (Score: ${scoredCandidates[0].score}, URL: ${scoredCandidates[0].candidate.url})`);
       }
 
+      // If Spotify supplied canonical metadata, attach the best playable source to that row.
+      const canonicalRows = collectedTracks.filter(t => t.sourceType === 'spotify' && !t.sourceUrl);
+      if (canonicalRows.length && scoredCandidates.length) {
+        for (const row of canonicalRows) {
+          const rowMatch = scoredCandidates
+            .map(candidate => ({ candidate, score: scoreCandidate({ title: row.title, artist: row.artist }, candidate.candidate) }))
+            .sort((a, b) => b.score - a.score)[0];
+          if (rowMatch && rowMatch.score >= 70) {
+            row.sourceUrl = rowMatch.candidate.candidate.url;
+            if (!row.duration) row.duration = rowMatch.candidate.candidate.duration;
+          }
+        }
+      }
+
       for (const s of scoredCandidates) {
         const c = s.candidate;
+        // Spotify rows keep Spotify title/artist/album/artwork; candidate rows are only source fallbacks.
+        if (canonicalRows.length) {
+          if (canonicalRows.some(row => row.sourceUrl === c.url)) continue;
+        }
         const cleanCTitle = cleanString(c.title);
         const cleanCArtist = cleanString(c.artist);
         const dedupKey = `${cleanCTitle}|${cleanCArtist}`;
-        if (seenTrackKeys.has(dedupKey)) continue;
+        if (seenTrackKeys.has(dedupKey)) {
+          // A catalogue match may already exist without a playable URL. Attach the matched
+          // YouTube Music source rather than dropping it as a duplicate.
+          const existing = collectedTracks.find(t =>
+            `${cleanString(t.title)}|${cleanString(t.artist)}` === dedupKey
+          );
+          if (existing && !existing.sourceUrl) {
+            existing.sourceUrl = c.url;
+            if ((!existing.duration || existing.duration <= 0) && c.duration > 0) existing.duration = c.duration;
+            if ((!existing.artworkUrl || existing.artworkUrl === '') && c.thumbnailUrl) existing.artworkUrl = c.thumbnailUrl;
+          }
+          continue;
+        }
         seenTrackKeys.add(dedupKey);
 
         collectedTracks.push({
@@ -471,6 +538,8 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   }
 
   if (collectedTracks.length > 0) {
+    // Put playable matches first; iTunes-only catalogue entries remain available after them.
+    collectedTracks.sort((a, b) => Number(Boolean(b.sourceUrl)) - Number(Boolean(a.sourceUrl)));
     console.log(`[Search Flow] Returning ${collectedTracks.length} tracks to frontend (Top: "${collectedTracks[0].title}" by "${collectedTracks[0].artist}")`);
     return {
       type: 'search',

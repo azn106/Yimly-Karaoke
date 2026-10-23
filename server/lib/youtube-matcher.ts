@@ -154,12 +154,12 @@ function isOfficialArtistOrLabel(uploader: string, queryOrArtist: string): boole
 /**
  * Search YouTube Music & YouTube InnerTube for audio candidates
  */
-export async function searchYouTubeCandidates(query: string): Promise<YouTubeCandidate[]> {
+export async function searchYouTubeCandidates(query: string, provider: 'music' | 'youtube' | 'both' = 'both'): Promise<YouTubeCandidate[]> {
   const candidates: YouTubeCandidate[] = [];
   const seenIds = new Set<string>();
 
   // 1. YouTube Music WEB_REMIX search endpoint (Songs filter: Eg-KAQwIABAAGAEgASgB)
-  try {
+  if (provider !== 'youtube') try {
     const ytMusicRes = await fetch('https://music.youtube.com/youtubei/v1/search?prettyPrint=false', {
       method: 'POST',
       headers: {
@@ -283,8 +283,8 @@ export async function searchYouTubeCandidates(query: string): Promise<YouTubeCan
     console.warn('[YTMusic Matcher] YouTube Music API query notice:', err);
   }
 
-  // 2. YouTube Search API (InnerTube WEB client) for audio & duration metadata
-  try {
+  // 2. Regular YouTube is a separate fallback, never queried during the music-first pass.
+  if (provider !== 'music') try {
     const ytRes = await fetch('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
       method: 'POST',
       headers: {

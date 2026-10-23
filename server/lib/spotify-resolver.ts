@@ -59,6 +59,41 @@ const trackResolutionCache = new Map<string, SpotifyResolvedTrack>();
 /**
  * Resolve Spotify Track, Album, or Playlist to metadata
  */
+
+/**
+ * Best-effort anonymous Spotify text search for canonical track metadata.
+ * Spotify's public search page is unofficial and may change; failures return
+ * an empty list so Yimly can safely fall back to its existing catalogue search.
+ */
+const spotifyTextSearchCache = new Map<string, { at: number; tracks: SpotifyResolvedTrack[] }>();
+export async function searchSpotifyTracks(query: string, limit = 10): Promise<SpotifyResolvedTrack[]> {
+  const key = query.trim().toLowerCase();
+  if (!key) return [];
+  const cached = spotifyTextSearchCache.get(key);
+  if (cached && Date.now() - cached.at < 10 * 60 * 1000) return cached.tracks.slice(0, limit);
+  try {
+    const response = await fetch(`https://open.spotify.com/search/${encodeURIComponent(query.trim())}/tracks`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36', 'Accept-Language': 'en-US,en;q=0.9' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return [];
+    const html = await response.text();
+    const ids = Array.from(new Set([
+      ...Array.from(html.matchAll(/spotify:track:([A-Za-z0-9]{22})/g), m => m[1]),
+      ...Array.from(html.matchAll(/open\.spotify\.com\/track\/([A-Za-z0-9]{22})/g), m => m[1]),
+    ])).slice(0, Math.max(limit, 5));
+    const resolved = await Promise.all(ids.map(id => resolveSpotifyTrack(id).catch(() => null)));
+    const tracks = resolved
+      .map(entity => entity?.tracks?.[0])
+      .filter((track): track is SpotifyResolvedTrack => Boolean(track && track.title && track.artist));
+    spotifyTextSearchCache.set(key, { at: Date.now(), tracks });
+    return tracks.slice(0, limit);
+  } catch (error) {
+    console.warn('[Spotify Resolver] Text search unavailable; using fallback catalogue:', error);
+    return [];
+  }
+}
+
 export async function resolveSpotifyEntity(urlOrUri: string): Promise<SpotifyResolvedEntity> {
   const { type, id } = parseSpotifyUrl(urlOrUri);
   if (!type || !id) {
