@@ -106,16 +106,20 @@ export function sanitizeFilename(str: string): string {
   return cleaned || 'Unknown';
 }
 
-/** Keep the primary artist first while preserving all distinct credited artists. */
+/** Normalize collaboration credits to a stable "Artist A; Artist B" format. */
 export function getCreditedArtists(primaryArtist: string, creditedArtists?: string[]): string[] {
   const result: string[] = [];
   const seen = new Set<string>();
   for (const raw of [primaryArtist, ...(creditedArtists || [])]) {
     const name = typeof raw === 'string' ? raw.trim() : '';
-    const key = name.toLocaleLowerCase();
-    if (name && !seen.has(key)) {
-      seen.add(key);
-      result.push(name);
+    if (!name) continue;
+    // Older sources put multiple artists in one string; split and normalize spacing.
+    for (const part of name.split(/\s*[;,]\s*/).map(value => value.trim()).filter(Boolean)) {
+      const key = part.toLocaleLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(part);
+      }
     }
   }
   return result.length ? result : ['Unknown Artist'];
@@ -669,11 +673,12 @@ export class DownloadQueueManager {
       return;
     }
 
-    // 1. Destination formatting
-    // Keep collaborations in their full metadata/tags, but organise files under
-    // the primary artist instead of creating folders like "Artist A, Artist B".
+    // 1. Destination formatting and canonical artist credits.
+    // Preserve every artist in metadata, but use only the primary artist for the folder.
     const creditedArtists = getCreditedArtists(track.artist || 'Unknown Artist', track.artists);
-    const primaryArtist = creditedArtists[0].split(/\\s*,\\s*|\\s*;\\s*|\\s+feat(?:uring)?\\.?\\s+/i)[0].trim() || 'Unknown Artist';
+    track.artist = creditedArtists.join('; ');
+    track.artists = creditedArtists;
+    const primaryArtist = creditedArtists[0] || 'Unknown Artist';
     const safeArtist = sanitizeFilename(primaryArtist);
     const safeTitle = sanitizeFilename(track.title || 'Unknown Title');
     const formatExt = job.format === 'opus' ? 'opus' : (job.format || 'mp3');
