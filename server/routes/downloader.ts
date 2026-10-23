@@ -141,7 +141,16 @@ import { cleanString, detectTrackIntent, normalizeCanonicalMetadata } from '../l
 // RESOLVE & METADATA ENDPOINT (Supports full playlist extraction)
 // -------------------------------------------------------------------
 
-export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
+function matchesYouTubeArtistToChannel(artist: string, channel: string): boolean {
+  const normalizeChannelName = (value: string) => cleanString(value).replace(/\s+topic$/, '');
+  const primaryArtist = artist.split(/\s+(?:feat\.?|ft\.?|featuring|with)\s+/i)[0].trim();
+  const normalizedArtist = normalizeChannelName(primaryArtist);
+  const normalizedChannel = normalizeChannelName(channel);
+  return Boolean(normalizedArtist && normalizedChannel && normalizedArtist === normalizedChannel);
+}
+
+export async function resolveUrlOrQuery(urlOrQuery: string, requestedOffset = 0): Promise<any> {
+  const offset = Math.max(0, Math.min(200, Math.floor(Number(requestedOffset) || 0)));
   const trimmed = urlOrQuery.trim();
 
   // 1. Check if Spotify URL
@@ -157,7 +166,7 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
 
     if (isPlaylist) {
       const { stdout } = await execFilePromise(ytDlpPath, [
-        '--flat-playlist',
+        '--ignore-errors',
         '--dump-json',
         '--js-runtimes',
         'node',
@@ -168,14 +177,22 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
       const tracks = lines.map((line, idx) => {
         try {
           const parsed = JSON.parse(line);
-          const rawTitle = parsed.title || 'Unknown Title';
-          const rawArtist = parsed.uploader || parsed.artist || 'Unknown Artist';
+          const rawTitle = typeof parsed.track === 'string' ? parsed.track.trim() : '';
+          const rawArtist = typeof parsed.artist === 'string' ? parsed.artist.trim() : '';
+          const channelName = typeof parsed.channel === 'string' ? parsed.channel : (typeof parsed.uploader === 'string' ? parsed.uploader : '');
+
+          // Reject entries that rely on a generic video title or uploader-as-artist.
+          if (!rawTitle || !rawArtist || !matchesYouTubeArtistToChannel(rawArtist, channelName)) {
+            console.info('[Downloader] Skipping YouTube playlist entry with missing or mismatched music metadata:', parsed.id || parsed.url || 'unknown video');
+            return null;
+          }
+
           const intent = detectTrackIntent(rawTitle, rawArtist);
 
           return {
             title: intent.coreTitle,
             artist: intent.mainArtist,
-            album: 'Single',
+            album: typeof parsed.album === 'string' ? parsed.album.trim() : '',
             trackNumber: idx + 1,
             sourceUrl: parsed.url || (parsed.id ? `https://www.youtube.com/watch?v=${parsed.id}` : undefined),
             artworkUrl: parsed.thumbnails?.[0]?.url || '',
@@ -200,13 +217,21 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
       ]);
 
       const parsed = JSON.parse(stdout);
-      const rawTitle = parsed.track || parsed.title || 'Unknown Title';
-      const rawArtist = parsed.artist || parsed.uploader || 'Unknown Artist';
+      const rawTitle = typeof parsed.track === 'string' ? parsed.track.trim() : '';
+      const rawArtist = typeof parsed.artist === 'string' ? parsed.artist.trim() : '';
+      const channelName = typeof parsed.channel === 'string' ? parsed.channel : (typeof parsed.uploader === 'string' ? parsed.uploader : '');
+
+      // Only accept explicit music metadata tied to the artist's own channel.
+      // Album metadata is optional; catalogue enrichment below can supply it.
+      if (!rawTitle || !rawArtist || !matchesYouTubeArtistToChannel(rawArtist, channelName)) {
+        throw new Error('This YouTube video does not provide reliable track and artist metadata matching its channel. Try an official artist upload or search by song name.');
+      }
+
       const intent = detectTrackIntent(rawTitle, rawArtist);
 
       let canonicalTitle = intent.coreTitle;
       let canonicalArtist = intent.mainArtist;
-      let canonicalAlbum = parsed.album || 'Single';
+      let canonicalAlbum = typeof parsed.album === 'string' ? parsed.album.trim() : '';
       let canonicalArtwork = parsed.thumbnail || (parsed.thumbnails?.[0]?.url || '');
       let duration = Math.round(parsed.duration || 0);
       let releaseYear: number | undefined = undefined;
@@ -324,7 +349,7 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
   const itunesResults = await Promise.all(
     uniqueQueries.map(async (q) => {
       try {
-        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=15`;
+        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=20&offset=${offset}`;
         const itunesRes = await fetch(itunesUrl);
         if (itunesRes.ok) {
           const itunesData = await itunesRes.json();
@@ -408,9 +433,6 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
         });
       }
 
-      if (collectedTracks.length >= 10) {
-        break;
-      }
     }
   }
 
@@ -427,17 +449,19 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
     type: 'search',
     query: trimmed,
     tracks: collectedTracks.slice(0, 20),
+    hasMore: itunesResults.some((items) => items.length >= 20),
+    nextOffset: offset + 20,
   };
 }
 
 router.post('/resolve', async (req, res) => {
   try {
-    const { urlOrQuery } = req.body;
+    const { urlOrQuery, offset = 0 } = req.body;
     if (!urlOrQuery || typeof urlOrQuery !== 'string') {
       return res.status(400).json({ error: 'Search query or URL is required' });
     }
 
-    const result = await resolveUrlOrQuery(urlOrQuery);
+    const result = await resolveUrlOrQuery(urlOrQuery, offset);
     return res.json(result);
   } catch (error: any) {
     console.error('Error resolving URL/query:', error);
