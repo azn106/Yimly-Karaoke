@@ -182,6 +182,17 @@ test('Playlist Data Loss Safeguards Regression Suite', async (t) => {
       variant: 'original',
     }).returning();
 
+    // Keep the song row, but simulate its audio file being absent from disk.
+    const missingAudioPath = path.join(libDir, 'temporarily_missing.mp3');
+    const [missingAudioSong] = await db.insert(songs).values({
+      libraryId: lib.id,
+      artistId: artist.id,
+      title: 'Missing File Track',
+      mainAudioPath: missingAudioPath,
+      duration: 200,
+      variant: 'original',
+    }).returning();
+
     // Create a playlist
     const [testPlaylist] = await db.insert(playlists).values({
       userId: user.id,
@@ -198,13 +209,20 @@ test('Playlist Data Loss Safeguards Regression Suite', async (t) => {
       addedAt: now,
     });
 
+    await db.insert(playlistSongs).values({
+      playlistId: testPlaylist.id,
+      songId: missingAudioSong.id,
+      position: 2,
+      addedAt: now,
+    });
+
     // Simulate an orphaned or unlinked association:
     // Insert a row in playlist_songs referencing a non-existent song ID with foreign_keys OFF
     const { sqlite } = dbModule;
     await sqlite.execute('PRAGMA foreign_keys = OFF;');
     await sqlite.execute({
       sql: 'INSERT INTO playlist_songs (playlist_id, song_id, position, added_at) VALUES (?, ?, ?, ?)',
-      args: [testPlaylist.id, 99999999, 2, Math.floor(now.getTime() / 1000)]
+      args: [testPlaylist.id, 99999999, 3, Math.floor(now.getTime() / 1000)]
     });
     await sqlite.execute('PRAGMA foreign_keys = ON;');
 
@@ -220,7 +238,7 @@ test('Playlist Data Loss Safeguards Regression Suite', async (t) => {
 
     assert.strictEqual(data.id, testPlaylist.id);
     assert.ok(Array.isArray(data.songs), 'Response should include songs array');
-    assert.strictEqual(data.songs.length, 2, 'Both playlist entries should be returned (neither dropped nor zeroed out)');
+    assert.strictEqual(data.songs.length, 3, 'All playlist entries should be returned (neither dropped nor zeroed out)');
 
     // Entry 1: valid song
     const entry1 = data.songs[0];
@@ -228,11 +246,17 @@ test('Playlist Data Loss Safeguards Regression Suite', async (t) => {
     assert.strictEqual(entry1.title, 'Radio Ga Ga');
     assert.strictEqual(entry1.isUnavailable, false);
 
-    // Entry 2: missing song record
+    // Entry 2: song record exists but the audio file is missing.
     const entry2 = data.songs[1];
-    assert.strictEqual(entry2.id, 99999999);
-    assert.strictEqual(entry2.title, 'Unavailable Track');
+    assert.strictEqual(entry2.id, missingAudioSong.id);
+    assert.strictEqual(entry2.title, 'Missing File Track');
     assert.strictEqual(entry2.isUnavailable, true);
+
+    // Entry 3: missing song record
+    const entry3 = data.songs[2];
+    assert.strictEqual(entry3.id, 99999999);
+    assert.strictEqual(entry3.title, 'Unavailable Track');
+    assert.strictEqual(entry3.isUnavailable, true);
   });
 
   await t.test('5. Duplicate-song reconciliation preserves playlist associations', async () => {

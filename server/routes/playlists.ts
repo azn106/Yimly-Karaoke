@@ -278,6 +278,10 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
       const lyr = lyricsMap.get(s.id) || { hasLrc: false, hasElrc: false };
       const hasOriginal = !!(s.mainAudioPath && s.mainAudioPath.trim().length > 0) || (s.variant === 'original' && !s.instrumentalAudioPath);
       const hasInstrumental = !!(s.instrumentalAudioPath && s.instrumentalAudioPath.trim().length > 0) || s.variant === 'instrumental';
+      // Preserve playlist data but don't advertise playback when neither audio file is accessible.
+      const hasAccessibleAudio = [s.mainAudioPath, s.instrumentalAudioPath].some(
+        audioPath => typeof audioPath === 'string' && audioPath.trim().length > 0 && fs.existsSync(audioPath)
+      );
       return {
         playlistSongId: s.playlistSongId,
         position: s.position,
@@ -295,7 +299,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
         hasElrc: lyr.hasElrc,
         hasOriginal,
         hasInstrumental,
-        isUnavailable: false,
+        isUnavailable: !hasAccessibleAudio,
       };
     });
 

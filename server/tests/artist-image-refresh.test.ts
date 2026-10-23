@@ -2,13 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
+import { execFileSync } from 'child_process';
+import { PNG } from 'pngjs';
 
 // Isolate test database to prevent race conditions with other test suites
 const testDataDir = path.resolve(process.cwd(), 'data', 'test_artist_image_refresh');
 process.env.DATA_DIR = testDataDir;
 
 import { db, setupDatabase } from '../db/index.js';
-import { artists, songs, albums, libraries } from '../db/schema.js';
+import { artists, songs, albums, libraries, users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import {
   refreshArtistProfileImage,
@@ -36,6 +38,17 @@ function createMockJpegBuffer(): Buffer {
 }
 
 // Helper to construct a valid WebP image buffer (>1KB with RIFF...WEBP header)
+function createMockPngBuffer(): Buffer {
+  const png = new PNG({ width: 32, height: 32 });
+  for (let i = 0; i < png.data.length; i += 4) {
+    png.data[i] = 190;
+    png.data[i + 1] = 70;
+    png.data[i + 2] = 130;
+    png.data[i + 3] = 255;
+  }
+  return PNG.sync.write(png);
+}
+
 function createMockWebpBuffer(): Buffer {
   const header = Buffer.from([
     0x52, 0x49, 0x46, 0x46, // RIFF
@@ -598,7 +611,7 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
     }
   });
 
-  await t.test('15. Saving downloaded artwork to the artist\'s actual folder as artist.jpg', async () => {
+  await t.test('15. Saving downloaded artwork as artist.webp or safely falling back to artwork cache', async () => {
     process.env.FANART_TV_API_KEY = 'mock_fanart_key';
     const artistName = `Local Folder Artist ${Date.now()}`;
     const testMbid = 'mbid-local-folder-uuid-5555';
@@ -629,18 +642,16 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
       mainAudioPath: fakeAudioPath,
     }).returning();
 
-    const mockJpeg = createMockJpegBuffer();
-
-    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+        globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
       const urlStr = String(input);
       if (urlStr.includes(`/v3/music/${testMbid}`)) {
         return new Response(JSON.stringify({
           name: artistName,
-          artistthumb: [{ id: '10', url: 'https://assets.fanart.tv/fanart/music/queen-thumb.jpg', likes: '100' }],
+          artistthumb: [{ id: '10', url: 'https://assets.fanart.tv/fanart/music/queen-thumb.png', likes: '100' }],
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
-      if (urlStr === 'https://assets.fanart.tv/fanart/music/queen-thumb.jpg') {
-        return new Response(mockJpeg, { status: 200, headers: { 'Content-Type': 'image/jpeg' } });
+      if (urlStr === 'https://assets.fanart.tv/fanart/music/queen-thumb.png') {
+        return new Response(createMockPngBuffer(), { status: 200, headers: { 'Content-Type': 'image/png' } });
       }
       return new Response('Not Found', { status: 404 });
     };
@@ -649,12 +660,27 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
       const res = await refreshArtistProfileImage(art.id);
       assert.strictEqual(res.status, 'updated');
 
-      const expectedArtistJpg = path.join(artistDir, 'artist.jpg');
-      assert.strictEqual(fs.existsSync(expectedArtistJpg), true, 'artist.jpg must be saved in the artist folder');
-
       const [check] = await db.select().from(artists).where(eq(artists.id, art.id));
-      assert.strictEqual(check.artworkPath, expectedArtistJpg, 'Database artworkPath must point to the saved artist.jpg');
       assert.strictEqual(check.artworkSource, 'fanart_tv');
+
+      const expectedArtistWebp = path.join(artistDir, 'artist.webp');
+      let ffmpegAvailable = false;
+      try {
+        execFileSync(process.env.FFMPEG_PATH || 'ffmpeg', ['-version'], { stdio: 'ignore' });
+        ffmpegAvailable = true;
+      } catch {
+        // CI environments may not install FFmpeg; the production code must use its safe cache fallback.
+      }
+
+      if (ffmpegAvailable) {
+        assert.strictEqual(check.artworkPath, expectedArtistWebp, 'When FFmpeg is available, artworkPath must point to artist.webp in the artist folder');
+        assert.strictEqual(fs.existsSync(expectedArtistWebp), true, 'Converted artist.webp must exist in the artist folder');
+      } else {
+        assert.ok(check.artworkPath, 'Fallback cache filename must be stored when FFmpeg is unavailable');
+        assert.strictEqual(check.artworkPath, path.basename(check.artworkPath), 'Fallback artworkPath must be a cache filename');
+        const fallbackFile = path.join(testDataDir, 'artwork', check.artworkPath);
+        assert.strictEqual(fs.existsSync(fallbackFile), true, 'Fallback artwork cache file must exist');
+      }
     } finally {
       await db.delete(songs).where(eq(songs.id, song.id));
       await db.delete(artists).where(eq(artists.id, art.id));
@@ -1144,8 +1170,15 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
     const server = app.listen(0);
     const address = server.address() as any;
     const baseUrl = `http://127.0.0.1:${address.port}`;
+    const [testAdmin] = await db.insert(users).values({
+      username: `artist_refresh_admin_${Date.now()}`,
+      password: 'test-only-password-hash',
+      role: 'administrator',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
     const token = jwt.sign(
-      { id: 1, username: 'test_admin', role: 'administrator' },
+      { id: testAdmin.id, username: testAdmin.username, role: testAdmin.role },
       process.env.JWT_SECRET || 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe'
     );
 
@@ -1205,6 +1238,7 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
       await db.delete(songs).where(eq(songs.id, song.id));
       await db.delete(artists).where(eq(artists.id, art.id));
       await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      await db.delete(users).where(eq(users.id, testAdmin.id));
       fs.rmSync(testLibDir, { recursive: true, force: true });
     }
   });
