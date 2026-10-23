@@ -371,7 +371,7 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
         // Artist-only queries (for example, "Ed Sheeran") should return songs by
         // that artist rather than being rejected because the artist name is not
         // part of each song title.
-        const queryWords = cleanCore.split(/\\s+/).filter((word: string) => word.length > 1);
+        const queryWords = cleanCore.split(/\s+/).filter((word: string) => word.length > 1);
         const queryMatchesArtist = Boolean(cleanCore) && (
           cleanTArtist.includes(cleanCore) ||
           (queryWords.length > 1 && queryWords.every((word: string) => cleanTArtist.includes(word)))
