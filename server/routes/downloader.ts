@@ -135,7 +135,6 @@ router.post('/settings', requireAdmin, async (req, res) => {
   }
 });
 
-import { searchYouTubeCandidates, scoreCandidate, YouTubeCandidate } from '../lib/youtube-matcher.js';
 import { cleanString, detectTrackIntent, normalizeCanonicalMetadata } from '../lib/canonical-metadata.js';
 
 // -------------------------------------------------------------------
@@ -407,112 +406,19 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
     }
   }
 
-  // Stage B: Fallback to YouTube Music & InnerTube if no exact target artist match found or results sparse
-  const hasExactArtistMatch = cleanArtist ? collectedTracks.some(t => cleanString(t.artist).includes(cleanArtist)) : false;
-
-  if (!hasExactArtistMatch || collectedTracks.length < 5) {
-    console.log(`[Search Flow Stage B] Fallback triggered: searching YouTube Music & InnerTube (hasExactArtistMatch=${hasExactArtistMatch}, count=${collectedTracks.length})...`);
-    try {
-      const candidatePool: YouTubeCandidate[] = [];
-      const poolSeenIds = new Set<string>();
-      const ytQueries = uniqueQueries.slice(0, 3);
-      const ytResults = await Promise.all(ytQueries.map(q => searchYouTubeCandidates(q)));
-
-      for (let idx = 0; idx < ytQueries.length; idx++) {
-        const q = ytQueries[idx];
-        const ytCandidates = ytResults[idx];
-        console.log(`[Search Flow Stage B] Query "${q}" returned ${ytCandidates.length} raw candidates`);
-        for (const c of ytCandidates) {
-          if (!poolSeenIds.has(c.id)) {
-            poolSeenIds.add(c.id);
-            candidatePool.push(c);
-          }
-        }
-      }
-
-      // Score and rank candidates against the target query intent
-      const targetMeta = {
-        title: queryIntent.coreTitle || trimmed,
-        // Only constrain artist when the parser found an explicit artist.
-        // For a plain query, score the candidate by title/version signals.
-        artist: (queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') ? queryIntent.mainArtist : '',
-      };
-
-      const scoredCandidates = candidatePool
-        .filter(c => c.duration <= 1200) // Disqualify long compilations
-        .map(c => scoreCandidate(targetMeta, c))
-        .filter(s => s.score >= 40) // Exclude negative and very poor matches (covers, karaoke)
-        .sort((a, b) => b.score - a.score);
-
-      console.log(`[Search Flow Stage B] Scored ${scoredCandidates.length} viable candidates (threshold >= 40)`);
-      if (scoredCandidates.length > 0) {
-        console.log(`[Search Flow Stage B] Top candidate: "${scoredCandidates[0].candidate.title}" by "${scoredCandidates[0].candidate.artist}" (Score: ${scoredCandidates[0].score}, URL: ${scoredCandidates[0].candidate.url})`);
-      }
-
-      for (const s of scoredCandidates) {
-        const c = s.candidate;
-        const cleanCTitle = cleanString(c.title);
-        const cleanCArtist = cleanString(c.artist);
-        const dedupKey = `${cleanCTitle}|${cleanCArtist}`;
-        if (seenTrackKeys.has(dedupKey)) continue;
-        seenTrackKeys.add(dedupKey);
-
-        collectedTracks.push({
-          title: c.title || 'Unknown Title',
-          artist: c.artist || 'Unknown Artist',
-          album: c.album || 'YouTube',
-          trackNumber: collectedTracks.length + 1,
-          sourceUrl: c.url,
-          artworkUrl: c.thumbnailUrl || '',
-          duration: c.duration,
-        });
-      }
-    } catch (ytErr) {
-      console.warn('[Downloader] YouTube search fallback notice:', ytErr);
-    }
+  // Stage B: Fallback to YouTube Music & InnerTube if no exact target artist match found or results sp  if (collectedTracks.length > 0) {
+    console.log(`[Search Flow] Returning ${collectedTracks.length} catalogue tracks to frontend (Top: "${collectedTracks[0].title}" by "${collectedTracks[0].artist}")`);
+  } else {
+    console.log(`[Search Flow] No catalogue matches found for "${trimmed}"; returning an empty result set (YouTube search is disabled).`);
   }
 
-  if (collectedTracks.length > 0) {
-    console.log(`[Search Flow] Returning ${collectedTracks.length} tracks to frontend (Top: "${collectedTracks[0].title}" by "${collectedTracks[0].artist}")`);
-    return {
-      type: 'search',
-      query: trimmed,
-      tracks: collectedTracks.slice(0, 20),
-    };
-  }
-
-  // Stage C: Final fallback to yt-dlp search
-  const ytDlpPath = await getYtDlpPath();
-  const { stdout } = await execFilePromise(ytDlpPath, [
-    `ytsearch10:${trimmed}`,
-    '--dump-json',
-    '--flat-playlist',
-    '--js-runtimes',
-    'node',
-  ]);
-
-  const lines = stdout.trim().split('\n').filter(Boolean);
-  const tracks = lines.map((line, idx) => {
-    try {
-      const parsed = JSON.parse(line);
-      return {
-        title: parsed.title || 'Unknown Title',
-        artist: parsed.uploader || 'Unknown Artist',
-        album: 'YouTube Search',
-        trackNumber: idx + 1,
-        sourceUrl: parsed.url || (parsed.id ? `https://www.youtube.com/watch?v=${parsed.id}` : undefined),
-        artworkUrl: parsed.thumbnails?.[0]?.url || '',
-        duration: Math.round(parsed.duration || 0),
-      };
-    } catch (e) {
-      return null;
-    }
-  }).filter(Boolean);
-
+  // Text search results come only from the metadata catalogue (currently iTunes).
+  // Do not fall back to YouTube Music, InnerTube, or yt-dlp text search: their
+  // uploader/title metadata can be unreliable and must not be presented as catalogue results.
   return {
     type: 'search',
     query: trimmed,
-    tracks,
+    tracks: collectedTracks.slice(0, 20),
   };
 }
 
