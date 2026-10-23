@@ -289,6 +289,30 @@ describe('Duration Parsing Utilities', () => {
 });
 
 describe('Search Expansion & Confidence Fallbacks', () => {
+  test('Unsegmented artist-title queries are not split using arbitrary word positions', () => {
+    const intent = detectTrackIntent('Ed Sheeran Shape of You', '');
+    assert.equal(intent.coreTitle, 'Ed Sheeran Shape of You');
+    assert.equal(intent.mainArtist, 'Unknown Artist');
+    assert.deepEqual(intent.featuredArtists, []);
+  });
+
+  test('YouTube candidate scoring does not invent an artist constraint for a plain query', () => {
+    const candidate: YouTubeCandidate = {
+      id: 'shape_of_you_test',
+      url: 'https://www.youtube.com/watch?v=shape_of_you_test',
+      title: 'Shape of You (Official Audio)',
+      artist: 'Ed Sheeran',
+      duration: 234,
+      isOfficial: true,
+    };
+    const score = scoreCandidate(
+      { title: 'Ed Sheeran Shape of You', artist: '' },
+      candidate
+    );
+    assert.ok(score.score >= 40, `Expected a relevant result to pass the unchanged threshold, got ${score.score}`);
+  });
+
+
   test('Superhuman by Chris Brown featuring Keri Hilson generates intelligent query expansions', () => {
     const rawQuery = '"Superhuman" by Chris Brown featuring Keri Hilson';
     const intent = detectTrackIntent(rawQuery, '');
