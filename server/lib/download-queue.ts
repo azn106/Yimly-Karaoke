@@ -106,6 +106,21 @@ export function sanitizeFilename(str: string): string {
   return cleaned || 'Unknown';
 }
 
+/** Keep the primary artist first while preserving all distinct credited artists. */
+export function getCreditedArtists(primaryArtist: string, creditedArtists?: string[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [primaryArtist, ...(creditedArtists || [])]) {
+    const name = typeof raw === 'string' ? raw.trim() : '';
+    const key = name.toLocaleLowerCase();
+    if (name && !seen.has(key)) {
+      seen.add(key);
+      result.push(name);
+    }
+  }
+  return result.length ? result : ['Unknown Artist'];
+}
+
 function sanitizeErrorMessage(msg?: string): string {
   if (!msg) return 'Unknown error occurred';
   // Remove absolute paths and long stack lines for clean UI display
@@ -846,7 +861,7 @@ export class DownloadQueueManager {
             const plainText = lyricsResult?.plain || (lyricsResult?.synced ? stripLrcTimestamps(lyricsResult.synced) : undefined);
             const tags: NodeID3.Tags = {
               title: track.title,
-              artist: track.artist,
+              artist: getCreditedArtists(track.artist, track.artists).join('; '),
               album: track.album || '',
               trackNumber: track.trackNumber ? String(track.trackNumber) : undefined,
               partOfSet: track.discNumber ? String(track.discNumber) : undefined,
@@ -1005,7 +1020,7 @@ export class DownloadQueueManager {
               libraryId,
               title: track.title,
               artist: track.artist,
-              artists: track.artists,
+              artists: getCreditedArtists(track.artist, track.artists),
               album: track.album || undefined,
               duration: track.duration || undefined,
               trackNumber: track.trackNumber || undefined,
