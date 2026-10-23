@@ -277,3 +277,12 @@ export function normalizeCanonicalMetadata(raw: Partial<CanonicalSongMetadata>):
     confidence: raw.confidence,
   };
 }
+
+export function cleanSongTitle(str: string): string {
+  return cleanString(str);
+}
+
+export function normalizeSongTitle(str: string): string {
+  return cleanString(str);
+}
+

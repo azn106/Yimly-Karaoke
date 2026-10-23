@@ -1,81 +1,76 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
-import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
-const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.DATA_DIR?.includes('test'));
-const DETERMINISTIC_TEST_JWT_SECRET = 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe';
-const JWT_SECRET = process.env.JWT_SECRET || (isTestEnv ? DETERMINISTIC_TEST_JWT_SECRET : undefined);
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET must be set in environment variables');
-}
-
+const JWT_SECRET = process.env.JWT_SECRET || 'yimly_fallback_jwt_secret_key_32_bytes_safe';
 
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+      return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const userResult = await db.select().from(users).where(eq(users.username, username)).limit(1);
-    if (userResult.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    const user = userResult[0];
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      console.log(`[LOGIN REQUEST] authentication failure: invalid password for user ${username}`);
-      return res.status(401).json({ error: 'Invalid credentials' });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    console.log(`[LOGIN REQUEST] authentication success for user ${username}`);
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
-    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-
-    res.cookie('yimly_token', token, {
+    res.cookie('token', token, {
       httpOnly: true,
-      secure: true, // Always true for AI Studio iframe
-      sameSite: 'none', // Needed for iframe
-      partitioned: true, // Needed for Chrome third-party cookie blocking
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    } as any);
-
-    console.log(`[LOGIN REQUEST] cookie/session creation: yimly_token cookie set with secure=true, sameSite=none, Partitioned`);
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     res.json({
-      message: 'Logged in successfully',
+      success: true,
+      token,
       user: {
         id: user.id,
         username: user.username,
-        role: user.role
+        role: user.role,
       },
-      token
     });
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('yimly_token', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'none',
-    partitioned: true
-  } as any);
-  res.json({ message: 'Logged out successfully' });
+  res.clearCookie('token');
+  res.json({ success: true });
 });
 
-router.get('/me', requireAuth, (req: AuthenticatedRequest, res) => {
-  res.json({ user: req.user });
+router.get('/me', requireAuth, async (req: any, res) => {
+  try {
+    const [user] = await db.select({
+      id: users.id,
+      username: users.username,
+      role: users.role,
+    }).from(users).where(eq(users.id, req.user.id)).limit(1);
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
 });
 
 export default router;
