@@ -321,18 +321,21 @@ class LibraryWatcherManager {
 
     try {
       if (!fsSync.existsSync(state.path)) {
-        // Directory missing/unmounted
-        if (state.fileIndex.size > 0) {
-          for (const filePath of state.fileIndex.keys()) {
-            console.log(`[LibraryWatcher] Detected deletion: ${filePath}`);
-            this.enqueue({ libraryId, filePath, action: 'delete' });
-          }
-          state.fileIndex.clear();
-        }
+        // A missing library root usually means a temporarily unavailable/unmounted
+        // media volume, not that every file was intentionally deleted. Preserve the
+        // cached index and database records until the root becomes available again.
+        console.warn(`[LibraryWatcher] Library root is unavailable; preserving indexed files: ${state.path}`);
         return;
       }
 
       const currentFiles = await this.scanDirectoryFiles(state.path);
+
+      // An existing but empty mount can occur while Docker/network storage is coming
+      // online. Do not convert an unexpectedly empty snapshot into mass deletions.
+      if (currentFiles.size === 0 && state.fileIndex.size > 0) {
+        console.warn(`[LibraryWatcher] Library scan returned no files; preserving ${state.fileIndex.size} indexed files: ${state.path}`);
+        return;
+      }
 
       // 1. Check for new and modified files
       for (const [filePath, currentSnap] of currentFiles.entries()) {
@@ -440,6 +443,12 @@ class LibraryWatcherManager {
       const exists = fsSync.existsSync(targetPath);
 
       if (!exists) {
+        // Ignore a missing root event: the whole volume may be temporarily unmounted.
+        if (path.resolve(targetPath) === path.resolve(state.path)) {
+          console.warn(`[LibraryWatcher] Ignoring missing library-root event; preserving indexed files: ${state.path}`);
+          return;
+        }
+
         // File or directory deleted
         if (state.fileIndex.has(targetPath)) {
           const cached = state.fileIndex.get(targetPath)!;
