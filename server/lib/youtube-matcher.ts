@@ -409,7 +409,12 @@ export function scoreCandidate(spotifyTrack: SpotifyTrackMeta, candidate: YouTub
   // 2. Primary & Additional Artist Agreement
   // -------------------------------------------------------------------------
   let primaryArtistMatched = false;
-  if (cleanCandArtist.includes(cleanTargetArtist) || cleanCandTitle.includes(cleanTargetArtist)) {
+  const hasTargetArtist = Boolean(cleanTargetArtist && cleanTargetArtist !== 'unknown artist');
+  if (!hasTargetArtist) {
+    // For free-form searches with no reliable artist parse, do not invent an
+    // artist constraint. Title relevance and recording/version checks still apply.
+    primaryArtistMatched = true;
+  } else if (cleanCandArtist.includes(cleanTargetArtist) || cleanCandTitle.includes(cleanTargetArtist)) {
     score += 50;
     primaryArtistMatched = true;
   } else {
@@ -421,8 +426,8 @@ export function scoreCandidate(spotifyTrack: SpotifyTrackMeta, candidate: YouTub
     }
   }
 
-  if (!primaryArtistMatched) {
-    // Heavy penalty for wrong primary artist
+  if (hasTargetArtist && !primaryArtistMatched) {
+    // Heavy penalty for wrong primary artist only when an artist was actually specified.
     score -= 110;
   }
 
