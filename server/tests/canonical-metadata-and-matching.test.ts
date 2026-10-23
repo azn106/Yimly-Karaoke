@@ -412,6 +412,43 @@ describe('Search Expansion & Confidence Fallbacks', () => {
     assert.ok(coverMatch.score < 0, 'Cover / Made Famous By must receive negative score');
   });
 
+  test('Natural-language search "Superhuman from Chris Brown" resolves title and artist correctly', () => {
+    const intent = detectTrackIntent('Superhuman from Chris Brown', '');
+
+    assert.equal(intent.coreTitle, 'Superhuman');
+    assert.equal(intent.mainArtist, 'Chris Brown');
+    assert.deepEqual(intent.featuredArtists, []);
+
+    // Representative official studio result should outrank a same-title wrong-artist upload.
+    const officialCandidate: YouTubeCandidate = {
+      id: 'superhuman_official_test',
+      url: 'https://www.youtube.com/watch?v=superhuman_official_test',
+      title: 'Superhuman (feat. Keri Hilson)',
+      artist: 'Chris BrownVEVO',
+      duration: 218,
+      isOfficial: true,
+    };
+    const wrongArtistCandidate: YouTubeCandidate = {
+      id: 'superhuman_wrong_artist_test',
+      url: 'https://www.youtube.com/watch?v=superhuman_wrong_artist_test',
+      title: 'Superhuman',
+      artist: 'Another Artist',
+      duration: 218,
+    };
+
+    const officialScore = scoreCandidate(
+      { title: intent.coreTitle, artist: intent.mainArtist, duration: 218 },
+      officialCandidate
+    );
+    const wrongArtistScore = scoreCandidate(
+      { title: intent.coreTitle, artist: intent.mainArtist, duration: 218 },
+      wrongArtistCandidate
+    );
+
+    assert.ok(officialScore.score > wrongArtistScore.score);
+    assert.ok(officialScore.score >= 100);
+  });
+
   test('Query decomposition handles Superhuman queries in various formats', () => {
     const queries = [
       'Superhuman by Chris Brown featuring Keri Hilson',
