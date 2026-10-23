@@ -670,7 +670,11 @@ export class DownloadQueueManager {
     }
 
     // 1. Destination formatting
-    const safeArtist = sanitizeFilename(track.artist || 'Unknown Artist');
+    // Keep collaborations in their full metadata/tags, but organise files under
+    // the primary artist instead of creating folders like "Artist A, Artist B".
+    const creditedArtists = getCreditedArtists(track.artist || 'Unknown Artist', track.artists);
+    const primaryArtist = creditedArtists[0].split(/\\s*,\\s*|\\s*;\\s*|\\s+feat(?:uring)?\\.?\\s+/i)[0].trim() || 'Unknown Artist';
+    const safeArtist = sanitizeFilename(primaryArtist);
     const safeTitle = sanitizeFilename(track.title || 'Unknown Title');
     const formatExt = job.format === 'opus' ? 'opus' : (job.format || 'mp3');
     const baseFilename = `${safeArtist} - ${safeTitle}`;
