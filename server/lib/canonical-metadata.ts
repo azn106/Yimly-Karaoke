@@ -84,7 +84,7 @@ export function detectTrackIntent(title: string, artist: string): TrackIntent {
 
   // If artist is empty and title contains "Title by Artist", "Artist - Title", or featured artist patterns, extract them
   if (!effectiveArtist) {
-    const byMatch = effectiveTitle.match(/^(.*?)\s+by\s+(.*)$/i);
+    const byMatch = effectiveTitle.match(/^(.*?)\s+(?:by|from)\s+(.*)$/i);
     if (byMatch) {
       effectiveTitle = byMatch[1].trim();
       effectiveArtist = byMatch[2].trim();
