@@ -3,7 +3,7 @@ import path from 'path';
 import { db } from '../db/index.js';
 import { artists, songs, libraries, songArtists } from '../db/schema.js';
 import { eq, or, and, isNull } from 'drizzle-orm';
-import { saveArtworkBuffer } from './scanner.js';
+import { saveArtworkBuffer, getArtworkDir } from './scanner.js';
 
 const activeArtistRefreshes = new Set<number>();
 let activeBulkAbortController: AbortController | null = null;
@@ -555,31 +555,198 @@ export async function resolveArtistDirectory(artistId: number): Promise<{ artist
 }
 
 /**
- * Searches for valid local artist artwork (artist.jpg, artist.png, artist.jpeg, artist.webp)
- * within an artist's folder, following Music Assistant metadata conventions.
+ * Searches for valid local artist artwork within an artist's folder,
+ * following Music Assistant metadata conventions with priority:
+ * 1. artist.webp
+ * 2. artist.jpg
+ * 3. artist.jpeg
+ * 4. artist.png
+ * 5. artist.gif
+ *
+ * Matching is case-insensitive (e.g. Artist.WEBP). Validates minimum size
+ * (>= 1024 bytes) and magic bytes. File descriptors are always closed safely.
  */
 export function findLocalArtistArtwork(artistDir: string): string | null {
-  const candidates = ['artist.jpg', 'artist.jpeg', 'artist.png', 'artist.webp', 'artist.gif'];
-  for (const name of candidates) {
-    const fullPath = path.join(artistDir, name);
-    try {
-      if (fs.existsSync(fullPath)) {
+  let files: string[];
+  try {
+    if (!fs.existsSync(artistDir) || !fs.statSync(artistDir).isDirectory()) {
+      return null;
+    }
+    files = fs.readdirSync(artistDir);
+  } catch {
+    return null;
+  }
+
+  const priorityNames = ['artist.webp', 'artist.jpg', 'artist.jpeg', 'artist.png', 'artist.gif'];
+  for (const targetName of priorityNames) {
+    const matchingFiles = files.filter(f => f.toLowerCase() === targetName);
+    matchingFiles.sort((a, b) => (a === targetName ? -1 : b === targetName ? 1 : 0));
+
+    for (const filename of matchingFiles) {
+      const fullPath = path.join(artistDir, filename);
+      let fd: number | null = null;
+      try {
         const stat = fs.statSync(fullPath);
         if (stat.isFile() && stat.size >= 1024) {
+          fd = fs.openSync(fullPath, 'r');
           const buf = Buffer.alloc(16);
-          const fd = fs.openSync(fullPath, 'r');
-          fs.readSync(fd, buf, 0, 16, 0);
-          fs.closeSync(fd);
-          if (validateImageMagicBytes(buf)) {
+          const bytesRead = fs.readSync(fd, buf, 0, 16, 0);
+          if (bytesRead >= 8 && validateImageMagicBytes(buf)) {
             return fullPath;
           }
         }
+      } catch {
+        // Continue checking other candidates
+      } finally {
+        if (fd !== null) {
+          try {
+            fs.closeSync(fd);
+          } catch {
+            // Ignore close error
+          }
+        }
       }
-    } catch {
-      // ignore read errors
     }
   }
+
   return null;
+}
+
+export interface ArtistLocalRefreshResult {
+  artistId: number;
+  status: 'updated' | 'unchanged' | 'unavailable' | 'failed';
+  artworkPath: string | null;
+  hasArtwork: boolean;
+  version: number | null;
+  error?: string;
+}
+
+/**
+ * Performs a local-only artwork refresh for the selected artist.
+ * Inspects only that artist's folder, prioritises artist.webp, invalidates stale cached artwork,
+ * updates the database record, and returns the file mtime version for cache-busting.
+ * Never calls external APIs (MusicBrainz, Fanart.tv) or triggers library scans.
+ */
+export async function refreshArtistLocalArtwork(artistId: number): Promise<ArtistLocalRefreshResult> {
+  if (typeof artistId !== 'number' || isNaN(artistId) || artistId <= 0) {
+    return {
+      artistId,
+      status: 'failed',
+      artworkPath: null,
+      hasArtwork: false,
+      version: null,
+      error: 'Invalid artist ID',
+    };
+  }
+
+  try {
+    const [artist] = await db.select().from(artists).where(eq(artists.id, artistId)).limit(1);
+    if (!artist) {
+      return {
+        artistId,
+        status: 'failed',
+        artworkPath: null,
+        hasArtwork: false,
+        version: null,
+        error: 'Artist not found',
+      };
+    }
+
+    const dirInfo = await resolveArtistDirectory(artistId);
+    let localArtPath: string | null = null;
+    if (dirInfo?.artistDir) {
+      localArtPath = findLocalArtistArtwork(dirInfo.artistDir);
+    }
+
+    if (localArtPath) {
+      // Invalidate/delete previous cached artwork in dataDir/artwork if exists
+      if (artist.artworkPath && artist.artworkPath !== localArtPath) {
+        try {
+          const artworkDir = getArtworkDir();
+          const candidateOldCached = path.isAbsolute(artist.artworkPath)
+            ? artist.artworkPath
+            : path.join(artworkDir, artist.artworkPath);
+          const resolvedCached = path.resolve(candidateOldCached);
+          const resolvedArtworkDir = path.resolve(artworkDir);
+          if (resolvedCached.startsWith(resolvedArtworkDir + path.sep)) {
+            if (fs.existsSync(resolvedCached)) {
+              fs.unlinkSync(resolvedCached);
+            }
+          }
+        } catch {
+          // Ignore cache deletion error
+        }
+      }
+
+      let version: number | null = null;
+      try {
+        const stat = fs.statSync(localArtPath);
+        version = Math.floor(stat.mtimeMs);
+      } catch {
+        version = Date.now();
+      }
+
+      await db.update(artists)
+        .set({
+          artworkPath: localArtPath,
+          artworkSource: 'local',
+          artworkVerified: 1,
+        })
+        .where(eq(artists.id, artistId));
+
+      return {
+        artistId,
+        status: 'updated',
+        artworkPath: localArtPath,
+        hasArtwork: true,
+        version,
+      };
+    }
+
+    // No local artwork found: invalidate previous cached artwork if any and clear record
+    if (artist.artworkPath) {
+      try {
+        const artworkDir = getArtworkDir();
+        const candidateOldCached = path.isAbsolute(artist.artworkPath)
+          ? artist.artworkPath
+          : path.join(artworkDir, artist.artworkPath);
+        const resolvedCached = path.resolve(candidateOldCached);
+        const resolvedArtworkDir = path.resolve(artworkDir);
+        if (resolvedCached.startsWith(resolvedArtworkDir + path.sep)) {
+          if (fs.existsSync(resolvedCached)) {
+            fs.unlinkSync(resolvedCached);
+          }
+        }
+      } catch {
+        // Ignore cache deletion error
+      }
+
+      await db.update(artists)
+        .set({
+          artworkPath: null,
+          artworkSource: null,
+          artworkVerified: 0,
+        })
+        .where(eq(artists.id, artistId));
+    }
+
+    return {
+      artistId,
+      status: 'unavailable',
+      artworkPath: null,
+      hasArtwork: false,
+      version: null,
+    };
+  } catch (err: any) {
+    return {
+      artistId,
+      status: 'failed',
+      artworkPath: null,
+      hasArtwork: false,
+      version: null,
+      error: err?.message || 'Failed to refresh local artwork',
+    };
+  }
 }
 
 /**

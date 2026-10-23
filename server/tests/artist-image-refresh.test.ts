@@ -12,6 +12,7 @@ import { artists, songs, albums, libraries } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import {
   refreshArtistProfileImage,
+  refreshArtistLocalArtwork,
   refreshAllArtists,
   normalizeArtistNameForMatching,
   isValidArtistImageUrl,
@@ -31,6 +32,18 @@ import { getOrCreateArtist } from '../lib/artist-utils.js';
 function createMockJpegBuffer(): Buffer {
   const header = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
   const payload = Buffer.alloc(2048, 0xab);
+  return Buffer.concat([header, payload]);
+}
+
+// Helper to construct a valid WebP image buffer (>1KB with RIFF...WEBP header)
+function createMockWebpBuffer(): Buffer {
+  const header = Buffer.from([
+    0x52, 0x49, 0x46, 0x46, // RIFF
+    0x00, 0x09, 0x00, 0x00, // file size
+    0x57, 0x45, 0x42, 0x50, // WEBP
+    0x56, 0x50, 0x38, 0x20, // VP8_
+  ]);
+  const payload = Buffer.alloc(2048, 0xcd);
   return Buffer.concat([header, payload]);
 }
 
@@ -785,6 +798,410 @@ test('Fanart.tv Artist Images Integration Test Suite', async (t) => {
       assert.strictEqual(check.artworkSource, 'local');
       assert.strictEqual(check.artworkVerified, 1);
     } finally {
+      await db.delete(songs).where(eq(songs.id, song.id));
+      await db.delete(artists).where(eq(artists.id, art.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('19. Prioritises artist.webp over artist.jpg, artist.jpeg, and artist.png', async () => {
+    const testLibDir = path.join(testDataDir, 'test_webp_priority_' + Date.now());
+    const artistDir = path.join(testLibDir, 'PriorityArtist');
+    fs.mkdirSync(artistDir, { recursive: true });
+
+    // Place both artist.jpg and artist.webp in artist directory
+    const localJpg = path.join(artistDir, 'artist.jpg');
+    const localWebp = path.join(artistDir, 'artist.webp');
+    fs.writeFileSync(localJpg, createMockJpegBuffer());
+    fs.writeFileSync(localWebp, createMockWebpBuffer());
+
+    try {
+      const selectedArt = findLocalArtistArtwork(artistDir);
+      assert.strictEqual(selectedArt, localWebp, 'findLocalArtistArtwork must prioritize artist.webp over artist.jpg');
+    } finally {
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('20. Replacing artist.webp and calling refreshArtistLocalArtwork updates artwork without restarting', async () => {
+    const artistName = `Webp Replace Artist ${Date.now()}`;
+    const testLibDir = path.join(testDataDir, 'test_webp_replace_' + Date.now());
+    const artistDir = path.join(testLibDir, 'WebpArtist');
+    fs.mkdirSync(artistDir, { recursive: true });
+
+    const localWebp = path.join(artistDir, 'artist.webp');
+    fs.writeFileSync(localWebp, createMockWebpBuffer());
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'Webp Replace Library',
+      path: testLibDir,
+    }).returning();
+
+    const [art] = await db.insert(artists).values({
+      name: artistName,
+      artworkPath: null,
+    }).returning();
+
+    const [song] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: art.id,
+      title: 'First Track',
+      mainAudioPath: path.join(artistDir, 'track1.mp3'),
+    }).returning();
+
+    try {
+      // 1. Initial refresh discovers artist.webp
+      const res1 = await refreshArtistLocalArtwork(art.id);
+      assert.strictEqual(res1.status, 'updated');
+      assert.strictEqual(res1.hasArtwork, true);
+      assert.strictEqual(res1.artworkPath, localWebp);
+      assert.ok(typeof res1.version === 'number', 'Must return a numeric version for cache busting');
+
+      const [check1] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check1.artworkPath, localWebp);
+
+      // 2. Simulate replacing artist.webp on disk with modified content
+      await new Promise(r => setTimeout(r, 20)); // Ensure mtime increases
+      const newWebpBuffer = Buffer.concat([createMockWebpBuffer(), Buffer.from('extra_bytes_v2')]);
+      fs.writeFileSync(localWebp, newWebpBuffer);
+
+      // 3. User clicks Refresh Artwork: rechecks local file without restarting app
+      const res2 = await refreshArtistLocalArtwork(art.id);
+      assert.strictEqual(res2.status, 'updated');
+      assert.strictEqual(res2.hasArtwork, true);
+      assert.strictEqual(res2.artworkPath, localWebp);
+
+      const [check2] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check2.artworkPath, localWebp);
+      assert.strictEqual(check2.artworkSource, 'local');
+      assert.strictEqual(check2.artworkVerified, 1);
+    } finally {
+      await db.delete(songs).where(eq(songs.id, song.id));
+      await db.delete(artists).where(eq(artists.id, art.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('21. Artists without artwork return unavailable status and null artworkPath (microphone placeholder)', async () => {
+    const artistName = `No Artwork Artist ${Date.now()}`;
+    const testLibDir = path.join(testDataDir, 'test_no_art_' + Date.now());
+    const artistDir = path.join(testLibDir, 'EmptyArtist');
+    fs.mkdirSync(artistDir, { recursive: true });
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'No Art Library',
+      path: testLibDir,
+    }).returning();
+
+    const [art] = await db.insert(artists).values({
+      name: artistName,
+      artworkPath: '/stale/nonexistent/art.jpg',
+    }).returning();
+
+    const [song] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: art.id,
+      title: 'Acapella Track',
+      mainAudioPath: path.join(artistDir, 'acapella.mp3'),
+    }).returning();
+
+    try {
+      const res = await refreshArtistLocalArtwork(art.id);
+      assert.strictEqual(res.status, 'unavailable');
+      assert.strictEqual(res.hasArtwork, false);
+      assert.strictEqual(res.artworkPath, null);
+
+      const [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check.artworkPath, null, 'Must clear stale artworkPath to display microphone placeholder');
+    } finally {
+      await db.delete(songs).where(eq(songs.id, song.id));
+      await db.delete(artists).where(eq(artists.id, art.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('22. Invalidate server-side cached artwork file in dataDir/artwork when local artwork is refreshed', async () => {
+    const artistName = `Cache Invalidate Artist ${Date.now()}`;
+    const testLibDir = path.join(testDataDir, 'test_cache_inval_' + Date.now());
+    const artistDir = path.join(testLibDir, 'CachedArtist');
+    fs.mkdirSync(artistDir, { recursive: true });
+
+    // Place an old cached file in dataDir/artwork
+    const cacheDir = path.join(testDataDir, 'artwork');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const staleCacheFile = path.join(cacheDir, `stale_${Date.now()}.jpg`);
+    fs.writeFileSync(staleCacheFile, createMockJpegBuffer());
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'Cache Invalidation Library',
+      path: testLibDir,
+    }).returning();
+
+    const [art] = await db.insert(artists).values({
+      name: artistName,
+      artworkPath: path.basename(staleCacheFile),
+      artworkSource: 'fanart_tv',
+    }).returning();
+
+    const [song] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: art.id,
+      title: 'Cached Track',
+      mainAudioPath: path.join(artistDir, 'song.mp3'),
+    }).returning();
+
+    // Place new local artist.webp in artist directory
+    const localWebp = path.join(artistDir, 'artist.webp');
+    fs.writeFileSync(localWebp, createMockWebpBuffer());
+
+    try {
+      assert.strictEqual(fs.existsSync(staleCacheFile), true, 'Stale cached file must exist before refresh');
+
+      const res = await refreshArtistLocalArtwork(art.id);
+      assert.strictEqual(res.status, 'updated');
+      assert.strictEqual(res.artworkPath, localWebp);
+
+      // Verify that stale cached file was removed/invalidated from disk
+      assert.strictEqual(fs.existsSync(staleCacheFile), false, 'Previous cached file must be invalidated and removed from disk');
+
+      const [check] = await db.select().from(artists).where(eq(artists.id, art.id));
+      assert.strictEqual(check.artworkPath, localWebp);
+      assert.strictEqual(check.artworkSource, 'local');
+    } finally {
+      await db.delete(songs).where(eq(songs.id, song.id));
+      await db.delete(artists).where(eq(artists.id, art.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      if (fs.existsSync(staleCacheFile)) fs.unlinkSync(staleCacheFile);
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('23. Refreshing one artist does not invalidate or touch artwork for other artists', async () => {
+    const testLibDir = path.join(testDataDir, 'test_isolation_' + Date.now());
+    const artistADir = path.join(testLibDir, 'ArtistA');
+    const artistBDir = path.join(testLibDir, 'ArtistB');
+    fs.mkdirSync(artistADir, { recursive: true });
+    fs.mkdirSync(artistBDir, { recursive: true });
+
+    const artAWebp = path.join(artistADir, 'artist.webp');
+    const artBJpg = path.join(artistBDir, 'artist.jpg');
+    fs.writeFileSync(artAWebp, createMockWebpBuffer());
+    fs.writeFileSync(artBJpg, createMockJpegBuffer());
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'Isolation Library',
+      path: testLibDir,
+    }).returning();
+
+    const [artA] = await db.insert(artists).values({ name: `Artist A ${Date.now()}` }).returning();
+    const [artB] = await db.insert(artists).values({
+      name: `Artist B ${Date.now()}`,
+      artworkPath: artBJpg,
+      artworkSource: 'local',
+      artworkVerified: 1,
+    }).returning();
+
+    const [songA] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: artA.id,
+      title: 'Song A',
+      mainAudioPath: path.join(artistADir, 'a.mp3'),
+    }).returning();
+
+    const [songB] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: artB.id,
+      title: 'Song B',
+      mainAudioPath: path.join(artistBDir, 'b.mp3'),
+    }).returning();
+
+    try {
+      // Refresh only Artist A
+      const resA = await refreshArtistLocalArtwork(artA.id);
+      assert.strictEqual(resA.status, 'updated');
+      assert.strictEqual(resA.artistId, artA.id);
+
+      // Verify Artist B record is completely untouched
+      const [checkB] = await db.select().from(artists).where(eq(artists.id, artB.id));
+      assert.strictEqual(checkB.artworkPath, artBJpg, 'Artist B artwork must remain completely unchanged');
+      assert.strictEqual(checkB.artworkSource, 'local');
+      assert.strictEqual(checkB.artworkVerified, 1);
+    } finally {
+      await db.delete(songs).where(eq(songs.id, songA.id));
+      await db.delete(songs).where(eq(songs.id, songB.id));
+      await db.delete(artists).where(eq(artists.id, artA.id));
+      await db.delete(artists).where(eq(artists.id, artB.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('24. findLocalArtistArtwork matches case-insensitively (e.g. Artist.WEBP, ARTIST.JPG)', async () => {
+    const testLibDir = path.join(testDataDir, 'test_case_insensitive_' + Date.now());
+    const artistDir = path.join(testLibDir, 'CaseArtist');
+    fs.mkdirSync(artistDir, { recursive: true });
+
+    const mixedCaseWebp = path.join(artistDir, 'Artist.WEBP');
+    fs.writeFileSync(mixedCaseWebp, createMockWebpBuffer());
+
+    try {
+      const found = findLocalArtistArtwork(artistDir);
+      assert.strictEqual(found, mixedCaseWebp, 'Must find Artist.WEBP despite case variation');
+    } finally {
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('25. findLocalArtistArtwork rejects corrupt, small, and non-image files, falling back to next candidate', async () => {
+    const testLibDir = path.join(testDataDir, 'test_corrupt_fallback_' + Date.now());
+    const artistDir = path.join(testLibDir, 'CorruptArtist');
+    fs.mkdirSync(artistDir, { recursive: true });
+
+    // Place a corrupt/small artist.webp (<1KB) and a non-image artist.jpeg
+    const corruptWebp = path.join(artistDir, 'artist.webp');
+    fs.writeFileSync(corruptWebp, Buffer.from('tiny corrupted file'));
+
+    const nonImageJpeg = path.join(artistDir, 'artist.jpeg');
+    fs.writeFileSync(nonImageJpeg, Buffer.alloc(2048, 0x00)); // 2KB but invalid magic bytes
+
+    // Place valid artist.png
+    const validPng = path.join(artistDir, 'artist.png');
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    fs.writeFileSync(validPng, Buffer.concat([pngHeader, Buffer.alloc(2048, 0x11)]));
+
+    try {
+      const found = findLocalArtistArtwork(artistDir);
+      assert.strictEqual(found, validPng, 'Must skip corrupt webp and invalid jpeg, falling back to valid png');
+    } finally {
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('26. refreshArtistLocalArtwork never triggers external network requests (MusicBrainz/Fanart.tv)', async () => {
+    const testLibDir = path.join(testDataDir, 'test_no_net_' + Date.now());
+    const artistDir = path.join(testLibDir, 'NoNetArtist');
+    fs.mkdirSync(artistDir, { recursive: true });
+    const localWebp = path.join(artistDir, 'artist.webp');
+    fs.writeFileSync(localWebp, createMockWebpBuffer());
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'No Net Library',
+      path: testLibDir,
+    }).returning();
+
+    const [art] = await db.insert(artists).values({
+      name: `No Net Artist ${Date.now()}`,
+    }).returning();
+
+    const [song] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: art.id,
+      title: 'No Net Track',
+      mainAudioPath: path.join(artistDir, 'song.mp3'),
+    }).returning();
+
+    const originalFetch = globalThis.fetch;
+    let fetchCalled = false;
+    globalThis.fetch = async () => {
+      fetchCalled = true;
+      throw new Error('fetch must not be called during local artwork refresh!');
+    };
+
+    try {
+      const res = await refreshArtistLocalArtwork(art.id);
+      assert.strictEqual(res.status, 'updated');
+      assert.strictEqual(res.artworkPath, localWebp);
+      assert.strictEqual(fetchCalled, false, 'No network requests may be issued during local artwork refresh');
+    } finally {
+      globalThis.fetch = originalFetch;
+      await db.delete(songs).where(eq(songs.id, song.id));
+      await db.delete(artists).where(eq(artists.id, art.id));
+      await db.delete(libraries).where(eq(libraries.id, testLib.id));
+      fs.rmSync(testLibDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('27. refreshArtistLocalArtwork handles non-existent artist safely', async () => {
+    const res = await refreshArtistLocalArtwork(999999999);
+    assert.strictEqual(res.status, 'failed');
+    assert.strictEqual(res.hasArtwork, false);
+    assert.strictEqual(res.artworkPath, null);
+    assert.strictEqual(res.error, 'Artist not found');
+  });
+
+  await t.test('28. POST /api/artists/:id/refresh-artwork endpoint and GET anti-caching headers', async () => {
+    const express = (await import('express')).default;
+    const jwt = (await import('jsonwebtoken')).default;
+    const artistsRouter = (await import('../routes/artists.js')).default;
+
+    const app = express();
+    app.use(express.json());
+    app.use('/api/artists', artistsRouter);
+
+    const server = app.listen(0);
+    const address = server.address() as any;
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const token = jwt.sign(
+      { id: 1, username: 'test_admin', role: 'administrator' },
+      process.env.JWT_SECRET || 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe'
+    );
+
+    const testLibDir = path.join(testDataDir, 'test_api_refresh_' + Date.now());
+    const artistDir = path.join(testLibDir, 'ApiRefreshArtist');
+    fs.mkdirSync(artistDir, { recursive: true });
+    const localWebp = path.join(artistDir, 'artist.webp');
+    fs.writeFileSync(localWebp, createMockWebpBuffer());
+
+    const [testLib] = await db.insert(libraries).values({
+      name: 'API Refresh Library',
+      path: testLibDir,
+    }).returning();
+
+    const [art] = await db.insert(artists).values({
+      name: `API Refresh Artist ${Date.now()}`,
+    }).returning();
+
+    const [song] = await db.insert(songs).values({
+      libraryId: testLib.id,
+      artistId: art.id,
+      title: 'API Track',
+      mainAudioPath: path.join(artistDir, 'track.mp3'),
+    }).returning();
+
+    try {
+      // 1. POST refresh-artwork returns 200 with status, hasArtwork, version
+      const postRes = await fetch(`${baseUrl}/api/artists/${art.id}/refresh-artwork`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.strictEqual(postRes.status, 200);
+      const postData = await postRes.json();
+      assert.strictEqual(postData.status, 'updated');
+      assert.strictEqual(postData.hasArtwork, true);
+      assert.ok(typeof postData.version === 'number');
+
+      // 2. GET artwork returns anti-caching headers
+      const getRes = await fetch(`${baseUrl}/api/artists/${art.id}/artwork?v=${postData.version}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.strictEqual(getRes.status, 200);
+      assert.strictEqual(getRes.headers.get('content-type'), 'image/webp');
+      const cacheControl = getRes.headers.get('cache-control') || '';
+      assert.ok(cacheControl.includes('no-store'), 'Must include no-store in Cache-Control');
+      assert.ok(cacheControl.includes('no-cache'), 'Must include no-cache in Cache-Control');
+      assert.strictEqual(getRes.headers.get('pragma'), 'no-cache');
+
+      // 3. POST refresh-artwork for missing artist returns 404
+      const missingRes = await fetch(`${baseUrl}/api/artists/999999999/refresh-artwork`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.strictEqual(missingRes.status, 404);
+    } finally {
+      server.close();
       await db.delete(songs).where(eq(songs.id, song.id));
       await db.delete(artists).where(eq(artists.id, art.id));
       await db.delete(libraries).where(eq(libraries.id, testLib.id));

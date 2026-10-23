@@ -68,6 +68,9 @@ export default function Library() {
   const [selectedArtist, setSelectedArtist] = useState<any | null>(null);
   const [selectedAlbum, setSelectedAlbum] = useState<any | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [artistArtworkVersions, setArtistArtworkVersions] = useState<Record<number, number>>({});
+  const [refreshingArtistId, setRefreshingArtistId] = useState<number | null>(null);
+  const [artistArtworkErrors, setArtistArtworkErrors] = useState<Record<number, boolean>>({});
 
   // Sidebar Jukebox navigation must exit detail views even if the target URL is unchanged.
   useEffect(() => {
@@ -764,12 +767,45 @@ export default function Library() {
         throw new Error('Failed to fetch artist details');
       }
       const data = await res.json();
+      setArtistArtworkErrors(prev => ({ ...prev, [artistId]: false }));
       setSelectedArtist(data);
       setSelectedAlbum(null);
       setSelectedPlaylist(null);
     } catch (e: any) {
       console.error(e);
       alert(e.message || 'Could not load artist details');
+    }
+  };
+
+  const handleRefreshArtwork = async (artistId: number) => {
+    if (refreshingArtistId === artistId) return;
+    setRefreshingArtistId(artistId);
+    try {
+      const res = await fetch(`/api/artists/${artistId}/refresh-artwork`, {
+        method: 'POST',
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) {
+        const nextVersion = typeof data.version === 'number' ? data.version : Date.now();
+        setArtistArtworkErrors(prev => ({ ...prev, [artistId]: false }));
+        setArtistArtworkVersions(prev => ({ ...prev, [artistId]: nextVersion }));
+        if (selectedArtist && selectedArtist.id === artistId) {
+          setSelectedArtist((prev: any) => prev ? { ...prev, hasArtwork: !!data.hasArtwork } : null);
+        }
+        setArtists(prev => prev.map(a => a.id === artistId ? { ...a, hasArtwork: !!data.hasArtwork } : a));
+      } else if (res.status === 404) {
+        setArtistArtworkErrors(prev => ({ ...prev, [artistId]: true }));
+        if (selectedArtist && selectedArtist.id === artistId) {
+          setSelectedArtist((prev: any) => prev ? { ...prev, hasArtwork: false } : null);
+        }
+        setArtists(prev => prev.map(a => a.id === artistId ? { ...a, hasArtwork: false } : a));
+      } else {
+        console.error('Failed to refresh artist artwork:', data?.error || res.statusText);
+      }
+    } catch (err) {
+      console.error('Error refreshing artist artwork:', err);
+    } finally {
+      setRefreshingArtistId(null);
     }
   };
 
@@ -1220,14 +1256,17 @@ export default function Library() {
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-[#141622] p-8 rounded-3xl border border-white/5 shadow-xl">
           <div className="w-28 h-28 rounded-full bg-gradient-to-br from-[#1E2033] to-[#12131F] flex items-center justify-center shrink-0 border border-white/10 shadow-lg shadow-[#F472B6]/10 overflow-hidden relative">
             <Mic className="w-12 h-12 text-[#F472B6] absolute" />
-            <img
-              src={`/api/artists/${selectedArtist.id}/artwork`}
-              alt={selectedArtist.name}
-              className="relative z-10 h-full w-full object-cover yk-artwork-image yk-artwork-image"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-              }}
-            />
+            {selectedArtist.hasArtwork && !artistArtworkErrors[selectedArtist.id] && (
+              <img
+                key={`${selectedArtist.id}-${artistArtworkVersions[selectedArtist.id] || 0}`}
+                src={`/api/artists/${selectedArtist.id}/artwork${artistArtworkVersions[selectedArtist.id] ? `?v=${artistArtworkVersions[selectedArtist.id]}` : ''}`}
+                alt={selectedArtist.name}
+                className="relative z-10 h-full w-full object-cover yk-artwork-image"
+                onError={() => {
+                  setArtistArtworkErrors(prev => ({ ...prev, [selectedArtist.id]: true }));
+                }}
+              />
+            )}
           </div>
           <div className="text-center sm:text-left flex-1">
             <span className="text-xs uppercase tracking-widest text-[#F472B6] font-bold">Artist</span>
@@ -1253,7 +1292,16 @@ export default function Library() {
                   <span>Play All Songs</span>
                 </button>
               )}
-
+              <button
+                type="button"
+                onClick={() => handleRefreshArtwork(selectedArtist.id)}
+                disabled={refreshingArtistId === selectedArtist.id}
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
+                title="Refresh local artist artwork"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshingArtistId === selectedArtist.id ? 'animate-spin text-[#F472B6]' : 'text-zinc-300'}`} />
+                <span>{refreshingArtistId === selectedArtist.id ? 'Refreshing…' : 'Refresh Artwork'}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -2042,8 +2090,19 @@ export default function Library() {
                 <div id={`library-card-artists-${artist.id}`} key={artist.id} onClick={() => openArtist(artist.id)}
                   className="group flex min-w-0 cursor-pointer flex-col items-center rounded-2xl border border-white/5 bg-[#141622] p-4 text-center transition hover:border-[#F472B6]/30 hover:bg-[#1A1C2C]">
                   <div className="relative mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/50">
-                    <Mic className="absolute h-10 w-10 text-zinc-500 transition-colors group-hover:text-[#F472B6]" />
-                    {artist.hasArtwork && <img src={`/api/artists/${artist.id}/artwork`} alt={artist.name} loading="lazy" decoding="async" className="yk-artwork-image relative z-10 h-full w-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />}
+                    {artist.hasArtwork && !artistArtworkErrors[artist.id] && (
+                      <img
+                        key={`${artist.id}-${artistArtworkVersions[artist.id] || 0}`}
+                        src={`/api/artists/${artist.id}/artwork${artistArtworkVersions[artist.id] ? `?v=${artistArtworkVersions[artist.id]}` : ''}`}
+                        alt={artist.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="yk-artwork-image relative z-10 h-full w-full object-cover"
+                        onError={() => {
+                          setArtistArtworkErrors(prev => ({ ...prev, [artist.id]: true }));
+                        }}
+                      />
+                    )}
                   </div>
                   <h3 className="w-full truncate text-sm font-semibold text-white transition-colors group-hover:text-[#F472B6]">{artist.name}</h3>
                   <p className="mt-1 text-xs text-zinc-400">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>

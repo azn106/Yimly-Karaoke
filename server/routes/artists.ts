@@ -5,6 +5,7 @@ import { eq, sql, isNotNull, and, or, inArray, asc } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 import { formatArtistDisplay } from '../lib/artist-utils.js';
 import { getSongArtistsMap } from './songs.js';
+import { findLocalArtistArtwork, refreshArtistLocalArtwork, resolveArtistDirectory } from '../lib/artist-image-refresher.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -12,15 +13,7 @@ const router = Router();
 router.use(requireAuth);
 
 function hasLocalPortrait(directory: string): boolean {
-  for (const filename of ['artist.jpg', 'artist.jpeg', 'artist.png', 'artist.webp', 'artist.gif']) {
-    try {
-      const stat = fs.statSync(path.join(directory, filename));
-      if (stat.isFile() && stat.size >= 8) return true;
-    } catch {
-      // Continue checking supported filenames.
-    }
-  }
-  return false;
+  return findLocalArtistArtwork(directory) !== null;
 }
 
 function getArtistFolder(libraryPath: string, audioPath: string): string | null {
@@ -184,78 +177,129 @@ router.get('/:id', async (req, res) => {
 
 router.get('/:id/artwork', async (req, res) => {
   try {
-    const artistId = parseInt(req.params.id);
-    if (isNaN(artistId)) return res.status(400).json({ error: 'Invalid artist ID' });
+    const artistId = parseInt(req.params.id, 10);
+    if (isNaN(artistId) || artistId <= 0) return res.status(400).json({ error: 'Invalid artist ID' });
 
-    const [artist] = await db.select({ id: artists.id })
+    const [artist] = await db.select({ id: artists.id, artworkPath: artists.artworkPath })
       .from(artists)
       .where(eq(artists.id, artistId))
       .limit(1);
     if (!artist) return res.status(404).json({ error: 'Artist not found' });
 
-    // Serve portraits only from the artist's own music folder.
-    const directSongs = await db.select({
-      mainAudioPath: songs.mainAudioPath,
-      instrumentalAudioPath: songs.instrumentalAudioPath,
-      libraryId: songs.libraryId,
-    }).from(songs).where(eq(songs.artistId, artistId));
+    let filePath: string | null = null;
+    const dirInfo = await resolveArtistDirectory(artistId);
+    if (dirInfo?.artistDir) {
+      filePath = findLocalArtistArtwork(dirInfo.artistDir);
+    }
 
-    let songPaths = directSongs;
-    if (songPaths.length === 0) {
-      songPaths = await db.select({
+    if (!filePath) {
+      // Check candidate folders from all associated tracks
+      const directSongs = await db.select({
         mainAudioPath: songs.mainAudioPath,
         instrumentalAudioPath: songs.instrumentalAudioPath,
         libraryId: songs.libraryId,
-      }).from(songArtists)
-        .innerJoin(songs, eq(songArtists.songId, songs.id))
-        .where(eq(songArtists.artistId, artistId));
-    }
+      }).from(songs).where(eq(songs.artistId, artistId));
 
-    const allLibraries = await db.select({ id: libraries.id, path: libraries.path }).from(libraries);
-    const libraryPaths = new Map(allLibraries.filter(l => l.path).map(l => [l.id, path.resolve(l.path!)]));
-    const artistDirectories = new Set<string>();
+      let songPaths = directSongs;
+      if (songPaths.length === 0) {
+        songPaths = await db.select({
+          mainAudioPath: songs.mainAudioPath,
+          instrumentalAudioPath: songs.instrumentalAudioPath,
+          libraryId: songs.libraryId,
+        }).from(songArtists)
+          .innerJoin(songs, eq(songArtists.songId, songs.id))
+          .where(eq(songArtists.artistId, artistId));
+      }
 
-    for (const song of songPaths) {
-      const audioPath = song.mainAudioPath || song.instrumentalAudioPath;
-      const libraryPath = song.libraryId ? libraryPaths.get(song.libraryId) : undefined;
-      if (!audioPath || !libraryPath) continue;
+      const allLibraries = await db.select({ id: libraries.id, path: libraries.path }).from(libraries);
+      const libraryPaths = new Map(allLibraries.filter(l => l.path).map(l => [l.id, path.resolve(l.path!)]));
 
-      const resolvedAudioPath = path.resolve(audioPath);
-      if (!resolvedAudioPath.startsWith(libraryPath + path.sep)) continue;
-      const firstFolder = path.relative(libraryPath, resolvedAudioPath).split(path.sep)[0];
-      if (!firstFolder) continue;
-      const artistDirectory = path.resolve(libraryPath, firstFolder);
-      if (artistDirectory.startsWith(libraryPath + path.sep)) artistDirectories.add(artistDirectory);
-    }
+      for (const song of songPaths) {
+        const audioPath = song.mainAudioPath || song.instrumentalAudioPath;
+        const libraryPath = song.libraryId ? libraryPaths.get(song.libraryId) : undefined;
+        if (!audioPath || !libraryPath) continue;
 
-    const candidates = ['artist.jpg', 'artist.jpeg', 'artist.png', 'artist.webp', 'artist.gif'];
-    let filePath: string | null = null;
-    for (const directory of artistDirectories) {
-      for (const filename of candidates) {
-        const candidate = path.join(directory, filename);
-        try {
-          const stat = fs.statSync(candidate);
-          if (stat.isFile() && stat.size >= 8) {
-            filePath = candidate;
+        const resolvedAudioPath = path.resolve(audioPath);
+        if (!resolvedAudioPath.startsWith(libraryPath + path.sep)) continue;
+        const firstFolder = path.relative(libraryPath, resolvedAudioPath).split(path.sep)[0];
+        if (!firstFolder) continue;
+        const artistDirectory = path.resolve(libraryPath, firstFolder);
+        if (artistDirectory.startsWith(libraryPath + path.sep)) {
+          const candidateArt = findLocalArtistArtwork(artistDirectory);
+          if (candidateArt) {
+            filePath = candidateArt;
             break;
           }
-        } catch {
-          // Try the next supported local portrait name.
         }
       }
-      if (filePath) break;
     }
 
-    if (!filePath) return res.status(404).json({ error: 'No local artist.jpg portrait found' });
+    if (!filePath) return res.status(404).json({ error: 'No local artist artwork found' });
 
-    // Avoid repeatedly reading the same local portrait from disk.
-    res.setHeader('Cache-Control', 'private, max-age=300');
+    // Anti-caching headers so client immediately renders refreshed or updated local artwork
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     const ext = path.extname(filePath).toLowerCase();
     const contentType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
     res.setHeader('Content-Type', contentType);
-    res.sendFile(filePath);
+    res.sendFile(filePath, { cacheControl: false, lastModified: false });
   } catch (error) {
     res.status(500).json({ error: 'Failed to serve local artist artwork' });
+  }
+});
+
+router.post('/:id/refresh-artwork', async (req, res) => {
+  try {
+    const artistId = parseInt(req.params.id, 10);
+    if (isNaN(artistId) || artistId <= 0) {
+      return res.status(400).json({ error: 'Invalid artist ID' });
+    }
+
+    const result = await refreshArtistLocalArtwork(artistId);
+
+    if (result.error === 'Artist not found') {
+      return res.status(404).json({
+        artistId,
+        status: 'failed',
+        hasArtwork: false,
+        artworkPath: null,
+        version: null,
+        error: 'Artist not found',
+      });
+    }
+
+    if (result.status === 'unavailable') {
+      return res.status(404).json({
+        artistId: result.artistId,
+        status: 'unavailable',
+        hasArtwork: false,
+        artworkPath: null,
+        version: null,
+        error: result.error || 'No local artwork found',
+      });
+    }
+
+    if (result.status === 'failed') {
+      return res.status(500).json({
+        artistId: result.artistId,
+        status: 'failed',
+        hasArtwork: false,
+        artworkPath: null,
+        version: null,
+        error: result.error || 'Failed to refresh local artwork',
+      });
+    }
+
+    return res.status(200).json({
+      artistId: result.artistId,
+      status: result.status,
+      hasArtwork: result.hasArtwork,
+      artworkPath: result.artworkPath,
+      version: result.version,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message || 'Failed to refresh artist artwork' });
   }
 });
 
