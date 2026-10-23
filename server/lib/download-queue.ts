@@ -113,8 +113,8 @@ export function getCreditedArtists(primaryArtist: string, creditedArtists?: stri
   for (const raw of [primaryArtist, ...(creditedArtists || [])]) {
     const name = typeof raw === 'string' ? raw.trim() : '';
     if (!name) continue;
-    // Older sources put multiple artists in one string; split and normalize spacing.
-    for (const part of name.split(/\s*[;,]\s*/).map(value => value.trim()).filter(Boolean)) {
+    // Sources use commas, semicolons, ampersands, plus signs, and feat/ft for collaborations.
+    for (const part of name.split(/\s*(?:[;,]|\s&\s|\s\+\s|\s+feat\.?\s+|\s+ft\.?\s+)/i).map(value => value.trim()).filter(Boolean)) {
       const key = part.toLocaleLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
@@ -123,6 +123,37 @@ export function getCreditedArtists(primaryArtist: string, creditedArtists?: stri
     }
   }
   return result.length ? result : ['Unknown Artist'];
+}
+
+/**
+ * YouTube Topic channels often expose the channel name as the artist and put the
+ * real credits plus song title in the video title, e.g.:
+ * artist="Bebe Rexha Topic", title="Bebe Rexha & Florida Georgia Line - Meant To Be [Audio]".
+ * Only apply this recovery to Topic-channel metadata so normal user-supplied titles
+ * and artist credits are not rewritten.
+ */
+export function normalizeTopicTrackMetadata(track: Pick<ActiveTrackJob, 'artist' | 'artists' | 'title'>): void {
+  if (!/\btopic$/i.test(track.artist.trim())) return;
+
+  const videoTitle = track.title.trim();
+  const match = videoTitle.match(/^(.+?)\s+-\s+(.+)$/);
+  if (!match) return;
+
+  const rawCredits = match[1].trim();
+  const songTitle = match[2]
+    .replace(/\s*\[(?:official\s*)?(?:audio|lyrics?|visuali[sz]er|music video)\]\s*$/i, '')
+    .replace(/\s*\((?:official\s*)?(?:audio|lyrics?|visuali[sz]er|music video)\)\s*$/i, '')
+    .trim();
+  if (!rawCredits || !songTitle) return;
+
+  const recoveredArtists = getCreditedArtists(rawCredits);
+  // Require at least one credible artist credit and avoid accepting a Topic channel
+  // name as the recovered credit.
+  if (!recoveredArtists.length || recoveredArtists.some(name => /\btopic$/i.test(name))) return;
+
+  track.artist = recoveredArtists.join('; ');
+  track.artists = recoveredArtists;
+  track.title = songTitle;
 }
 
 function sanitizeErrorMessage(msg?: string): string {
@@ -672,6 +703,10 @@ export class DownloadQueueManager {
       await this.persistTrackUpdate(track);
       return;
     }
+
+    // Recover canonical credits from YouTube Topic video titles before building paths.
+    // Topic channel names are distribution labels, not the song's artist credits.
+    normalizeTopicTrackMetadata(track);
 
     // 1. Destination formatting and canonical artist credits.
     // Preserve every artist in metadata, but use only the primary artist for the folder.
