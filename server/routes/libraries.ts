@@ -3,10 +3,25 @@ import { db } from '../db/index.js';
 import { libraries, songs, artists, albums, lyrics, queueItems, playlists, playlistSongs, favorites, songArtists } from '../db/schema.js';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
-import { scanLibrary } from '../lib/scanner.js';
+import { scanLibrary, SUPPORTED_AUDIO_EXTS } from '../lib/scanner.js';
 import { cleanupOrphanedRecords } from '../lib/artist-utils.js';
 import { libraryWatcher } from '../lib/watcher.js';
 import fs from 'fs';
+import path from 'path';
+
+async function containsSupportedAudio(rootPath: string): Promise<boolean> {
+  const pending = [rootPath];
+  while (pending.length > 0) {
+    const currentPath = pending.pop()!;
+    const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) pending.push(fullPath);
+      else if (entry.isFile() && SUPPORTED_AUDIO_EXTS.has(path.extname(entry.name).toLowerCase())) return true;
+    }
+  }
+  return false;
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -70,6 +85,32 @@ router.post('/:id/scan', requireAdmin, async (req, res) => {
     
     if (lib.length === 0) {
       return res.status(404).json({ error: 'Library not found' });
+    }
+
+    // Validate the library root before starting a destructive reconciliation scan.
+    // A missing or empty mount must not be mistaken for an intentional deletion of
+    // every song, because song deletion also removes playlist entries.
+    let rootStat: fs.Stats;
+    try {
+      rootStat = fs.statSync(lib[0].path);
+    } catch {
+      return res.status(409).json({ error: 'Library folder is unavailable. No songs or playlist entries were changed.' });
+    }
+    if (!rootStat.isDirectory()) {
+      return res.status(409).json({ error: 'Library path is not a directory. No songs or playlist entries were changed.' });
+    }
+
+    let hasAudio: boolean;
+    try {
+      hasAudio = await containsSupportedAudio(lib[0].path);
+    } catch {
+      return res.status(409).json({ error: 'Library folder could not be read. No songs or playlist entries were changed.' });
+    }
+    if (!hasAudio) {
+      const existingSongs = await db.select({ id: songs.id }).from(songs).where(eq(songs.libraryId, id)).limit(1);
+      if (existingSongs.length > 0) {
+        return res.status(409).json({ error: 'No supported audio files were found. Existing songs and playlist entries were preserved.' });
+      }
     }
 
     // Run async so it doesn't block request
