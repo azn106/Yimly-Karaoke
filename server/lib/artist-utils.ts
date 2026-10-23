@@ -15,7 +15,7 @@ export function parseArtists(rawArtist?: string | null, rawArtists?: (string | n
     if (!chunk) return;
     // Sources commonly flatten artist credits with commas, semicolons, or spaced ampersands.
     // Do not split on arbitrary punctuation or unspaced ampersands inside artist names.
-    const parts = chunk.split(/\\s*;\\s*|\\s*,\\s*|\\s+&\\s+|\\s+\\+\\s+|\\s+(?:feat(?:uring)?\\.?|ft\\.?)\\s+/i);
+    const parts = chunk.split(/\s*;\s*|\s*,\s*|\s+&\s+|\s+\+\s+|\s+(?:feat(?:uring)?\.?|ft\.?)\s+/i);
     for (const rawPart of parts) {
       const part = rawPart.trim();
       if (!part) continue;
