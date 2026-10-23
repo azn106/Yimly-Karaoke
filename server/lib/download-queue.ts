@@ -18,6 +18,7 @@ export interface TrackMetadata {
   id?: string;
   title: string;
   artist: string;
+  artists?: string[];
   album?: string;
   trackNumber?: number;
   discNumber?: number;
@@ -54,6 +55,7 @@ export interface ActiveTrackJob {
   jobId: string;
   title: string;
   artist: string;
+  artists?: string[];
   album: string;
   trackNumber?: number | null;
   discNumber?: number | null;
@@ -289,6 +291,7 @@ export class DownloadQueueManager {
       jobId,
       title: t.title.trim(),
       artist: t.artist.trim(),
+      artists: t.artists?.map(a => a.trim()).filter(Boolean),
       album: (t.album || '').trim(),
       trackNumber: t.trackNumber || null,
       discNumber: t.discNumber || null,
@@ -1002,6 +1005,7 @@ export class DownloadQueueManager {
               libraryId,
               title: track.title,
               artist: track.artist,
+              artists: track.artists,
               album: track.album || undefined,
               duration: track.duration || undefined,
               trackNumber: track.trackNumber || undefined,
