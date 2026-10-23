@@ -433,7 +433,9 @@ export async function resolveUrlOrQuery(urlOrQuery: string): Promise<any> {
       // Score and rank candidates against the target query intent
       const targetMeta = {
         title: queryIntent.coreTitle || trimmed,
-        artist: (queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') ? queryIntent.mainArtist : (queryIntent.coreTitle || trimmed),
+        // Only constrain artist when the parser found an explicit artist.
+        // For a plain query, score the candidate by title/version signals.
+        artist: (queryIntent.mainArtist && queryIntent.mainArtist !== 'Unknown Artist') ? queryIntent.mainArtist : '',
       };
 
       const scoredCandidates = candidatePool
