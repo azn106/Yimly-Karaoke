@@ -39,12 +39,16 @@ function createMockJpegBuffer(): Buffer {
 
 // Helper to construct a valid WebP image buffer (>1KB with RIFF...WEBP header)
 function createMockPngBuffer(): Buffer {
-  // Use deterministic pixel noise so the fixture exceeds the production 1 KB minimum.
+  // Use deterministic pseudo-random pixel noise so the fixture exceeds the production 1 KB minimum.
   const png = new PNG({ width: 64, height: 64 });
+  let seed = 123456789;
   for (let i = 0; i < png.data.length; i += 4) {
-    png.data[i] = (i * 37 + 19) % 256;
-    png.data[i + 1] = (i * 17 + 83) % 256;
-    png.data[i + 2] = (i * 29 + 151) % 256;
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    png.data[i] = seed >>> 24;
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    png.data[i + 1] = seed >>> 24;
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    png.data[i + 2] = seed >>> 24;
     png.data[i + 3] = 255;
   }
   const buffer = PNG.sync.write(png);
