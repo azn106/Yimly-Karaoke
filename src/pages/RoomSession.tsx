@@ -421,8 +421,11 @@ export default function RoomSession() {
       const key = e.key;
       const keyCode = e.keyCode;
 
-      const isDpad = key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight' ||
-                     keyCode === 38 || keyCode === 40 || keyCode === 37 || keyCode === 39;
+      const isUpKey = key === 'ArrowUp' || key === 'Up' || key === 'DPAD_UP' || keyCode === 38 || keyCode === 19;
+      const isDownKey = key === 'ArrowDown' || key === 'Down' || key === 'DPAD_DOWN' || keyCode === 40 || keyCode === 20;
+      const isLeftKey = key === 'ArrowLeft' || key === 'Left' || key === 'DPAD_LEFT' || keyCode === 37 || keyCode === 21;
+      const isRightKey = key === 'ArrowRight' || key === 'Right' || key === 'DPAD_RIGHT' || keyCode === 39 || keyCode === 22;
+      const isDpad = isUpKey || isDownKey || isLeftKey || isRightKey;
 
       const isSelect = key === 'Enter' || key === ' ' || key === 'Select' ||
                        keyCode === 13 || keyCode === 32 || keyCode === 29443;
@@ -492,10 +495,10 @@ export default function RoomSession() {
 
         e.preventDefault();
 
-        const isRight = key === 'ArrowRight' || keyCode === 39;
-        const isLeft = key === 'ArrowLeft' || keyCode === 37;
-        const isDown = key === 'ArrowDown' || keyCode === 40;
-        const isUp = key === 'ArrowUp' || keyCode === 38;
+        const isRight = isRightKey;
+        const isLeft = isLeftKey;
+        const isDown = isDownKey;
+        const isUp = isUpKey;
 
         // Determine container scope
         let searchContainer: HTMLElement | Document = document;
@@ -571,6 +574,19 @@ export default function RoomSession() {
 
         if (bestCandidate) {
           bestCandidate.focus();
+        } else {
+          // Some TV browsers report incomplete element geometry. Keep D-pad navigation
+          // usable by falling back to the adjacent visible control in DOM order.
+          const currentIndex = candidates.indexOf(activeEl);
+          if (currentIndex >= 0) {
+            const step = (isRight || isDown) ? 1 : -1;
+            const fallbackIndex = currentIndex + step;
+            if (fallbackIndex >= 0 && fallbackIndex < candidates.length) {
+              candidates[fallbackIndex].focus();
+            } else if (candidates.length > 1) {
+              candidates[step > 0 ? 0 : candidates.length - 1].focus();
+            }
+          }
         }
       }
     };
