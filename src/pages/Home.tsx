@@ -152,7 +152,7 @@ export default function Home() {
     );
   }
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-10">
+    <div className="w-full max-w-none mx-0 p-6 md:p-10 space-y-10">
       {/* Hero / Welcome Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 p-8 md:p-12 shadow-2xl">
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#F472B6]/15 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
