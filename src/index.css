@@ -271,6 +271,10 @@ html, body {
   grid-template-columns: 230px minmax(0, 1fr);
 }
 
+.yk-desktop-layout.yk-tv-landscape.yk-has-right-panel {
+  grid-template-columns: 230px minmax(0, 1fr) 346px;
+}
+
 .yk-desktop-layout.yk-tv-landscape .yk-desktop-sidebar {
   display: flex;
   grid-column: 1;
