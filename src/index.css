@@ -105,11 +105,13 @@ html, body {
 .min-h-screen {
   min-height: 100vh;
   min-height: calc(var(--vh, 1vh) * 100);
+  min-height: 100dvh;
 }
 
 .h-screen {
   height: 100vh;
   height: calc(var(--vh, 1vh) * 100);
+  height: 100dvh;
 }
 
 /* Flex gap fallback for iOS 12 Safari when no-flex-gap is present */
