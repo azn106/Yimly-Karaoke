@@ -71,6 +71,10 @@ export default function RoomSession() {
   };
   const controllerId = urlControllerId || getStoredControllerId(sessionId);
   const isHost = roleParam === 'host';
+  const isDisplay = roleParam === 'display';
+  const audioOutput = isDisplay && searchParams.get('audioOutput') === '1';
+  const [displayAudioBlocked, setDisplayAudioBlocked] = useState(false);
+  const lastSyncSentAtRef = useRef(0);
 
   useEffect(() => {
     if (sessionId && urlControllerId) {
@@ -207,6 +211,7 @@ export default function RoomSession() {
   const [audioError, setAudioError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  const displayAudioRef = audioRef;
   const restorePositionRef = useRef<{ time: number, playing: boolean } | null>(null);
 
   // Background Music State & Controller (Host Only)
@@ -675,7 +680,7 @@ export default function RoomSession() {
 
       try {
         const query = new URLSearchParams({
-          role: roleParam || 'guest',
+          role: isDisplay ? 'guest' : (roleParam || 'guest'),
           ...(controllerId ? { controllerId } : {})
         });
 
@@ -730,7 +735,7 @@ export default function RoomSession() {
     return () => {
       isMounted = false;
     };
-  }, [sessionId, roleParam, controllerId]);
+  }, [sessionId, roleParam, controllerId, isDisplay]);
 
   // 2. Fetch Session State & Queue
   const fetchState = async () => {
@@ -797,7 +802,7 @@ export default function RoomSession() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const token = getAuthToken();
       const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
-      socket = new WebSocket(`${protocol}//${window.location.host}/ws/karaoke?sessionId=${sessionId}&isHost=${isHost}${tokenQuery}`);
+      socket = new WebSocket(`${protocol}//${window.location.host}/ws/karaoke?sessionId=${sessionId}&isHost=${isHost}${controllerId ? `&controllerId=${encodeURIComponent(controllerId)}` : ''}${tokenQuery}`);
 
       socket.onopen = () => {
         // Re-fetch authoritative state on connect/reconnect
@@ -841,9 +846,29 @@ export default function RoomSession() {
               break;
             case 'PLAYING':
               setPlaying(true);
+              if (isDisplay && audioOutput && audioRef.current) {
+                if (Number.isFinite(Number(msg.payload?.position)) && Math.abs(audioRef.current.currentTime - Number(msg.payload.position)) > 0.75) audioRef.current.currentTime = Number(msg.payload.position);
+                audioRef.current.play().then(() => setDisplayAudioBlocked(false)).catch(() => setDisplayAudioBlocked(true));
+              }
               break;
             case 'PAUSED':
               setPlaying(false);
+              if (isDisplay && audioOutput && audioRef.current) {
+                if (Number.isFinite(Number(msg.payload?.position))) audioRef.current.currentTime = Number(msg.payload.position);
+                audioRef.current.pause();
+              }
+              break;
+            case 'SYNC':
+              if (typeof msg.payload?.playing === 'boolean') setPlaying(msg.payload.playing);
+              if (Number.isFinite(Number(msg.payload?.position))) {
+                const syncedPosition = Number(msg.payload.position);
+                setCurrentTime(syncedPosition);
+                if (isDisplay && audioOutput && audioRef.current) {
+                  if (Math.abs(audioRef.current.currentTime - syncedPosition) > 0.65) audioRef.current.currentTime = syncedPosition;
+                  if (msg.payload.playing) audioRef.current.play().then(() => setDisplayAudioBlocked(false)).catch(() => setDisplayAudioBlocked(true));
+                  else audioRef.current.pause();
+                }
+              }
               break;
             case 'RESTARTED':
               if (audioRef.current) {
@@ -2165,6 +2190,61 @@ export default function RoomSession() {
   }
 
   // -------------------------------------------------------------
+  // Render: Synchronized Display Mode (separate from Singer controls)
+  // -------------------------------------------------------------
+  if (isDisplay) {
+    const requestDisplayFullscreen = async () => {
+      try {
+        const root = document.getElementById('yimly-display-mode');
+        if (root?.requestFullscreen) await root.requestFullscreen();
+        if (audioOutput && audioRef.current) {
+          const target = audioRef.current;
+          if (Math.abs(target.currentTime - currentTime) > 0.75) target.currentTime = currentTime;
+          if (playing) await target.play();
+          setDisplayAudioBlocked(false);
+        }
+      } catch {
+        if (audioOutput) setDisplayAudioBlocked(true);
+      }
+    };
+    return (
+      <div id="yimly-display-mode" className="fixed inset-0 z-[100] bg-[#08090E] text-white overflow-hidden flex flex-col items-center justify-center px-6 py-8 md:px-12">
+        <div className="absolute top-5 left-6 right-6 flex items-center justify-between gap-4 opacity-70">
+          <div className="flex items-center gap-2"><Music className="w-4 h-4 text-[#F472B6]" /><span className="text-xs font-bold tracking-[0.25em]">YIMLY DISPLAY</span></div>
+          <div className="text-xs text-zinc-400">{audioOutput ? 'AUDIO OUTPUT ON' : 'SILENT DISPLAY'}</div>
+        </div>
+        {currentSongDetails && <div className="text-center mb-8 max-w-4xl">
+          <h1 className="text-xl md:text-3xl font-bold text-white">{currentSongDetails.title || currentSong?.songTitle || 'Waiting for song'}</h1>
+          <p className="text-sm md:text-lg text-zinc-400 mt-2">{currentSongDetails.artist || currentSong?.artist || ''}</p>
+        </div>}
+        <div className="w-full max-w-6xl text-center flex flex-col items-center justify-center gap-5 md:gap-8">
+          {lyrics.length ? (
+            <>
+              {prev1Line && <p className="text-xl md:text-3xl text-zinc-600 font-semibold max-w-full">{prev1Line.text}</p>}
+              <p className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-black leading-tight text-[#F472B6] max-w-full">{currLine?.text || lyrics[0]?.text}</p>
+              {next1Line && <p className="text-xl md:text-3xl text-zinc-400 font-semibold max-w-full">{next1Line.text}</p>}
+            </>
+          ) : <p className="text-xl md:text-3xl text-zinc-500">{currentSong ? 'Loading lyrics…' : 'Waiting for the host to start a song…'}</p>}
+        </div>
+        {(displayAudioBlocked || !document.fullscreenElement) && (
+          <button onClick={requestDisplayFullscreen} className="absolute bottom-6 px-5 py-3 rounded-xl bg-[#F472B6] text-white font-bold shadow-lg shadow-[#F472B6]/20">
+            {displayAudioBlocked ? 'Tap to enable audio & fullscreen' : 'Enter fullscreen'}
+          </button>
+        )}
+        {audioOutput && <audio ref={displayAudioRef} src={currentSong?.songId ? `/api/songs/${currentSong.songId}/audio?type=${variant}` : undefined} preload="auto" playsInline onLoadedMetadata={() => {
+          const audio = audioRef.current;
+          if (!audio) return;
+          audio.currentTime = currentTime;
+          if (playing) audio.play().then(() => setDisplayAudioBlocked(false)).catch(() => setDisplayAudioBlocked(true));
+        }} onTimeUpdate={() => {
+          const audio = audioRef.current;
+          if (audio) setCurrentTime(audio.currentTime);
+        }} onError={() => setDisplayAudioBlocked(true)} className="hidden" />}
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
   // Render: Active Karaoke Room Experience
   // -------------------------------------------------------------
   return (
@@ -2760,7 +2840,7 @@ export default function RoomSession() {
           )}
 
           {/* Audio Player for Host */}
-          {isHost && (
+          {(isHost || (isDisplay && audioOutput)) && (
             <audio 
               ref={audioRef}
               src={currentSong && currentSong.songId ? `/api/songs/${currentSong.songId}/audio?type=${variant}` : undefined}
@@ -2774,12 +2854,23 @@ export default function RoomSession() {
               }}
               onTimeUpdate={() => {
                 if (audioRef.current) {
-                  setCurrentTime(audioRef.current.currentTime);
+                  const position = audioRef.current.currentTime;
+                  setCurrentTime(position);
+                  const now = Date.now();
+                  if (isHost && ws && ws.readyState === WebSocket.OPEN && now - lastSyncSentAtRef.current >= 500) {
+                    lastSyncSentAtRef.current = now;
+                    ws.send(JSON.stringify({ type: 'SYNC', payload: { position, playing: !audioRef.current.paused } }));
+                  }
                 }
               }}
               onLoadedMetadata={() => {
                 if (audioRef.current) {
                   setDuration(audioRef.current.duration);
+                  if (isDisplay && audioOutput) {
+                    audioRef.current.currentTime = currentTime;
+                    if (playing) audioRef.current.play().then(() => setDisplayAudioBlocked(false)).catch(() => setDisplayAudioBlocked(true));
+                    else audioRef.current.pause();
+                  }
                   if (restorePositionRef.current) {
                     audioRef.current.currentTime = restorePositionRef.current.time;
                     if (restorePositionRef.current.playing) {
