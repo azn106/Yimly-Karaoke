@@ -5,6 +5,7 @@ import { clearAuthToken } from '../lib/auth';
 import NowPlayingOverlay from './NowPlayingOverlay';
 import NowPlayingPanel from './NowPlayingPanel';
 import { usePlayback } from '../context/PlaybackContext';
+import { detectDeviceType, type DeviceType } from '../lib/deviceDetection';
 
 export default function Layout() {
   const { currentSong, queue, togglePlay } = usePlayback();
@@ -13,6 +14,7 @@ export default function Layout() {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedSection, setExpandedSection] = useState<'jukebox' | 'settings' | null>(null);
+  const [deviceType, setDeviceType] = useState<DeviceType>(() => detectDeviceType());
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -50,6 +52,18 @@ export default function Layout() {
       setExpandedSection(null);
     }
   }, [location.pathname]);
+
+  // Refresh the best-effort device label on resize/orientation changes.
+  // This is informational only; layout continues to follow viewport breakpoints.
+  useEffect(() => {
+    const updateDeviceType = () => setDeviceType(detectDeviceType());
+    window.addEventListener('resize', updateDeviceType);
+    window.addEventListener('orientationchange', updateDeviceType);
+    return () => {
+      window.removeEventListener('resize', updateDeviceType);
+      window.removeEventListener('orientationchange', updateDeviceType);
+    };
+  }, []);
 
   // Only use the physical-screen fallback when a wide landscape display is
   // reporting an unusually narrow CSS viewport (e.g. some TV browsers).
@@ -172,7 +186,7 @@ export default function Layout() {
   }
 
   return (
-    <div className={`w-full h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans yk-desktop-layout ${
+    <div data-device-type={deviceType} className={`w-full h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans yk-desktop-layout ${
       isWideLandscapeScreen ? 'yk-tv-landscape' : ''
     } ${isRightPanelVisible ? 'yk-has-right-panel' : ''}`}>
       {/* Desktop & Tablet Sidebar */}
