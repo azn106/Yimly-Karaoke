@@ -188,6 +188,13 @@ html, body {
   outline-offset: 2px;
 }
 
+/* TV remotes often move focus programmatically and may not trigger :focus-visible. */
+#room-session-root .yk-tv-focused {
+  outline: 3px solid #F472B6 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 2px rgba(244, 114, 182, 0.22), 0 0 18px rgba(244, 114, 182, 0.24) !important;
+}
+
 /* Horizontal Library rails: static artwork with native swipe/scroll. */
 .yk-horizontal-rail {
   scroll-behavior: auto;
