@@ -51,7 +51,8 @@ export default function Layout() {
     }
   }, [location.pathname]);
 
-  // Keep the right-side player at the wide desktop breakpoint (1280px). The main sidebar activates at a 900px CSS viewport to accommodate landscape TV browsers that report a reduced viewport width.
+  // Keep the right-side player at the wide desktop breakpoint (1280px).
+  // The main layout responds continuously to landscape orientation (TVs, laptops, desktops) and viewport width.
   const [isDesktop, setIsDesktop] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1280px)').matches;
@@ -59,20 +60,40 @@ export default function Layout() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const mql = window.matchMedia('(min-width: 1280px)');
-    const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
+    const mqlDesktop = window.matchMedia('(min-width: 1280px)');
+    const onChangeDesktop = (e: MediaQueryListEvent | MediaQueryList) => {
       setIsDesktop(e.matches);
     };
-    if (mql.addEventListener) {
-      mql.addEventListener('change', onChange as (e: MediaQueryListEvent) => void);
+    if (mqlDesktop.addEventListener) {
+      mqlDesktop.addEventListener('change', onChangeDesktop as (e: MediaQueryListEvent) => void);
     } else {
-      mql.addListener(onChange);
+      mqlDesktop.addListener(onChangeDesktop);
     }
+
+    const mqlDesktopTV = window.matchMedia(
+      '(min-width: 900px) and (min-height: 500px), (orientation: landscape) and (min-width: 800px) and (min-height: 480px)'
+    );
+    const onChangeDesktopTV = (e: MediaQueryListEvent | MediaQueryList) => {
+      if (e.matches) {
+        setMobileMenuOpen(false);
+      }
+    };
+    if (mqlDesktopTV.addEventListener) {
+      mqlDesktopTV.addEventListener('change', onChangeDesktopTV as (e: MediaQueryListEvent) => void);
+    } else {
+      mqlDesktopTV.addListener(onChangeDesktopTV);
+    }
+
     return () => {
-      if (mql.removeEventListener) {
-        mql.removeEventListener('change', onChange as (e: MediaQueryListEvent) => void);
+      if (mqlDesktop.removeEventListener) {
+        mqlDesktop.removeEventListener('change', onChangeDesktop as (e: MediaQueryListEvent) => void);
       } else {
-        mql.removeListener(onChange);
+        mqlDesktop.removeListener(onChangeDesktop);
+      }
+      if (mqlDesktopTV.removeEventListener) {
+        mqlDesktopTV.removeEventListener('change', onChangeDesktopTV as (e: MediaQueryListEvent) => void);
+      } else {
+        mqlDesktopTV.removeListener(onChangeDesktopTV);
       }
     };
   }, []);
@@ -127,13 +148,11 @@ export default function Layout() {
   }
 
   return (
-    <div className={`flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans min-[900px]:grid ${
-      isRightPanelVisible 
-        ? 'min-[900px]:grid-cols-[230px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_346px]' 
-        : 'min-[900px]:grid-cols-[230px_minmax(0,1fr)]'
+    <div className={`w-full h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans yk-desktop-layout ${
+      isRightPanelVisible ? 'yk-has-right-panel' : ''
     }`}>
       {/* Desktop & Tablet Sidebar */}
-      <aside className="hidden min-[900px]:flex min-[900px]:col-start-1 min-[900px]:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
+      <aside className="yk-desktop-sidebar col-start-1 row-start-1 h-full w-full min-w-0 flex flex-col bg-[#11121A] border-r border-white/5">
           {/* Brand Header */}
           <div className="p-6 pb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -180,7 +199,7 @@ export default function Layout() {
 
       {/* Mobile Drawer Backdrop & Menu */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 min-[900px]:hidden flex">
+        <div className="fixed inset-0 z-50 yk-mobile-drawer flex">
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
             onClick={() => setMobileMenuOpen(false)} 
@@ -227,9 +246,9 @@ export default function Layout() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#0A0B10] min-[900px]:col-start-2 min-[900px]:row-start-1">
+      <div className="flex min-w-0 min-h-0 flex-1 w-full flex-col overflow-hidden bg-[#0A0B10] yk-main-content">
         {/* Mobile Header Bar */}
-        <div className="min-[900px]:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
+        <div className="yk-mobile-header px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#F472B6] flex items-center justify-center text-white">
                 <Mic className="w-4 h-4" />
@@ -256,7 +275,7 @@ export default function Layout() {
 
       {/* Right panel is a separate full-height grid column, visible only on desktop music routes */}
       {isRightPanelVisible && (
-        <aside className="hidden xl:flex xl:col-start-3 xl:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
+        <aside className="hidden xl:flex yk-right-panel xl:col-start-3 xl:row-start-1 h-full min-h-0 w-full min-w-0 overflow-hidden border-l border-white/5 bg-[#11121A]">
           <NowPlayingPanel />
         </aside>
       )}
