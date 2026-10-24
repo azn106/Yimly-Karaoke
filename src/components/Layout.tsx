@@ -65,18 +65,20 @@ export default function Layout() {
     };
   }, []);
 
-  // Only use the physical-screen fallback when a wide landscape display is
-  // reporting an unusually narrow CSS viewport (e.g. some TV browsers).
-  // Normal phones and tablets continue to respond to their actual viewport.
+  // Use the physical-screen fallback only for displays identified as TVs.
+  // Without this guard, a normal PC with a narrow browser window can be
+  // mistaken for a TV and have its sidebar forced open.
   const [isWideLandscapeScreen, setIsWideLandscapeScreen] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return window.screen.width >= 1000 &&
+    return deviceType === 'tv' &&
+      window.screen.width >= 1000 &&
       window.screen.width > window.screen.height && window.innerWidth < 900;
   });
 
   useEffect(() => {
     const updateScreenLayout = () => {
       setIsWideLandscapeScreen(
+        detectDeviceType() === 'tv' &&
         window.screen.width >= 1000 &&
         window.screen.width > window.screen.height && window.innerWidth < 900
       );
