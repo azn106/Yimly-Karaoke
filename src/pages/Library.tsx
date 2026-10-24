@@ -2086,7 +2086,7 @@ export default function Library() {
 
           {/* Artists Grid: responsive, vertically scrolling catalogue */}
           {tab === 'artists' && (
-            <div className="grid grid-cols-3 justify-center gap-3 pb-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4">
+            <div className="grid grid-cols-3 justify-center gap-3 pb-4 [@media(orientation:landscape)]:grid-cols-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4">
               {artists.map(artist => (
                 <div id={`library-card-artists-${artist.id}`} key={artist.id} onClick={() => openArtist(artist.id)}
                   className="group flex min-w-0 cursor-pointer flex-col items-center rounded-xl border border-white/5 bg-[#141622] p-1 text-center transition hover:border-[#F472B6]/30 hover:bg-[#1A1C2C] sm:rounded-2xl sm:p-4">
@@ -2117,7 +2117,7 @@ export default function Library() {
 
           {/* Albums Grid: responsive, vertically scrolling catalogue */}
           {tab === 'albums' && (
-            <div className="grid grid-cols-3 justify-center gap-3 pb-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4">
+            <div className="grid grid-cols-3 justify-center gap-3 pb-4 [@media(orientation:landscape)]:grid-cols-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4">
               {albums.map(album => (
                 <div id={`library-card-albums-${album.id}`} key={album.id} onClick={() => openAlbum(album.id)} className="group min-w-0 cursor-pointer rounded-xl p-1 transition hover:bg-white/[0.04] sm:p-2">
                   <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
