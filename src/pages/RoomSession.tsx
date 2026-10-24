@@ -481,14 +481,14 @@ export default function RoomSession() {
 
         // Allow range slider native left/right adjustment
         if (activeEl.tagName === 'INPUT' && (activeEl as HTMLInputElement).type === 'range') {
-          if (key === 'ArrowLeft' || key === 'ArrowRight' || keyCode === 37 || keyCode === 39) {
+          if (isLeftKey || isRightKey) {
             return;
           }
         }
 
         // Allow text input left/right cursor movement
         if (activeEl.tagName === 'INPUT' && (activeEl as HTMLInputElement).type === 'text') {
-          if (key === 'ArrowLeft' || key === 'ArrowRight' || keyCode === 37 || keyCode === 39) {
+          if (isLeftKey || isRightKey) {
             return;
           }
         }
