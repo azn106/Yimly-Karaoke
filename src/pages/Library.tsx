@@ -2086,11 +2086,11 @@ export default function Library() {
 
           {/* Artists Grid: responsive, vertically scrolling catalogue */}
           {tab === 'artists' && (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,180px))] justify-center gap-4 pb-4">
+            <div className="grid grid-cols-3 justify-center gap-3 pb-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4">
               {artists.map(artist => (
                 <div id={`library-card-artists-${artist.id}`} key={artist.id} onClick={() => openArtist(artist.id)}
-                  className="group flex min-w-0 cursor-pointer flex-col items-center rounded-2xl border border-white/5 bg-[#141622] p-4 text-center transition hover:border-[#F472B6]/30 hover:bg-[#1A1C2C]">
-                  <div className="relative mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/50">
+                  className="group flex min-w-0 cursor-pointer flex-col items-center rounded-xl border border-white/5 bg-[#141622] p-1 text-center transition hover:border-[#F472B6]/30 hover:bg-[#1A1C2C] sm:rounded-2xl sm:p-4">
+                  <div className="relative mb-2.5 flex aspect-square h-auto w-full max-w-[5rem] items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/50">
                     {artist.hasArtwork && !artistArtworkErrors[artist.id] && (
                       <img
                         key={`${artist.id}-${artistArtworkVersions[artist.id] || 0}`}
@@ -2105,8 +2105,8 @@ export default function Library() {
                       />
                     )}
                   </div>
-                  <h3 className="w-full truncate text-sm font-semibold text-white transition-colors group-hover:text-[#F472B6]">{artist.name}</h3>
-                  <p className="mt-1 text-xs text-zinc-400">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>
+                  <h3 className="w-full truncate text-xs font-semibold text-white transition-colors group-hover:text-[#F472B6] sm:text-sm">{artist.name}</h3>
+                  <p className="mt-1 text-[10px] text-zinc-400 sm:text-xs">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>
                 </div>
               ))}
               {artists.length === 0 && !loading && <div className="col-span-full py-16 text-center text-zinc-500">No artists found. Run a library scan or configure a directory in Settings.</div>}
@@ -2117,15 +2117,15 @@ export default function Library() {
 
           {/* Albums Grid: responsive, vertically scrolling catalogue */}
           {tab === 'albums' && (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,180px))] justify-center gap-4 pb-4">
+            <div className="grid grid-cols-3 justify-center gap-3 pb-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4">
               {albums.map(album => (
-                <div id={`library-card-albums-${album.id}`} key={album.id} onClick={() => openAlbum(album.id)} className="group min-w-0 cursor-pointer rounded-xl p-2 transition hover:bg-white/[0.04]">
+                <div id={`library-card-albums-${album.id}`} key={album.id} onClick={() => openAlbum(album.id)} className="group min-w-0 cursor-pointer rounded-xl p-1 transition hover:bg-white/[0.04] sm:p-2">
                   <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
                     {album.hasArtwork ? <img src={`/api/albums/${album.id}/artwork`} alt={album.title} loading="lazy" decoding="async" className="yk-artwork-image h-full w-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} /> : <Disc className="h-12 w-12 text-zinc-500 transition-colors group-hover:text-[#F472B6]" />}
                   </div>
-                  <h3 className="truncate text-sm font-semibold text-white transition-colors group-hover:text-[#F472B6]">{album.title}</h3>
-                  <p className="mt-0.5 truncate text-xs text-zinc-400">{album.artist || 'Unknown Artist'}</p>
-                  <p className="mt-1 text-[11px] text-zinc-500">{album.year || 'Album'} • {album.songCount || 0} Tracks</p>
+                  <h3 className="truncate text-xs font-semibold text-white transition-colors group-hover:text-[#F472B6] sm:text-sm">{album.title}</h3>
+                  <p className="mt-0.5 truncate text-[10px] text-zinc-400 sm:text-xs">{album.artist || 'Unknown Artist'}</p>
+                  <p className="mt-1 text-[10px] text-zinc-500 sm:text-[11px]">{album.year || 'Album'} • {album.songCount || 0} Tracks</p>
                 </div>
               ))}
               {albums.length === 0 && !loading && <div className="col-span-full py-16 text-center text-zinc-500">No albums found in media library.</div>}
