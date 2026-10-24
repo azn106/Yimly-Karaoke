@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Mic, ArrowRight, AlertCircle, Music } from 'lucide-react';
+import { Mic, ArrowRight, AlertCircle, Music, MonitorPlay, Volume2, VolumeX, ArrowLeft } from 'lucide-react';
 
 export default function Join() {
   const [searchParams] = useSearchParams();
@@ -16,14 +16,16 @@ export default function Join() {
     : rawCode || '------';
 
   const [username, setUsername] = useState('');
+  const [joinMode, setJoinMode] = useState<'choose' | 'singer' | 'display'>('choose');
+  const [audioOutput, setAudioOutput] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleJoin = async (e: FormEvent) => {
     e.preventDefault();
 
-    const trimmedName = username.trim();
-    if (!trimmedName) {
+    const trimmedName = joinMode === 'display' ? 'Display' : username.trim();
+    if (joinMode !== 'display' && !trimmedName) {
       setError('Please enter your username.');
       return;
     }
@@ -65,7 +67,7 @@ export default function Join() {
       }
 
       // Success! Navigate directly to Guest Controller
-      navigate(`/rooms/${data.sessionId}?role=guest&controllerId=${data.controllerId}`);
+      navigate(`/rooms/${data.sessionId}?role=${joinMode === 'display' ? 'display' : 'guest'}&controllerId=${data.controllerId}${joinMode === 'display' ? `&audioOutput=${audioOutput ? '1' : '0'}` : ''}`);
     } catch (err: any) {
       console.error('Join room error:', err);
       setError('This room is no longer available.');
@@ -108,40 +110,47 @@ export default function Join() {
             <p className="text-xs text-zinc-400 mt-1">Please ask the host for an active room QR code.</p>
           </div>
         ) : (
-          /* Username Entry Form */
-          <form onSubmit={handleJoin} className="space-y-4">
-            <div className="space-y-2 text-left">
-              <label htmlFor="username-input" className="block text-xs font-semibold text-zinc-300 text-center">
-                What's your username?
-              </label>
-              <input
-                id="username-input"
-                type="text"
-                placeholder="Enter username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                maxLength={30}
-                required
-                autoFocus
-                className="w-full px-4 py-3.5 bg-[#08090E] border border-white/15 rounded-xl text-center text-base font-semibold text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-2 focus:ring-[#F472B6]/40 transition-all"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !username.trim() || !rawCode}
-              className="w-full py-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-base rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40"
-            >
-              {loading ? (
-                <span>Joining...</span>
-              ) : (
-                <>
-                  <span>JOIN ROOM</span>
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </form>
+          <div className="space-y-4">
+            {joinMode === 'choose' ? (
+              <>
+                <p className="text-sm text-zinc-400 mb-4">How would you like to use this device?</p>
+                <button type="button" onClick={() => setJoinMode('singer')} className="w-full p-4 bg-[#F472B6] hover:bg-[#ff69b2] rounded-xl text-left flex items-center gap-3 shadow-lg shadow-[#F472B6]/20">
+                  <Mic className="w-6 h-6" />
+                  <span><strong className="block">Join as Singer</strong><span className="text-xs text-white/80">Choose songs and add them to the queue</span></span>
+                  <ArrowRight className="w-5 h-5 ml-auto" />
+                </button>
+                <button type="button" onClick={() => setJoinMode('display')} className="w-full p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-left flex items-center gap-3">
+                  <MonitorPlay className="w-6 h-6 text-[#F472B6]" />
+                  <span><strong className="block">Join as Display</strong><span className="text-xs text-zinc-400">Fullscreen lyrics synced to the room</span></span>
+                  <ArrowRight className="w-5 h-5 ml-auto" />
+                </button>
+              </>
+            ) : joinMode === 'display' ? (
+              <>
+                <button type="button" onClick={() => setJoinMode('choose')} className="text-xs text-zinc-400 hover:text-white flex items-center gap-1"><ArrowLeft className="w-3.5 h-3.5" /> Back</button>
+                <h3 className="text-lg font-bold">Display settings</h3>
+                <p className="text-sm text-zinc-400">Choose whether this display should play the song audio.</p>
+                <button type="button" onClick={() => setAudioOutput(true)} className={`w-full p-4 rounded-xl border flex items-center gap-3 text-left ${audioOutput ? 'bg-[#F472B6]/15 border-[#F472B6]' : 'bg-white/5 border-white/10'}`}>
+                  <Volume2 className="w-6 h-6 text-[#F472B6]" /><span><strong className="block">Audio Output On</strong><span className="text-xs text-zinc-400">Play audio and synchronise lyrics</span></span>{audioOutput && <span className="ml-auto text-[#F472B6]">✓</span>}
+                </button>
+                <button type="button" onClick={() => setAudioOutput(false)} className={`w-full p-4 rounded-xl border flex items-center gap-3 text-left ${!audioOutput ? 'bg-[#F472B6]/15 border-[#F472B6]' : 'bg-white/5 border-white/10'}`}>
+                  <VolumeX className="w-6 h-6 text-[#F472B6]" /><span><strong className="block">Audio Output Off</strong><span className="text-xs text-zinc-400">Show synchronised lyrics silently</span></span>{!audioOutput && <span className="ml-auto text-[#F472B6]">✓</span>}
+                </button>
+                <button type="button" onClick={() => handleJoin({ preventDefault: () => {} } as FormEvent)} disabled={loading || !rawCode} className="w-full py-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold rounded-xl disabled:opacity-40">{loading ? 'Joining…' : 'Start Display'} <ArrowRight className="inline w-4 h-4 ml-1" /></button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={() => setJoinMode('choose')} className="text-xs text-zinc-400 hover:text-white flex items-center gap-1"><ArrowLeft className="w-3.5 h-3.5" /> Back</button>
+                <form onSubmit={handleJoin} className="space-y-4">
+                  <div className="space-y-2 text-left">
+                    <label htmlFor="username-input" className="block text-xs font-semibold text-zinc-300 text-center">What's your singer name?</label>
+                    <input id="username-input" type="text" placeholder="Enter singer name" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={30} required autoFocus className="w-full px-4 py-3.5 bg-[#08090E] border border-white/15 rounded-xl text-center text-base font-semibold text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-2 focus:ring-[#F472B6]/40 transition-all" />
+                  </div>
+                  <button type="submit" disabled={loading || !username.trim() || !rawCode} className="w-full py-4 bg-[#F472B6] hover:bg-[#ff69b2] text-white font-bold text-base rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40">{loading ? <span>Joining...</span> : <><span>JOIN ROOM</span><ArrowRight className="w-5 h-5" /></>}</button>
+                </form>
+              </>
+            )}
+          </div>
         )}
       </div>
     </div>
