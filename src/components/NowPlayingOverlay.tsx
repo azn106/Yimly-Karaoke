@@ -348,7 +348,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
 
           <section className="shrink-0 px-5 sm:px-8 pb-2">
             <div className="flex justify-center mb-3">
-              <div className="w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px]">
+              <div className="yk-now-playing-artwork-size w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px]">
                 <div
                   ref={artworkCardRef}
                   className={'yk-audio-reactive-border relative w-full h-full rounded-2xl overflow-hidden border bg-black/20 will-change-[border-color,background,box-shadow] shadow-xl ' + (showLyrics ? 'cursor-zoom-in' : '')}
