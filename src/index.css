@@ -263,6 +263,32 @@ html, body {
   }
 }
 
+
+/* TV fallback: use the physical landscape display when its CSS viewport is reported too small. */
+.yk-desktop-layout.yk-tv-landscape {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: 230px minmax(0, 1fr);
+}
+
+.yk-desktop-layout.yk-tv-landscape .yk-desktop-sidebar {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.yk-desktop-layout.yk-tv-landscape .yk-mobile-header,
+.yk-desktop-layout.yk-tv-landscape .yk-mobile-drawer {
+  display: none !important;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.yk-desktop-layout.yk-tv-landscape .yk-main-content {
+  grid-column: 2;
+  grid-row: 1;
+}
+
 /* Horizontal Library rails: static artwork with native swipe/scroll. */
 .yk-horizontal-rail {
   scroll-behavior: auto;
