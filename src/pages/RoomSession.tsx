@@ -292,20 +292,35 @@ export default function RoomSession() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Track last focused element ID
+  // Track focused controls and provide a reliable visible focus ring on TV browsers.
   useEffect(() => {
+    let focusedTvElement: HTMLElement | null = null;
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
-      if (target && target !== document.body) {
-        lastFocusedElementRef.current = target;
-        const tvId = target.getAttribute('data-tv-id');
-        if (tvId) {
-          lastFocusedTvIdRef.current = tvId;
-        }
+      if (!target || target === document.body) return;
+      if (focusedTvElement && focusedTvElement !== target) {
+        focusedTvElement.classList.remove('yk-tv-focused');
+      }
+      focusedTvElement = target;
+      target.classList.add('yk-tv-focused');
+      lastFocusedElementRef.current = target;
+      const tvId = target.getAttribute('data-tv-id');
+      if (tvId) lastFocusedTvIdRef.current = tvId;
+    };
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target === focusedTvElement && !target.contains(e.relatedTarget as Node | null)) {
+        target.classList.remove('yk-tv-focused');
+        focusedTvElement = null;
       }
     };
     window.addEventListener('focusin', handleFocusIn);
-    return () => window.removeEventListener('focusin', handleFocusIn);
+    window.addEventListener('focusout', handleFocusOut);
+    return () => {
+      window.removeEventListener('focusin', handleFocusIn);
+      window.removeEventListener('focusout', handleFocusOut);
+      focusedTvElement?.classList.remove('yk-tv-focused');
+    };
   }, []);
 
   // Initial focus placement on Play button or primary action when Host room opens
@@ -496,7 +511,7 @@ export default function RoomSession() {
 
         if (activeEl === document.body || !searchContainer.contains(activeEl)) {
           const defaultTarget = candidates.find(c => c.getAttribute('data-tv-id') === 'play-button') || candidates[0];
-          if (defaultTarget) defaultTarget.focus();
+          if (defaultTarget) safeFocus(defaultTarget);
           return;
         }
 
@@ -560,8 +575,9 @@ export default function RoomSession() {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Capture remote key events before nested controls or browser handlers can swallow them.
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isHost, showEndSessionModal, showSessionInfoModal, showLibrary]);
 
   // Feature detect if native Element Fullscreen API is available
