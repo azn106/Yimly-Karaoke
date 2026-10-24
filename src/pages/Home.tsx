@@ -92,7 +92,8 @@ export default function Home() {
         return;
       }
       const storageKey = `yimly_controller_${s.id}`;
-      const storedControllerId = localStorage.getItem(storageKey);
+      let storedControllerId: string | null = null;
+      try { storedControllerId = localStorage.getItem(storageKey); } catch { /* Continue without cached credentials if storage is unavailable. */ }
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       const token = getAuthToken();
       if (token) headers.Authorization = `Bearer ${token}`;
@@ -110,7 +111,7 @@ export default function Home() {
       if (typeof data.controllerId !== 'string' || !data.controllerId.trim()) {
         throw new Error('The server did not return room access credentials. Please try again.');
       }
-      localStorage.setItem(storageKey, data.controllerId);
+      try { localStorage.setItem(storageKey, data.controllerId); } catch { /* The URL carries the current controller ID for this visit. */ }
       navigate(`/rooms/${s.id}?role=guest&controllerId=${encodeURIComponent(data.controllerId)}`);
     } catch (err: any) {
       console.warn('Join session failed:', err?.message || err);
