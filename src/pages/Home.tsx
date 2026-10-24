@@ -1,53 +1,13 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useOutletContext, Link, useNavigate } from 'react-router-dom';
-import { Play, Pause, Mic, Radio, Users, Music, Disc, ChevronRight, Plus, Sparkles, Folder, Download } from 'lucide-react';
+import { Mic, Radio, Music, ChevronRight, Sparkles, Download } from 'lucide-react';
 import { getAuthToken } from '../lib/auth';
-import { usePlayback, PlaybackSong } from '../context/PlaybackContext';
-import EqualizerIndicator from '../components/EqualizerIndicator';
 
 export default function Home() {
   const { user } = useOutletContext<{ user: any }>() || {};
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ songs: 0, artists: 0, albums: 0 });
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
-  const [featuredSongs, setFeaturedSongs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const hostButtonRef = useRef<HTMLButtonElement>(null);
-
-  const { 
-    currentSong: jukeboxCurrentSong, 
-    isPlaying: jukeboxIsPlaying, 
-    playSong: playJukeboxSong, 
-    togglePlay: toggleJukeboxPlay 
-  } = usePlayback();
-
-  const handlePlayInJukebox = (song: any) => {
-    if (jukeboxCurrentSong?.id === song.id) {
-      toggleJukeboxPlay();
-      return;
-    }
-    const formatted: PlaybackSong = {
-      id: song.id,
-      title: song.title,
-      artist: song.artist || 'Unknown Artist',
-      artists: song.artists,
-      album: song.album,
-      duration: song.duration,
-      hasArtwork: song.hasArtwork,
-      variant: song.variant,
-    };
-    const formattedList: PlaybackSong[] = featuredSongs.map(s => ({
-      id: s.id,
-      title: s.title,
-      artist: s.artist || 'Unknown Artist',
-      artists: s.artists,
-      album: s.album,
-      duration: s.duration,
-      hasArtwork: s.hasArtwork,
-      variant: s.variant,
-    }));
-    playJukeboxSong(formatted, formattedList);
-  };
 
   useEffect(() => {
     if (user?.role === 'user') {
@@ -58,28 +18,12 @@ export default function Home() {
   useEffect(() => {
     async function loadDashboardData() {
       try {
-        const [statsRes, sessionsRes, songsRes] = await Promise.all([
-          fetch('/api/libraries/stats'),
-          fetch('/api/karaoke/active-sessions'),
-          fetch('/api/songs')
-        ]);
-
-        if (statsRes.ok && statsRes.headers.get('content-type')?.includes('application/json')) {
-          setStats(await statsRes.json());
-        }
+        const sessionsRes = await fetch('/api/karaoke/active-sessions');
         if (sessionsRes.ok && sessionsRes.headers.get('content-type')?.includes('application/json')) {
           setActiveSessions(await sessionsRes.json());
         }
-        if (songsRes.ok && songsRes.headers.get('content-type')?.includes('application/json')) {
-          const songsData = await songsRes.json();
-          if (Array.isArray(songsData)) {
-            setFeaturedSongs(songsData.slice(0, 8));
-          }
-        }
       } catch (e) {
         console.error('Failed to load dashboard data:', e);
-      } finally {
-        setLoading(false);
       }
     }
 
@@ -269,35 +213,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Stats Overview Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-        <StatCard
-          icon={<Music className="w-5 h-5 text-[#F472B6]" />}
-          title="Total Songs"
-          value={stats.songs}
-          link="/library"
-        />
-        <StatCard
-          icon={<Mic className="w-5 h-5 text-[#F472B6]" />}
-          title="Artists"
-          value={stats.artists}
-          link="/library"
-        />
-        <StatCard
-          icon={<Disc className="w-5 h-5 text-[#F472B6]" />}
-          title="Albums"
-          value={stats.albums}
-          link="/library"
-        />
-        <StatCard
-          icon={<Radio className="w-5 h-5 text-[#F472B6]" />}
-          title="Active Rooms"
-          value={activeSessions.length}
-          link="/rooms"
-          highlight={activeSessions.length > 0}
-        />
-      </div>
-
       {/* Live Karaoke Sessions Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -360,105 +275,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* Featured / Recently Added Songs Showcase */}
-      {featuredSongs.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white tracking-tight">Media Library Highlights</h2>
-            <Link
-              to="/library"
-              className="text-xs font-semibold text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
-            >
-              <span>Explore All Songs</span>
-              <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {featuredSongs.map((song, index) => {
-              const isCurrent = jukeboxCurrentSong?.id === song.id;
-              const isThisPlaying = isCurrent && jukeboxIsPlaying;
-              return (
-                <div
-                  key={song.id}
-                  className={`border rounded-2xl p-4 transition-all group flex flex-col justify-between ${
-                    isCurrent 
-                      ? 'bg-[#181524] border-[#F472B6]/30 shadow-lg shadow-[#F472B6]/10' 
-                      : 'bg-[#141622] hover:bg-[#1A1C2C] border-white/5 hover:border-white/15'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handlePlayInJukebox(song)}
-                    className="w-full aspect-square rounded-xl bg-[#1C1E2D] border border-white/5 mb-3 flex items-center justify-center relative overflow-hidden group-hover:border-[#F472B6]/30 transition-colors cursor-pointer group/art"
-                    title={isThisPlaying ? 'Pause song' : 'Play in Jukebox'}
-                  >
-                    {song.hasArtwork ? (
-                      <img
-                        src={`/api/songs/${song.id}/artwork`}
-                        alt={song.title}
-                        className={`w-full h-full object-cover yk-artwork-image yk-artwork-motion group-hover:scale-105 transition-transform duration-300 ${index === 0 || isThisPlaying ? 'yk-heartbeat-artwork' : ''}`}
-                      />
-                    ) : (
-                      <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
-                    )}
-                    <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity ${isThisPlaying ? 'opacity-100' : 'opacity-0 group-hover/art:opacity-100'}`}>
-                      {isThisPlaying ? (
-                        <Pause className="w-8 h-8 text-[#F472B6] fill-current" />
-                      ) : (
-                        <Play className="w-8 h-8 text-white fill-current ml-1" />
-                      )}
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <h3 className={`font-semibold text-sm truncate group-hover:text-[#F472B6] transition-colors ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`} title={song.title}>
-                      {song.title}
-                    </h3>
-                    {isCurrent && <EqualizerIndicator isPlaying={isThisPlaying} />}
-                  </div>
-                  <p className="text-xs text-zinc-400 truncate mt-0.5">{song.artist || 'Unknown Artist'}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
-  );
-}
-
-function StatCard({
-  icon,
-  title,
-  value,
-  link,
-  highlight = false
-}: {
-  icon: ReactNode;
-  title: string;
-  value: number;
-  link: string;
-  highlight?: boolean;
-}) {
-  return (
-    <Link
-      to={link}
-      className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-        highlight
-          ? 'bg-[#181524] border-[#F472B6]/30 shadow-lg shadow-[#F472B6]/10'
-          : 'bg-[#141622] hover:bg-[#1A1C2C] border-white/5 hover:border-white/10'
-      }`}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center">
-          {icon}
-        </div>
-        <ChevronRight className="w-4 h-4 text-zinc-600" />
-      </div>
-      <div>
-        <div className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">{value}</div>
-        <div className="text-xs font-medium text-zinc-400 mt-1">{title}</div>
-      </div>
-    </Link>
   );
 }
