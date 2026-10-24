@@ -1315,6 +1315,7 @@ export default function RoomSession() {
     setQueue([]);
     setSession(null);
     setValidationStatus('expired');
+    navigate('/');
   };
 
   // Start New Real Karaoke Session (Host Only)
