@@ -382,3 +382,33 @@ html, body {
     transform: scaleY(0.6) !important;
   }
 }
+
+/* Touch-first controls: keep navigation targets comfortable on phones, tablets,
+   and touchscreen desktops without enlarging every compact player button. */
+@media (pointer: coarse) {
+  .yk-mobile-header > button,
+  .yk-mobile-drawer button,
+  .yk-desktop-sidebar nav a,
+  .yk-desktop-sidebar nav button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Short landscape viewports have limited vertical room (especially phones).
+   Keep the mobile header compact; layout selection remains based on the live
+   viewport rather than a guessed device category. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 900px) {
+  .yk-mobile-header {
+    padding-block: 0.375rem;
+  }
+
+  .yk-mobile-header > button {
+    min-height: 40px;
+  }
+
+  .yk-mobile-drawer > div:last-child {
+    padding-block: 0.75rem;
+  }
+}
+
