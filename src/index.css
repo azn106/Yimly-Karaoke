@@ -412,3 +412,16 @@ html, body {
   }
 }
 
+/* In short landscape viewports, constrain square artwork by available height as
+   well as width so the transport controls and queue remain reachable. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .yk-now-playing-artwork-size {
+    width: min(28vw, 34dvh, 220px);
+    height: min(28vw, 34dvh, 220px);
+    min-width: 96px;
+    min-height: 96px;
+    max-width: 220px;
+    max-height: 220px;
+  }
+}
+
