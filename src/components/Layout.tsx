@@ -51,17 +51,20 @@ export default function Layout() {
     }
   }, [location.pathname]);
 
-  // Some TV browsers expose a reduced CSS viewport even on a wide landscape screen.
-  // Use physical screen dimensions as a fallback without changing TV focus handling.
+  // Only use the physical-screen fallback when a wide landscape display is
+  // reporting an unusually narrow CSS viewport (e.g. some TV browsers).
+  // Normal phones and tablets continue to respond to their actual viewport.
   const [isWideLandscapeScreen, setIsWideLandscapeScreen] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return window.screen.width >= 1000 && window.screen.width > window.screen.height;
+    return window.screen.width >= 1000 &&
+      window.screen.width > window.screen.height && window.innerWidth < 900;
   });
 
   useEffect(() => {
     const updateScreenLayout = () => {
       setIsWideLandscapeScreen(
-        window.screen.width >= 1000 && window.screen.width > window.screen.height
+        window.screen.width >= 1000 &&
+        window.screen.width > window.screen.height && window.innerWidth < 900
       );
     };
     window.addEventListener('resize', updateScreenLayout);
