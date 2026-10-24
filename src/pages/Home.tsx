@@ -253,7 +253,7 @@ export default function Home() {
                   </span>
                 </p>
               </button>
-            ))
+            ))}
           </div>
         ) : (
           <div className="rounded-2xl bg-[#12131E] border border-dashed border-white/10 p-8 text-center">
