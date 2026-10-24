@@ -1869,9 +1869,9 @@ export default function Library() {
                           type="button"
                           key={artist.id}
                           onClick={() => openArtist(artist.id)}
-                          className="yk-artist-carousel-card group flex basis-[calc((100%_-_1.5rem)_/_3)] shrink-0 flex-col items-center snap-start text-center transition hover:opacity-90 cursor-pointer"
+                          className="yk-artist-carousel-card group flex w-[calc((100%_-_1.5rem)_/_3)] shrink-0 flex-col items-center snap-start text-center transition hover:opacity-90 cursor-pointer"
                         >
-                          <div className="relative mb-2.5 flex h-[clamp(3.5rem,18vw,5rem)] w-[clamp(3.5rem,18vw,5rem)] items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#F472B6]/40 transition-colors shadow-md">
+                          <div className="relative mb-2.5 flex aspect-square h-auto w-full max-w-[5rem] items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1C1E2D] shadow-md transition-colors group-hover:border-[#F472B6]/40">
                             <Mic className="absolute h-8 w-8 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
                             {artist.hasArtwork && (
                               <img
