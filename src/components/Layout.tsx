@@ -51,7 +51,7 @@ export default function Layout() {
     }
   }, [location.pathname]);
 
-  // Track xl viewport breakpoint (1280px) for responsive player presentation
+  // Keep the right-side player at the wide desktop breakpoint (1280px). The main sidebar can appear earlier for landscape TV browsers.
   const [isDesktop, setIsDesktop] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1280px)').matches;
@@ -98,7 +98,7 @@ export default function Layout() {
   }, [currentSong, togglePlay]);
 
   // Unified player visibility conditions:
-  // Right-side player panel is shown on desktop (>= 1280px) on music/library routes (Home & Library).
+  // The right-side player panel is shown only at wide desktop widths (>= 1280px) on music/library routes (Home & Library).
   // On other routes (e.g. /rooms, /settings, /download, /users) or below xl, it is hidden.
   const isRightPanelRoute = location.pathname === '/' || location.pathname.startsWith('/library');
   const isRightPanelVisible = isDesktop && isRightPanelRoute;
@@ -127,13 +127,13 @@ export default function Layout() {
   }
 
   return (
-    <div className={`flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans xl:grid ${
+    <div className={`flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans lg:grid ${
       isRightPanelVisible 
-        ? 'xl:grid-cols-[230px_minmax(0,1fr)_346px]' 
-        : 'xl:grid-cols-[230px_minmax(0,1fr)]'
+        ? 'lg:grid-cols-[230px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_346px]' 
+        : 'lg:grid-cols-[230px_minmax(0,1fr)]'
     }`}>
       {/* Desktop & Tablet Sidebar */}
-      <aside className="hidden xl:flex xl:col-start-1 xl:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
+      <aside className="hidden lg:flex lg:col-start-1 lg:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
           {/* Brand Header */}
           <div className="p-6 pb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -180,7 +180,7 @@ export default function Layout() {
 
       {/* Mobile Drawer Backdrop & Menu */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 xl:hidden flex">
+        <div className="fixed inset-0 z-50 lg:hidden flex">
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
             onClick={() => setMobileMenuOpen(false)} 
@@ -227,9 +227,9 @@ export default function Layout() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#0A0B10] xl:col-start-2 xl:row-start-1">
+      <div className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#0A0B10] lg:col-start-2 lg:row-start-1">
         {/* Mobile Header Bar */}
-        <div className="xl:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
+        <div className="lg:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#F472B6] flex items-center justify-center text-white">
                 <Mic className="w-4 h-4" />
