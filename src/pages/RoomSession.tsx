@@ -369,31 +369,31 @@ export default function RoomSession() {
     if (showEndSessionModal) {
       const t = setTimeout(() => {
         const cancelBtn = document.querySelector<HTMLElement>('[data-tv-id="end-session-cancel"]');
-        if (cancelBtn) cancelBtn.focus();
+        if (cancelBtn) safeFocus(cancelBtn);
       }, 50);
       return () => clearTimeout(t);
     }
-  }, [showEndSessionModal]);
+  }, [showEndSessionModal, safeFocus]);
 
   useEffect(() => {
     if (showSessionInfoModal) {
       const t = setTimeout(() => {
         const closeBtn = document.querySelector<HTMLElement>('[data-tv-id="session-info-close"]');
-        if (closeBtn) closeBtn.focus();
+        if (closeBtn) safeFocus(closeBtn);
       }, 50);
       return () => clearTimeout(t);
     }
-  }, [showSessionInfoModal]);
+  }, [showSessionInfoModal, safeFocus]);
 
   useEffect(() => {
     if (showLibrary) {
       const t = setTimeout(() => {
         const searchInput = document.querySelector<HTMLElement>('[data-tv-id="library-search"]');
-        if (searchInput) searchInput.focus();
+        if (searchInput) safeFocus(searchInput);
       }, 50);
       return () => clearTimeout(t);
     }
-  }, [showLibrary]);
+  }, [showLibrary, safeFocus]);
 
   // Keydown Spatial & Back Key Handler for TV Remote / Keyboard
   useEffect(() => {
@@ -418,46 +418,47 @@ export default function RoomSession() {
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const key = e.key;
-      const keyCode = e.keyCode;
+      const rawKey = e.key || '';
+      const key = rawKey.toLowerCase();
+      const keyCode = e.keyCode || e.which || 0;
 
-      const isUpKey = key === 'ArrowUp' || key === 'Up' || key === 'DPAD_UP' || keyCode === 38 || keyCode === 19;
-      const isDownKey = key === 'ArrowDown' || key === 'Down' || key === 'DPAD_DOWN' || keyCode === 40 || keyCode === 20;
-      const isLeftKey = key === 'ArrowLeft' || key === 'Left' || key === 'DPAD_LEFT' || keyCode === 37 || keyCode === 21;
-      const isRightKey = key === 'ArrowRight' || key === 'Right' || key === 'DPAD_RIGHT' || keyCode === 39 || keyCode === 22;
+      const isUpKey = key === 'arrowup' || key === 'up' || key === 'dpad_up' || keyCode === 38 || keyCode === 19;
+      const isDownKey = key === 'arrowdown' || key === 'down' || key === 'dpad_down' || keyCode === 40 || keyCode === 20;
+      const isLeftKey = key === 'arrowleft' || key === 'left' || key === 'dpad_left' || keyCode === 37 || keyCode === 21;
+      const isRightKey = key === 'arrowright' || key === 'right' || key === 'dpad_right' || keyCode === 39 || keyCode === 22;
       const isDpad = isUpKey || isDownKey || isLeftKey || isRightKey;
 
-      const isSelect = key === 'Enter' || key === ' ' || key === 'Select' ||
-                       keyCode === 13 || keyCode === 32 || keyCode === 29443;
+      const isSelect = key === 'enter' || key === ' ' || key === 'select' ||
+                       keyCode === 13 || keyCode === 32 || keyCode === 29443 || keyCode === 23 || keyCode === 66;
 
-      const isBack = key === 'Escape' || key === 'Backspace' || key === 'GoBack' ||
-                     keyCode === 27 || keyCode === 8 || keyCode === 10009 || keyCode === 461;
+      const isBack = key === 'escape' || key === 'backspace' || key === 'goback' || key === 'back' ||
+                     keyCode === 27 || keyCode === 8 || keyCode === 10009 || keyCode === 461 || keyCode === 4;
 
       // 1. Handle TV Remote Back / Escape Key
       if (isBack) {
         if (showEndSessionModal) {
           e.preventDefault();
           setShowEndSessionModal(false);
-          lastFocusedElementRef.current?.focus();
+          safeFocus(lastFocusedElementRef.current);
           return;
         }
         if (showSessionInfoModal) {
           e.preventDefault();
           setShowSessionInfoModal(false);
-          lastFocusedElementRef.current?.focus();
+          safeFocus(lastFocusedElementRef.current);
           return;
         }
         if (showLibrary) {
           e.preventDefault();
           setShowLibrary(false);
-          lastFocusedElementRef.current?.focus();
+          safeFocus(lastFocusedElementRef.current);
           return;
         }
         // Return focus to Play button if somewhere else
         const playBtn = playButtonRef.current || document.querySelector<HTMLElement>('[data-tv-id="play-button"]');
         if (playBtn && document.activeElement !== playBtn && !playBtn.hasAttribute('disabled')) {
           e.preventDefault();
-          playBtn.focus();
+          safeFocus(playBtn);
           return;
         }
       }
@@ -468,7 +469,7 @@ export default function RoomSession() {
           e.preventDefault();
           const playBtn = playButtonRef.current || document.querySelector<HTMLElement>('[data-tv-id="play-button"], [data-tv-id="start-session-button"]');
           if (playBtn) {
-            playBtn.focus();
+            safeFocus(playBtn);
             playBtn.click();
           }
           return;
@@ -500,10 +501,10 @@ export default function RoomSession() {
         const isDown = isDownKey;
         const isUp = isUpKey;
 
-        // Determine container scope
+        // Determine container scope (explicitly targeted via data-modal-container to avoid matching #room-session-root)
         let searchContainer: HTMLElement | Document = document;
         if (showEndSessionModal || showSessionInfoModal || showLibrary) {
-          const activeModal = document.querySelector<HTMLElement>('.fixed.inset-0 > div, .fixed.inset-0');
+          const activeModal = document.querySelector<HTMLElement>('[data-modal-container]');
           if (activeModal) {
             searchContainer = activeModal;
           }
@@ -512,7 +513,8 @@ export default function RoomSession() {
         const candidates = getFocusable(searchContainer);
         if (candidates.length === 0) return;
 
-        if (activeEl === document.body || !searchContainer.contains(activeEl)) {
+        // Fallback recovery if focus is on body, outside active scope, or lost on an ineligible element
+        if (activeEl === document.body || !searchContainer.contains(activeEl) || !candidates.includes(activeEl)) {
           const defaultTarget = candidates.find(c => c.getAttribute('data-tv-id') === 'play-button') || candidates[0];
           if (defaultTarget) safeFocus(defaultTarget);
           return;
@@ -573,28 +575,16 @@ export default function RoomSession() {
         }
 
         if (bestCandidate) {
-          bestCandidate.focus();
-        } else {
-          // Some TV browsers report incomplete element geometry. Keep D-pad navigation
-          // usable by falling back to the adjacent visible control in DOM order.
-          const currentIndex = candidates.indexOf(activeEl);
-          if (currentIndex >= 0) {
-            const step = (isRight || isDown) ? 1 : -1;
-            const fallbackIndex = currentIndex + step;
-            if (fallbackIndex >= 0 && fallbackIndex < candidates.length) {
-              candidates[fallbackIndex].focus();
-            } else if (candidates.length > 1) {
-              candidates[step > 0 ? 0 : candidates.length - 1].focus();
-            }
-          }
+          safeFocus(bestCandidate);
         }
+        // When no candidate exists in the requested direction, keep focus at the current boundary
       }
     };
 
     // Capture remote key events before nested controls or browser handlers can swallow them.
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isHost, showEndSessionModal, showSessionInfoModal, showLibrary]);
+  }, [isHost, showEndSessionModal, showSessionInfoModal, showLibrary, safeFocus]);
 
   // Feature detect if native Element Fullscreen API is available
   const isNativeFullscreenSupported = () => {
@@ -2287,7 +2277,7 @@ export default function RoomSession() {
     <div id="room-session-root" className="fixed inset-0 flex h-full w-full bg-[#08090E] text-white overflow-hidden flex-col font-sans select-none">
       {/* Room Song Catalog / Add to Queue Modal (Guests Only) */}
       {!isHost && showLibrary && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-8">
+        <div data-modal-container="library" className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-8">
           <div className="w-full max-w-3xl bg-[#12131D] border border-white/10 rounded-3xl flex flex-col h-[85vh] shadow-2xl overflow-hidden">
             {/* Modal Header */}
             <div className="p-5 border-b border-white/5 bg-[#0D0E17] flex items-center justify-between shrink-0">
@@ -3099,7 +3089,7 @@ export default function RoomSession() {
       {/* Confirmation Modal: End Session */}
       <AnimatePresence>
         {showEndSessionModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div data-modal-container="end-session" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -3139,7 +3129,7 @@ export default function RoomSession() {
       {/* Info Modal: Session Info */}
       <AnimatePresence>
         {showSessionInfoModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div data-modal-container="session-info" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
