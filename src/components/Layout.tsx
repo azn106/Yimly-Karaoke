@@ -51,7 +51,7 @@ export default function Layout() {
     }
   }, [location.pathname]);
 
-  // Keep the right-side player at the wide desktop breakpoint (1280px). The main sidebar can appear earlier for landscape TV browsers.
+  // Keep the right-side player at the wide desktop breakpoint (1280px). The main sidebar activates at a 900px CSS viewport to accommodate landscape TV browsers that report a reduced viewport width.
   const [isDesktop, setIsDesktop] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(min-width: 1280px)').matches;
@@ -127,13 +127,13 @@ export default function Layout() {
   }
 
   return (
-    <div className={`flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans lg:grid ${
+    <div className={`flex h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans min-[900px]:grid ${
       isRightPanelVisible 
-        ? 'lg:grid-cols-[230px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_346px]' 
-        : 'lg:grid-cols-[230px_minmax(0,1fr)]'
+        ? 'min-[900px]:grid-cols-[230px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_346px]' 
+        : 'min-[900px]:grid-cols-[230px_minmax(0,1fr)]'
     }`}>
       {/* Desktop & Tablet Sidebar */}
-      <aside className="hidden lg:flex lg:col-start-1 lg:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
+      <aside className="hidden min-[900px]:flex min-[900px]:col-start-1 min-[900px]:row-start-1 h-full w-full min-w-0 flex-col bg-[#11121A] border-r border-white/5">
           {/* Brand Header */}
           <div className="p-6 pb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -180,7 +180,7 @@ export default function Layout() {
 
       {/* Mobile Drawer Backdrop & Menu */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
+        <div className="fixed inset-0 z-50 min-[900px]:hidden flex">
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
             onClick={() => setMobileMenuOpen(false)} 
@@ -227,9 +227,9 @@ export default function Layout() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#0A0B10] lg:col-start-2 lg:row-start-1">
+      <div className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#0A0B10] min-[900px]:col-start-2 min-[900px]:row-start-1">
         {/* Mobile Header Bar */}
-        <div className="lg:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
+        <div className="min-[900px]:hidden px-4 py-3 bg-[#11121A] border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#F472B6] flex items-center justify-center text-white">
                 <Mic className="w-4 h-4" />
