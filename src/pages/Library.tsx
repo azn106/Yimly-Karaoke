@@ -1810,7 +1810,7 @@ export default function Library() {
                             key={playlist.id}
                             type="button"
                             onClick={() => openPlaylist(playlist.id)}
-                            className="group relative h-[7.5rem] w-[min(44vw,11.5rem)] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-[#141416] text-left shadow-lg shadow-black/20 sm:h-32"
+                            className="group relative h-[7.5rem] w-[calc((100%_-_1rem)_/_2)] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-[#141416] text-left shadow-lg shadow-black/20 sm:h-32"
                             aria-label={`Open playlist ${playlist.name}`}
                           >
                             {playlist.coverImageUrl || playlist.coverPath ? (
@@ -1863,15 +1863,15 @@ export default function Library() {
                     </button>
                   </div>
                   {artists.length ? (
-                    <div className="yk-horizontal-rail flex items-center gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
+                    <div className="yk-horizontal-rail flex items-center gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
                       {artists.map(artist => (
                         <button
                           type="button"
                           key={artist.id}
                           onClick={() => openArtist(artist.id)}
-                          className="yk-artist-carousel-card group flex flex-col items-center shrink-0 w-28 snap-start text-center transition hover:opacity-90 cursor-pointer"
+                          className="yk-artist-carousel-card group flex basis-[calc((100%_-_1.5rem)_/_3)] shrink-0 flex-col items-center snap-start text-center transition hover:opacity-90 cursor-pointer"
                         >
-                          <div className="relative mb-2.5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#F472B6]/40 transition-colors shadow-md">
+                          <div className="relative mb-2.5 flex h-[clamp(3.5rem,18vw,5rem)] w-[clamp(3.5rem,18vw,5rem)] items-center justify-center overflow-hidden rounded-full bg-[#1C1E2D] border border-white/10 group-hover:border-[#F472B6]/40 transition-colors shadow-md">
                             <Mic className="absolute h-8 w-8 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
                             {artist.hasArtwork && (
                               <img
@@ -1904,13 +1904,13 @@ export default function Library() {
                     </button>
                   </div>
                   {albums.length ? (
-                    <div className="yk-horizontal-rail flex items-start gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
+                    <div className="yk-horizontal-rail flex items-start gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
                       {albums.map(album => (
                         <button
                           type="button"
                           key={album.id}
                           onClick={() => openAlbum(album.id)}
-                          className="group w-[6.3rem] sm:w-[7rem] shrink-0 snap-start rounded-xl p-2 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F472B6]"
+                          className="group w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start rounded-xl p-1 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F472B6]"
                           aria-label={`Open album ${album.title}`}
                         >
                           <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
@@ -1952,7 +1952,7 @@ export default function Library() {
                       {songs.slice(0, 10).map((song, idx) => (
                         <div
                           key={song.id}
-                          className="group flex flex-col shrink-0 w-[6.3rem] snap-start rounded-xl p-2 transition hover:bg-white/[0.04] cursor-pointer"
+                          className="group flex w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start flex-col rounded-xl p-1 transition hover:bg-white/[0.04] cursor-pointer"
                           onClick={() => handlePlayInJukebox(song, songs, idx)}
                         >
                           <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#1C1E2D] flex items-center justify-center">
