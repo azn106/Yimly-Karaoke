@@ -7,6 +7,8 @@ export default function Home() {
   const { user } = useOutletContext<{ user: any }>() || {};
   const navigate = useNavigate();
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [joiningSessionId, setJoiningSessionId] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const hostButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -81,50 +83,40 @@ export default function Home() {
   };
 
   const handleJoinSession = async (s: any) => {
+    if (joiningSessionId) return;
+    setJoinError(null);
+    setJoiningSessionId(s.id);
     try {
       if (user?.id && s.hostId === user.id) {
         navigate(`/rooms/${s.id}?role=host`);
         return;
       }
-
       const storageKey = `yimly_controller_${s.id}`;
-      let controllerId = localStorage.getItem(storageKey);
-
-      if (!controllerId) {
-        const res = await fetch('/api/karaoke/sessions/join', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            roomCode: s.roomCode,
-            sessionId: s.id
-          })
-        });
-        let data: any = {};
-        if (res.headers.get('content-type')?.includes('application/json')) {
-          try {
-            data = await res.json();
-          } catch (e) {
-            console.error('Failed to parse join response', e);
-          }
-        }
-        if (!res.ok) {
-          setActiveSessions((prev) => prev.filter((item) => item.id !== s.id));
-          throw new Error(data.error || 'Failed to join room');
-        }
-        controllerId = data.controllerId;
-        if (controllerId) {
-          localStorage.setItem(storageKey, controllerId);
-        }
+      const storedControllerId = localStorage.getItem(storageKey);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const token = getAuthToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch('/api/karaoke/sessions/join', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers,
+        body: JSON.stringify({ roomCode: s.roomCode, sessionId: s.id, ...(storedControllerId ? { controllerId: storedControllerId } : {}) })
+      });
+      let data: any = {};
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        try { data = await res.json(); } catch (e) { console.error('Failed to parse join response', e); }
       }
-
-      if (controllerId) {
-        navigate(`/rooms/${s.id}?role=guest&controllerId=${encodeURIComponent(controllerId)}`);
-      } else {
-        navigate(`/rooms/${s.id}?role=guest`);
+      if (!res.ok) throw new Error(data.error || `Unable to join room (${res.status}). Please try again.`);
+      if (typeof data.controllerId !== 'string' || !data.controllerId.trim()) {
+        throw new Error('The server did not return room access credentials. Please try again.');
       }
+      localStorage.setItem(storageKey, data.controllerId);
+      navigate(`/rooms/${s.id}?role=guest&controllerId=${encodeURIComponent(data.controllerId)}`);
     } catch (err: any) {
-      console.warn('Join session notice:', err?.message || err);
-      navigate(`/rooms/${s.id}?role=guest`);
+      console.warn('Join session failed:', err?.message || err);
+      setJoinError(err?.message || 'Unable to join this room. Please try again.');
+    } finally {
+      setJoiningSessionId(null);
     }
   };
 
@@ -229,13 +221,24 @@ export default function Home() {
           </Link>
         </div>
 
+        {joinError && (
+          <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <span className="flex-1">{joinError}</span>
+            <button type="button" onClick={() => setJoinError(null)} className="shrink-0 rounded-md px-2 py-1 hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300" aria-label="Dismiss join error">Dismiss</button>
+          </div>
+        )}
+
         {activeSessions.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeSessions.map((s) => (
-              <div
+              <button
                 key={s.id}
+                type="button"
                 onClick={() => handleJoinSession(s)}
-                className="bg-[#141622] hover:bg-[#1A1C2C] border border-white/5 hover:border-[#F472B6]/40 rounded-2xl p-5 cursor-pointer transition-all group relative overflow-hidden"
+                disabled={joiningSessionId !== null}
+                aria-label={`Join karaoke room ${s.roomCode}`}
+                aria-busy={joiningSessionId === s.id}
+                className="text-left w-full bg-[#141622] hover:bg-[#1A1C2C] border border-white/5 hover:border-[#F472B6]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F472B6] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1018] disabled:opacity-70 disabled:cursor-wait rounded-2xl p-5 cursor-pointer transition-all group relative overflow-hidden"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25 flex items-center gap-1.5">
@@ -243,19 +246,17 @@ export default function Home() {
                   </span>
                   <span className="text-xs text-zinc-500 font-mono">ID: {s.id.slice(0, 6)}</span>
                 </div>
-
                 <div className="font-mono text-2xl font-black tracking-widest text-white mb-2 group-hover:text-[#F472B6] transition-colors">
                   {s.roomCode}
                 </div>
-
                 <p className="text-xs text-zinc-400 flex items-center justify-between">
                   <span>Host: {s.hostId}</span>
                   <span className="text-[#F472B6] font-semibold flex items-center gap-1">
-                    Join <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    {joiningSessionId === s.id ? 'Joining…' : 'Join'} <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </p>
-              </div>
-            ))}
+              </button>
+            ))
           </div>
         ) : (
           <div className="rounded-2xl bg-[#12131E] border border-dashed border-white/10 p-8 text-center">
