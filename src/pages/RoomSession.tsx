@@ -755,6 +755,9 @@ export default function RoomSession() {
           if (typeof data.playback.playing === 'boolean') {
             setPlaying(data.playback.playing);
           }
+          if (typeof data.playback.position === 'number' && Number.isFinite(data.playback.position)) {
+            setCurrentTime(data.playback.position);
+          }
           if (data.playback.variant) {
             setVariant(data.playback.variant);
           }
