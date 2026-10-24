@@ -51,6 +51,27 @@ export default function Layout() {
     }
   }, [location.pathname]);
 
+  // Some TV browsers expose a reduced CSS viewport even on a wide landscape screen.
+  // Use physical screen dimensions as a fallback without changing TV focus handling.
+  const [isWideLandscapeScreen, setIsWideLandscapeScreen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.screen.width >= 1000 && window.screen.width > window.screen.height;
+  });
+
+  useEffect(() => {
+    const updateScreenLayout = () => {
+      setIsWideLandscapeScreen(
+        window.screen.width >= 1000 && window.screen.width > window.screen.height
+      );
+    };
+    window.addEventListener('resize', updateScreenLayout);
+    window.addEventListener('orientationchange', updateScreenLayout);
+    return () => {
+      window.removeEventListener('resize', updateScreenLayout);
+      window.removeEventListener('orientationchange', updateScreenLayout);
+    };
+  }, []);
+
   // Keep the right-side player at the wide desktop breakpoint (1280px).
   // The main layout responds continuously to landscape orientation (TVs, laptops, desktops) and viewport width.
   const [isDesktop, setIsDesktop] = useState(() => {
@@ -149,8 +170,8 @@ export default function Layout() {
 
   return (
     <div className={`w-full h-screen bg-[#0A0B10] text-zinc-100 overflow-hidden font-sans yk-desktop-layout ${
-      isRightPanelVisible ? 'yk-has-right-panel' : ''
-    }`}>
+      isWideLandscapeScreen ? 'yk-tv-landscape' : ''
+    } ${isRightPanelVisible ? 'yk-has-right-panel' : ''}`}>
       {/* Desktop & Tablet Sidebar */}
       <aside className="yk-desktop-sidebar col-start-1 row-start-1 h-full w-full min-w-0 flex flex-col bg-[#11121A] border-r border-white/5">
           {/* Brand Header */}
