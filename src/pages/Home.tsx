@@ -87,10 +87,6 @@ export default function Home() {
     setJoinError(null);
     setJoiningSessionId(s.id);
     try {
-      if (user?.id && s.hostId === user.id) {
-        navigate(`/rooms/${s.id}?role=host`);
-        return;
-      }
       const storageKey = `yimly_controller_${s.id}`;
       let storedControllerId: string | null = null;
       try { storedControllerId = localStorage.getItem(storageKey); } catch { /* Continue without cached credentials if storage is unavailable. */ }
