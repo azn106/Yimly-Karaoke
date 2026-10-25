@@ -122,6 +122,24 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
 
   // Single HTML Audio element ref
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Keep the Web Audio context reachable by playback actions and track transitions.
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioContextResumeInFlightRef = useRef(false);
+
+  // Resume only a suspended context; never let recovery block HTMLAudioElement playback.
+  const safelyResumeAudioContext = useCallback(() => {
+    const context = audioContextRef.current;
+    if (!context || context.state !== 'suspended' || audioContextResumeInFlightRef.current) return;
+
+    audioContextResumeInFlightRef.current = true;
+    context.resume()
+      .catch(error => {
+        console.warn('[PlaybackContext] AudioContext resume failed:', error);
+      })
+      .finally(() => {
+        audioContextResumeInFlightRef.current = false;
+      });
+  }, []);
   // Keep the ended-event listener pointed at the latest transition logic.
   // The audio engine effect intentionally mounts once, so its closure would otherwise go stale.
   const handleTrackEndedRef = useRef<() => void>(() => {});
@@ -231,6 +249,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
         audioContext = new AudioContextClass();
+        audioContextRef.current = audioContext;
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 1024;
         analyser.smoothingTimeConstant = 0.72;
@@ -244,6 +263,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       // Keep playback unaffected on browsers that cannot provide Web Audio analysis.
       console.warn('[PlaybackContext] Bass visualizer unavailable:', error);
       audioContext = null;
+      audioContextRef.current = null;
       analyser = null;
       frequencyData = null;
     }
@@ -316,8 +336,15 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    const onAudioContextStateChange = () => {
+      if (audioContext) {
+        console.info('[PlaybackContext] AudioContext state:', audioContext.state);
+      }
+    };
+    audioContext?.addEventListener('statechange', onAudioContextStateChange);
+
     const onPlay = () => {
-      if (audioContext?.state === 'suspended') audioContext.resume().catch(() => {});
+      safelyResumeAudioContext();
       if (analyser && !animationFrame) animationFrame = requestAnimationFrame(sampleBass);
       setIsPlaying(true);
       setPlaybackError(null);
@@ -363,14 +390,16 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('error', onError);
       audio.removeEventListener('ended', onEnded);
+      audioContext?.removeEventListener('statechange', onAudioContextStateChange);
       stopBassSampling();
+      if (audioContextRef.current === audioContext) audioContextRef.current = null;
       if (audioContext) audioContext.close().catch(() => {});
       try {
         audio.pause();
         audio.src = '';
       } catch {}
     };
-  }, []);
+  }, [safelyResumeAudioContext]);
 
   // Broadcast Channel setup for Cross-Tab Coordination
   useEffect(() => {
@@ -550,6 +579,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current;
     if (!audio) return;
 
+    safelyResumeAudioContext();
     setCurrentSong(song);
     setPlaybackError(null);
     setCurrentTime(0);
@@ -595,7 +625,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       setIsPlaying(false);
       broadcastSync({ currentSong: song, isPlaying: false });
     });
-  }, [broadcastSync, claimLeadership, queue]);
+  }, [broadcastSync, claimLeadership, queue, safelyResumeAudioContext]);
 
   // Play a full list of songs from a given start index
   const playQueue = useCallback((songs: PlaybackSong[], startIndex = 0) => {
@@ -622,6 +652,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         audio.src = `/api/songs/${currentSong.id}/audio`;
       }
 
+      safelyResumeAudioContext();
       audio.play().then(() => {
         setIsPlaying(true);
         broadcastSync({ isPlaying: true });
@@ -630,7 +661,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
         setIsPlaying(false);
       });
     });
-  }, [broadcastSync, currentSong, dispatchOrExecute, playSong, queue, queueIndex]);
+  }, [broadcastSync, currentSong, dispatchOrExecute, playSong, queue, queueIndex, safelyResumeAudioContext]);
 
   const pause = useCallback(() => {
     dispatchOrExecute('pause', undefined, () => {
@@ -750,6 +781,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       const audio = audioRef.current;
       if (audio && endedSong) {
         audio.currentTime = 0;
+        safelyResumeAudioContext();
         audio.play().then(() => {
           setIsPlaying(true);
           setCurrentTime(0);
@@ -761,7 +793,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       return;
     }
     next();
-  }, [broadcastSync, next]);
+  }, [broadcastSync, next, safelyResumeAudioContext]);
 
   // Update the callback ref every render; the long-lived audio listener reads this ref.
   handleTrackEndedRef.current = handleTrackEnded;
