@@ -406,9 +406,6 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         }}
       >
         {Array.from({ length: sectionCount }, (_, sectionIndex) => {
-          const vertAlignment = lyricsSettings.verticalAlignment || 'center';
-          const sectionAlign = vertAlignment === 'top' ? 'justify-start' : vertAlignment === 'bottom' ? 'justify-end' : 'justify-center';
-          
           const currLineIndex = safeFocusIndex >= sectionIndex
             ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
             : -1;
