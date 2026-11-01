@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { 
   Plus, Folder, RefreshCw, Trash2, AlertCircle, HardDrive, 
   ShieldCheck, Type, AlignLeft, AlignCenter, AlignRight, RotateCcw, Sparkles, Download, Save, Check,
-  Layers, Zap, Sliders, Eye, Shield, Music, Volume2, Shuffle, ListMusic
+  Layers, Zap, Sliders, Eye, Shield, Music, Volume2, Shuffle, ListMusic, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { getAuthToken } from '../lib/auth';
 import { AutoResponsiveLyrics } from '../components/AutoResponsiveLyrics';
@@ -1036,7 +1036,67 @@ export default function Settings() {
                   </button>
                 </div>
                 <p className="text-xs text-zinc-500 mt-2">
-                  Controls horizontal alignment of lyric text. The lyrics block remains top-anchored.
+                  Controls horizontal alignment of lyric text.
+                </p>
+              </div>
+
+              {/* Vertical Alignment */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-3">
+                  Vertical Position (In Section)
+                </label>
+                <div className="grid grid-cols-3 gap-3 max-w-md">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSetting((prev) => ({ ...prev, verticalAlignment: 'top' }))
+                    }
+                    className={`py-3.5 px-4 rounded-2xl border font-bold text-xs flex flex-col items-center gap-2 transition-all ${
+                      lyricsSettings.verticalAlignment === 'top'
+                        ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
+                        : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <ChevronUp className="w-5 h-5" />
+                    <span>Top</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSetting((prev) => ({ ...prev, verticalAlignment: 'center' }))
+                    }
+                    className={`py-3.5 px-4 rounded-2xl border font-bold text-xs flex flex-col items-center gap-2 transition-all ${
+                      lyricsSettings.verticalAlignment === 'center'
+                        ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
+                        : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <div className="w-5 h-5 flex flex-col items-center justify-center gap-0.5">
+                      <div className="w-4 h-0.5 bg-current rounded-full" />
+                      <div className="w-2 h-0.5 bg-current rounded-full" />
+                      <div className="w-4 h-0.5 bg-current rounded-full" />
+                    </div>
+                    <span>Centre</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSetting((prev) => ({ ...prev, verticalAlignment: 'bottom' }))
+                    }
+                    className={`py-3.5 px-4 rounded-2xl border font-bold text-xs flex flex-col items-center gap-2 transition-all ${
+                      lyricsSettings.verticalAlignment === 'bottom'
+                        ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
+                        : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <ChevronDown className="w-5 h-5" />
+                    <span>Bottom</span>
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-500 mt-2">
+                  Controls where each lyric line sits vertically within its fixed-position section.
                 </p>
               </div>
 

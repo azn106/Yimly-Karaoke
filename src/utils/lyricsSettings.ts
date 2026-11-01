@@ -18,6 +18,7 @@ export interface LyricsAppearanceSettings {
   highlighted: LyricStyleSettings;
   unhighlighted: LyricStyleSettings;
   alignment: 'left' | 'center' | 'right';
+  verticalAlignment: 'top' | 'center' | 'bottom';
   visibleLines: number; // Number of parallel lyric sections (1–5)
   lineTransition?: LineTransition;
   highlightCurrentLine: boolean; // on / off
@@ -56,6 +57,7 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
     color: '#d4d4d8'
   },
   alignment: 'center',
+  verticalAlignment: 'center',
   visibleLines: 2,
   lineTransition: 'fade',
   highlightCurrentLine: true,
@@ -109,6 +111,7 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
 
   const validTextCases = ['original', 'lowercase', 'uppercase', 'titlecase'] as const;
   const validAlignments = ['left', 'center', 'right'] as const;
+  const validVerticalAlignments = ['top', 'center', 'bottom'] as const;
 
   const resolved: LyricsAppearanceSettings = {
     highlighted: {
@@ -132,6 +135,7 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
       color: typeof unhigh.color === 'string' && unhigh.color.trim() ? unhigh.color.trim() : DEFAULT_LYRICS_SETTINGS.unhighlighted.color
     },
     alignment: validAlignments.includes(parsed.alignment) ? parsed.alignment : DEFAULT_LYRICS_SETTINGS.alignment,
+    verticalAlignment: validVerticalAlignments.includes(parsed.verticalAlignment) ? parsed.verticalAlignment : DEFAULT_LYRICS_SETTINGS.verticalAlignment,
     // Preserve the user's existing 1–5 selection; it now controls the number of rotating sections.
     visibleLines: Number.isInteger(parsed.visibleLines) && parsed.visibleLines >= 1 && parsed.visibleLines <= 5
       ? parsed.visibleLines

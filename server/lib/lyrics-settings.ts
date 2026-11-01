@@ -15,6 +15,7 @@ export interface LyricsAppearanceSettings {
   highlighted: LyricStyleSettings;
   unhighlighted: LyricStyleSettings;
   alignment: 'left' | 'center' | 'right';
+  verticalAlignment: 'top' | 'center' | 'bottom';
   visibleLines: number;
   highlightCurrentLine: boolean;
   animationDuration: number;
@@ -52,7 +53,8 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
     color: '#d4d4d8'
   },
   alignment: 'center',
-  visibleLines: 3,
+  verticalAlignment: 'center',
+  visibleLines: 2,
   highlightCurrentLine: true,
   animationDuration: 0.25,
   elrcDisplayLeadInMs: 0,
@@ -98,6 +100,7 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
 
   const validTextCases = ['original', 'lowercase', 'uppercase', 'titlecase'] as const;
   const validAlignments = ['left', 'center', 'right'] as const;
+  const validVerticalAlignments = ['top', 'center', 'bottom'] as const;
 
   return {
     highlighted: {
@@ -121,7 +124,10 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
       color: typeof unhigh.color === 'string' && unhigh.color.trim() ? unhigh.color.trim() : DEFAULT_LYRICS_SETTINGS.unhighlighted.color
     },
     alignment: validAlignments.includes(parsed.alignment) ? parsed.alignment : DEFAULT_LYRICS_SETTINGS.alignment,
-    visibleLines: [1, 3, 5].includes(parsed.visibleLines) ? parsed.visibleLines : DEFAULT_LYRICS_SETTINGS.visibleLines,
+    verticalAlignment: validVerticalAlignments.includes(parsed.verticalAlignment) ? parsed.verticalAlignment : DEFAULT_LYRICS_SETTINGS.verticalAlignment,
+    visibleLines: (Number.isInteger(parsed.visibleLines) && parsed.visibleLines >= 1 && parsed.visibleLines <= 5)
+      ? parsed.visibleLines
+      : DEFAULT_LYRICS_SETTINGS.visibleLines,
     highlightCurrentLine: typeof parsed.highlightCurrentLine === 'boolean' ? parsed.highlightCurrentLine : DEFAULT_LYRICS_SETTINGS.highlightCurrentLine,
     animationDuration: typeof parsed.animationDuration === 'number' && !isNaN(parsed.animationDuration) ? parsed.animationDuration : DEFAULT_LYRICS_SETTINGS.animationDuration,
     elrcDisplayLeadInMs: typeof parsed.elrcDisplayLeadInMs === 'number' && Number.isFinite(parsed.elrcDisplayLeadInMs) ? Math.max(0, Math.min(5000, Math.round(parsed.elrcDisplayLeadInMs))) : (DEFAULT_LYRICS_SETTINGS.elrcDisplayLeadInMs ?? 0),
