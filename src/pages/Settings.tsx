@@ -352,8 +352,8 @@ export default function Settings() {
           <div className="w-full h-48 flex items-center justify-center mt-4">
             <AutoResponsiveLyrics
               lyrics={[
-                { time: 1, text: 'Earlier lyric line' },
-                { time: 2, text: 'Previous lyric line' },
+                { time: 1, text: 'First lyric line' },
+                { time: 2, text: 'Second lyric line' },
                 {
                   time: 3,
                   text: 'CURRENT ACTIVE LYRIC',
@@ -363,26 +363,17 @@ export default function Settings() {
                     { text: 'LYRIC', start: 4.0 }
                   ]
                 },
-                { time: 4, text: 'Next upcoming lyric' },
-                { time: 5, text: 'Later upcoming lyric' },
+                { time: 4, text: 'Fourth upcoming lyric' },
+                { time: 5, text: 'Fifth lyric line' },
+                { time: 6, text: 'Sixth lyric line' },
+                { time: 7, text: 'Seventh lyric line' },
+                { time: 8, text: 'Eighth lyric line' },
+                { time: 9, text: 'Ninth lyric line' },
               ]}
               focusIndex={2}
               lyricsSettings={lyricsSettings}
               isHighlighted={lyricsSettings.highlightCurrentLine !== false}
-              prev2Line={{ time: 1, text: 'Earlier lyric line' }}
-              prev1Line={{ time: 2, text: 'Previous lyric line' }}
-              currLine={{
-                time: 3,
-                text: 'CURRENT ACTIVE LYRIC',
-                words: [
-                  { text: 'CURRENT', start: 3.0 },
-                  { text: 'ACTIVE', start: 3.5 },
-                  { text: 'LYRIC', start: 4.0 }
-                ]
-              }}
-              next1Line={{ time: 4, text: 'Next upcoming lyric' }}
-              next2Line={{ time: 5, text: 'Later upcoming lyric' }}
-              visibleLinesCount={lyricsSettings.visibleLines ?? 2}
+              sectionsCount={lyricsSettings.visibleLines ?? 2}
               applyTextCase={applyTextCase}
               getFontFamilyStyle={getFontFamilyStyle}
               getAlignmentClass={getAlignmentClass}
