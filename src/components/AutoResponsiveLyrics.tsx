@@ -20,12 +20,7 @@ interface AutoResponsiveLyricsProps {
   lyricsSettings: LyricsAppearanceSettings;
   isHighlighted: boolean;
   animDuration?: number;
-  prev2Line?: LyricLine | null;
-  prev1Line?: LyricLine | null;
-  currLine?: LyricLine | null;
-  next1Line?: LyricLine | null;
-  next2Line?: LyricLine | null;
-  visibleLinesCount?: number;
+  sectionsCount?: number;
   applyTextCase: (text: string, textCase?: string) => string;
   getFontFamilyStyle: (fontId?: string, customFontName?: string | null) => string;
   getAlignmentClass: (alignment?: string) => string;
@@ -56,7 +51,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   lyricsSettings,
   isHighlighted,
   animDuration = 0.25,
-  visibleLinesCount = 2,
+  sectionsCount = 2,
   applyTextCase,
   getFontFamilyStyle,
   isPreview = false,
@@ -70,7 +65,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   const [scale, setScale] = useState<number>(1);
   const [effectiveGap, setEffectiveGap] = useState<number>(12);
 
-  const sectionCount = Math.max(1, Math.min(5, Math.round(visibleLinesCount || 2)));
+  const sectionCount = Math.max(1, Math.min(5, Math.round(sectionsCount || 2)));
   const safeFocusIndex = Math.max(0, Math.min(Math.max(0, lyrics.length - 1), focusIndex));
   // Keep each group of N consecutive lyric lines visible together, one line per section.
   const groupStartIndex = Math.floor(safeFocusIndex / sectionCount) * sectionCount;
