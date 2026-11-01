@@ -1080,7 +1080,7 @@ export default function Settings() {
                   ))}
                 </div>
                 <p className="text-xs text-zinc-500 mt-2">
-                  Sets the number of parallel lyric sections. Each section advances through every Nth line, preserving the original lyric order.
+                  Sets the number of parallel sections. Each section shows three lines from its own sequence; together they preserve the original lyric order.
                 </p>
               </div>
 
