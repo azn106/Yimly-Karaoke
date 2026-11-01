@@ -132,10 +132,10 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
       color: typeof unhigh.color === 'string' && unhigh.color.trim() ? unhigh.color.trim() : DEFAULT_LYRICS_SETTINGS.unhighlighted.color
     },
     alignment: validAlignments.includes(parsed.alignment) ? parsed.alignment : DEFAULT_LYRICS_SETTINGS.alignment,
-    // Older settings stored a line-count choice (1/3/5), not a section count. Start those settings at the new two-section default.
-    visibleLines: parsed.lineTransition === undefined
-      ? DEFAULT_LYRICS_SETTINGS.visibleLines
-      : (Number.isInteger(parsed.visibleLines) && parsed.visibleLines >= 1 && parsed.visibleLines <= 5 ? parsed.visibleLines : DEFAULT_LYRICS_SETTINGS.visibleLines),
+    // Preserve the user's existing 1–5 selection; it now controls the number of rotating sections.
+    visibleLines: Number.isInteger(parsed.visibleLines) && parsed.visibleLines >= 1 && parsed.visibleLines <= 5
+      ? parsed.visibleLines
+      : DEFAULT_LYRICS_SETTINGS.visibleLines,
     lineTransition: ['fade', 'slide', 'instant'].includes(parsed.lineTransition) ? parsed.lineTransition : DEFAULT_LYRICS_SETTINGS.lineTransition,
     highlightCurrentLine: typeof parsed.highlightCurrentLine === 'boolean' ? parsed.highlightCurrentLine : DEFAULT_LYRICS_SETTINGS.highlightCurrentLine,
     animationDuration: typeof parsed.animationDuration === 'number' && !isNaN(parsed.animationDuration) ? parsed.animationDuration : DEFAULT_LYRICS_SETTINGS.animationDuration,
