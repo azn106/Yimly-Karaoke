@@ -12,12 +12,14 @@ export interface LyricStyleSettings {
 }
 
 export type ElrcTransition = 'smooth_sweep' | 'karaoke' | 'current_only' | 'instant';
+export type LineTransition = 'fade' | 'slide' | 'instant';
 
 export interface LyricsAppearanceSettings {
   highlighted: LyricStyleSettings;
   unhighlighted: LyricStyleSettings;
   alignment: 'left' | 'center' | 'right';
-  visibleLines: number; // 1 | 3 | 5
+  visibleLines: number; // Number of parallel lyric sections (1–5)
+  lineTransition?: LineTransition;
   highlightCurrentLine: boolean; // on / off
   animationDuration: number; // in seconds, e.g. 0.25
   elrcDisplayLeadInMs?: number; // Optional line-display lead-in for eLRC lyrics, in milliseconds.
@@ -54,7 +56,8 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
     color: '#d4d4d8'
   },
   alignment: 'center',
-  visibleLines: 3,
+  visibleLines: 2,
+  lineTransition: 'fade',
   highlightCurrentLine: true,
   animationDuration: 0.25,
   elrcDisplayLeadInMs: 0,
@@ -129,7 +132,8 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
       color: typeof unhigh.color === 'string' && unhigh.color.trim() ? unhigh.color.trim() : DEFAULT_LYRICS_SETTINGS.unhighlighted.color
     },
     alignment: validAlignments.includes(parsed.alignment) ? parsed.alignment : DEFAULT_LYRICS_SETTINGS.alignment,
-    visibleLines: [1, 3, 5].includes(parsed.visibleLines) ? parsed.visibleLines : DEFAULT_LYRICS_SETTINGS.visibleLines,
+    visibleLines: Number.isInteger(parsed.visibleLines) && parsed.visibleLines >= 1 && parsed.visibleLines <= 5 ? parsed.visibleLines : DEFAULT_LYRICS_SETTINGS.visibleLines,
+    lineTransition: ['fade', 'slide', 'instant'].includes(parsed.lineTransition) ? parsed.lineTransition : DEFAULT_LYRICS_SETTINGS.lineTransition,
     highlightCurrentLine: typeof parsed.highlightCurrentLine === 'boolean' ? parsed.highlightCurrentLine : DEFAULT_LYRICS_SETTINGS.highlightCurrentLine,
     animationDuration: typeof parsed.animationDuration === 'number' && !isNaN(parsed.animationDuration) ? parsed.animationDuration : DEFAULT_LYRICS_SETTINGS.animationDuration,
     elrcDisplayLeadInMs: typeof parsed.elrcDisplayLeadInMs === 'number' && Number.isFinite(parsed.elrcDisplayLeadInMs) ? Math.max(0, Math.min(5000, Math.round(parsed.elrcDisplayLeadInMs))) : (DEFAULT_LYRICS_SETTINGS.elrcDisplayLeadInMs ?? 0),
