@@ -2124,6 +2124,11 @@ export default function RoomSession() {
   // Number of parallel lyric sections (1–5); each section advances through every Nth line.
   const sectionsCount = lyricsSettings.visibleLines ?? 2;
 
+  // The fullscreen display mode still shows the adjacent chronological lyric lines.
+  const prev1Line = focusIndex >= 1 ? lyrics[focusIndex - 1] : null;
+  const currLine = lyrics.length > 0 ? (lyrics[focusIndex] || null) : null;
+  const next1Line = focusIndex + 1 < lyrics.length ? lyrics[focusIndex + 1] : null;
+
   const animDuration = lyricsSettings.animationDuration ?? 0.25;
 
   const filteredSongs = filterSongs(availableSongs, searchQuery);
