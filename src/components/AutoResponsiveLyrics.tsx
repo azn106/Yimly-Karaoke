@@ -171,9 +171,10 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     });
   }, [lyricsSettings.highlighted.size, lyricsSettings.highlighted.lineSpacing, sectionCount, isPreview]);
 
+  // Recalculate geometry only when stage/layout inputs change, never as playback advances.
   useLayoutEffect(() => {
     recalculateLayout();
-  }, [lyrics, focusIndex, lyricsSettings, sectionCount, isHighlighted, isPreview, recalculateLayout]);
+  }, [lyricsSettings.highlighted.size, lyricsSettings.highlighted.lineSpacing, sectionCount, isPreview, recalculateLayout]);
 
   useEffect(() => {
     const handleFontLoad = () => recalculateLayout();
@@ -211,7 +212,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     };
   }, [recalculateLayout]);
 
-  const renderLine = (line: LyricLine | undefined, lineIndex: number, sectionIndex: number, slotIndex: number, isOverlap: boolean = false) => {
+  const renderLine = (line: LyricLine | undefined, lineIndex: number, sectionIndex: number, slotIndex: number) => {
     if (!line) {
       return (
         <div 
@@ -322,7 +323,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const standardLrcGlow = isLineActiveOrPast ? `0 0 25px ${highColor}80` : 'none';
 
     return (
-      <div className={`lyric-line-row flex ${isOverlap ? 'relative flex-1 my-0.5' : 'h-full absolute inset-0'} ${rowAlign} ${rowJustify} shrink-0 w-full overflow-visible py-1 px-2`} key={`row-${sectionIndex}-${slotIndex}-${lineIndex}`}>
+      <div className={`lyric-line-row relative flex ${rowAlign} ${rowJustify} w-full h-full min-h-0 overflow-hidden py-1 px-2`} key={`row-${sectionIndex}-${slotIndex}-${lineIndex}`}>
         <AnimatePresence mode="popLayout">
           <motion.p
             key={`section-${sectionIndex}-slot-${slotIndex}-${lineIndex}-${line.time}-${line.text}`}
@@ -368,12 +369,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     );
   };
 
-  const vertAlignment = lyricsSettings.verticalAlignment || 'center';
-  const stageAlignmentClass = vertAlignment === 'top'
-    ? 'justify-start pt-3 sm:pt-4'
-    : vertAlignment === 'bottom'
-    ? 'justify-end pb-3 sm:pb-4'
-    : 'justify-center';
+  // The section group is always centred as one fixed block. Vertical alignment is
+  // applied to lyric text inside each fixed slot, not to the group itself.
+  const stageAlignmentClass = 'justify-center';
 
   return (
     <div ref={stageRef} className={`w-full flex-1 h-full min-h-0 flex flex-col ${stageAlignmentClass} items-center overflow-hidden relative select-none`}>
@@ -423,29 +421,38 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
           const prevLineEnd = getLineSingingEndTime(prevLine);
           const isPrevFinished = prevLineIndex < 0 || !prevLine || adjustedTime >= prevLineEnd;
 
-          const sectionLineIndices: number[] = [];
-          if (!isPrevFinished && prevLineIndex >= 0) {
-            sectionLineIndices.push(prevLineIndex);
-          }
-          if (currLineIndex >= 0 && (isPrevFinished || currLineIndex !== prevLineIndex)) {
-            sectionLineIndices.push(currLineIndex);
-          }
-          if (sectionLineIndices.length === 0 && currLineIndex >= 0) {
-            sectionLineIndices.push(currLineIndex);
-          }
-
-          const isOverlap = sectionLineIndices.length > 1;
+          // Every section always reserves the same two physical lyric slots.
+          // The previous line occupies slot 0 while it is still being sung; the
+          // current line always remains in slot 1, so its position never jumps
+          // when the previous line completes.
+          const previousLine = !isPrevFinished && prevLineIndex >= 0
+            ? lyrics[prevLineIndex]
+            : undefined;
+          const currentLine = currLineIndex >= 0 ? lyrics[currLineIndex] : undefined;
 
           return (
-            <div 
-              key={`lyric-section-${sectionIndex}`} 
-              className={`w-full flex flex-col ${sectionAlign} items-center overflow-visible flex-1 relative`} 
+            <div
+              key={`lyric-section-${sectionIndex}`}
+              data-lyrics-section={sectionIndex}
+              className="w-full flex flex-col items-center overflow-hidden flex-1 relative min-h-0"
               style={{ minHeight: 0 }}
             >
-              {sectionLineIndices.map((lineIndex, slotIndex) => {
-                const line = lineIndex >= 0 ? lyrics[lineIndex] : undefined;
-                return renderLine(line, lineIndex, sectionIndex, slotIndex, isOverlap);
-              })}
+              <div
+                data-lyrics-slot="previous"
+                className="lyric-section-slot relative flex-1 min-h-0 w-full overflow-hidden"
+              >
+                {previousLine
+                  ? renderLine(previousLine, prevLineIndex, sectionIndex, 0)
+                  : null}
+              </div>
+              <div
+                data-lyrics-slot="current"
+                className="lyric-section-slot relative flex-1 min-h-0 w-full overflow-hidden"
+              >
+                {currentLine
+                  ? renderLine(currentLine, currLineIndex, sectionIndex, 1)
+                  : null}
+              </div>
             </div>
           );
         })}
