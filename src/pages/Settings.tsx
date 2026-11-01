@@ -974,7 +974,9 @@ export default function Settings() {
                         key={item.count}
                         type="button"
                         onClick={() =>
-                          updateSetting((prev) => ({ ...prev, [sectionSetting.key]: item.count }))
+                          updateSetting((prev) => sectionSetting.key === 'lrcVisibleLines'
+                            ? { ...prev, lrcVisibleLines: item.count }
+                            : { ...prev, elrcVisibleLines: item.count })
                         }
                         className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1 transition-all ${
                           (lyricsSettings[sectionSetting.key] ?? lyricsSettings.visibleLines ?? 2) === item.count
