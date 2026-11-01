@@ -94,8 +94,8 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   const baseFontSizeInit = lyricsSettings.highlighted.size || 48;
   const lineSpacingInit = lyricsSettings.highlighted.lineSpacing || 1.2;
   const singleLineHeightInit = baseFontSizeInit * lineSpacingInit;
-  // Initial portrait-safe allocation: each previous/current lyric slot can wrap to 3 rows.
-  const sectionHeightAllocInit = singleLineHeightInit * 3 * 2;
+  // Each section displays one lyric line, with room for up to 3 wrapped rows in portrait.
+  const sectionHeightAllocInit = singleLineHeightInit * 3;
   const gapsInit = Math.max(0, sectionCount - 1);
   const initialProjectedHeight = (sectionCount * sectionHeightAllocInit) + (gapsInit * Math.max(4, Math.round(baseFontSizeInit * 0.2)));
 
@@ -135,14 +135,13 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         maxWidth = Math.max(groupEl.offsetWidth, rect.width / appliedScale);
       }
 
-      // STABLE LAYOUT: Each of the two reserved lyric slots gets enough height
-      // for the orientation-specific wrapped-line capacity. The slot positions
-      // remain fixed while playback advances.
+      // STABLE LAYOUT: One lyric line per section, with orientation-specific
+      // capacity for wrapped rows. The section remains fixed until it rotates.
       const baseFontSize = lyricsSettings.highlighted.size || 48;
       const lineSpacing = lyricsSettings.highlighted.lineSpacing || 1.2;
       const singleLineHeight = baseFontSize * lineSpacing;
       const rowsPerLyric = stageWidth >= stageHeight ? 2 : 3;
-      const sectionHeightAllocation = singleLineHeight * rowsPerLyric * 2;
+      const sectionHeightAllocation = singleLineHeight * rowsPerLyric;
       const gapBase = Math.max(4, Math.round(baseFontSize * 0.2));
       const gaps = Math.max(0, sectionCount - 1);
       const gap = gapBase;
@@ -412,41 +411,21 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
             : -1;
           
-          const prevLineIndex = currLineIndex >= sectionCount
-            ? currLineIndex - sectionCount
-            : -1;
-
-          const prevLine = prevLineIndex >= 0 ? lyrics[prevLineIndex] : undefined;
-
-          // Keep the completed line in this section until the section rotates
-          // again. Finishing its singing/highlight must not clear the slot while
-          // the other sections continue advancing.
-          const previousLine = prevLine;
+          // One section owns one chronological lyric line. Its line remains
+          // visible and fully highlighted while other sections advance, then
+          // is replaced only when this section receives its next line.
           const currentLine = currLineIndex >= 0 ? lyrics[currLineIndex] : undefined;
 
           return (
             <div
               key={`lyric-section-${sectionIndex}`}
               data-lyrics-section={sectionIndex}
-              className="w-full flex flex-col items-center overflow-hidden flex-1 relative min-h-0"
-              style={{ minHeight: 0 }}
+              className="lyric-section-slot w-full flex flex-col items-center justify-center overflow-hidden flex-1 relative min-h-0"
+              data-lyrics-slot="current"
             >
-              <div
-                data-lyrics-slot="previous"
-                className="lyric-section-slot relative flex-1 min-h-0 w-full overflow-hidden"
-              >
-                {previousLine
-                  ? renderLine(previousLine, prevLineIndex, sectionIndex, 0)
-                  : null}
-              </div>
-              <div
-                data-lyrics-slot="current"
-                className="lyric-section-slot relative flex-1 min-h-0 w-full overflow-hidden"
-              >
-                {currentLine
-                  ? renderLine(currentLine, currLineIndex, sectionIndex, 1)
-                  : null}
-              </div>
+              {currentLine
+                ? renderLine(currentLine, currLineIndex, sectionIndex, 0)
+                : null}
             </div>
           );
         })}
