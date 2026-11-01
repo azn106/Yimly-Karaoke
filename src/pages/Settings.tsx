@@ -382,7 +382,7 @@ export default function Settings() {
               }}
               next1Line={{ time: 4, text: 'Next upcoming lyric' }}
               next2Line={{ time: 5, text: 'Later upcoming lyric' }}
-              visibleLinesCount={lyricsSettings.visibleLines ?? 3}
+              visibleLinesCount={lyricsSettings.visibleLines ?? 2}
               applyTextCase={applyTextCase}
               getFontFamilyStyle={getFontFamilyStyle}
               getAlignmentClass={getAlignmentClass}
@@ -1056,9 +1056,11 @@ export default function Settings() {
                 </label>
                 <div className="grid grid-cols-3 gap-3 max-w-md">
                   {[
-                    { count: 1, label: '1 Line', desc: 'Current Only' },
-                    { count: 3, label: '3 Lines', desc: 'Prev / Current / Next' },
-                    { count: 5, label: '5 Lines', desc: 'Extended Context' }
+                    { count: 1, label: '1 Section', desc: '1, 2, 3…' },
+                    { count: 2, label: '2 Sections', desc: '1,3… / 2,4…' },
+                    { count: 3, label: '3 Sections', desc: '1,4… / 2,5… / 3,6…' },
+                    { count: 4, label: '4 Sections', desc: 'Every 4th line' },
+                    { count: 5, label: '5 Sections', desc: 'Every 5th line' }
                   ].map((item) => (
                     <button
                       key={item.count}
@@ -1067,7 +1069,7 @@ export default function Settings() {
                         updateSetting((prev) => ({ ...prev, visibleLines: item.count }))
                       }
                       className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1 transition-all ${
-                        (lyricsSettings.visibleLines ?? 3) === item.count
+                        (lyricsSettings.visibleLines ?? 2) === item.count
                           ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
                           : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
                       }`}
@@ -1078,8 +1080,36 @@ export default function Settings() {
                   ))}
                 </div>
                 <p className="text-xs text-zinc-500 mt-2">
-                  Controls how many lines of context are shown simultaneously on the Host Room screen.
+                  Sets the number of parallel lyric sections. Each section advances through every Nth line, preserving the original lyric order.
                 </p>
+              </div>
+
+              {/* Line Transition Style */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-3">
+                  Line Transition
+                </label>
+                <div className="grid grid-cols-3 gap-3 max-w-md">
+                  {[
+                    { id: 'fade', label: 'Fade', desc: 'Soft fade between lines' },
+                    { id: 'slide', label: 'Slide', desc: 'Sections move in opposite directions' },
+                    { id: 'instant', label: 'Instant', desc: 'No line transition' }
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => updateSetting((prev) => ({ ...prev, lineTransition: item.id as any }))}
+                      className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1 transition-all ${
+                        (lyricsSettings.lineTransition || 'fade') === item.id
+                          ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
+                          : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
+                      }`}
+                    >
+                      <span className="text-sm font-black">{item.label}</span>
+                      <span className="text-[10px] font-normal opacity-80 text-center">{item.desc}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Transition / Animation Duration */}
