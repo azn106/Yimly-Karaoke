@@ -2154,8 +2154,10 @@ export default function RoomSession() {
   // Focus line index: when playing, points to activeLyricIndex; when waiting/idle/pre-intro, points to 0 (the first line preview)
   const focusIndex = activeLyricIndex >= 0 ? activeLyricIndex : 0;
 
-  // Number of parallel lyric sections (1–5); each section advances through every Nth line.
-  const sectionsCount = lyricsSettings.visibleLines ?? 2;
+  // Use the independently saved section count for the active lyric format.
+  const sectionsCount = lyricsFormat === 'elrc'
+    ? (lyricsSettings.elrcVisibleLines ?? lyricsSettings.visibleLines ?? 2)
+    : (lyricsSettings.lrcVisibleLines ?? lyricsSettings.visibleLines ?? 2);
 
   // The fullscreen display mode still shows the adjacent chronological lyric lines.
   const prev1Line = focusIndex >= 1 ? lyrics[focusIndex - 1] : null;
