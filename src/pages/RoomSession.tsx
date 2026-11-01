@@ -2115,8 +2115,8 @@ export default function RoomSession() {
     });
   }
 
-  // Is highlighting active? True only if activeLyricIndex >= 0 AND highlight toggle in settings is enabled
-  const isHighlighted = activeLyricIndex >= 0 && (lyricsSettings.highlightCurrentLine !== false);
+  // Is highlighting active? Always true if an active lyric is found under the new refined rules.
+  const isHighlighted = activeLyricIndex >= 0;
 
   // Focus line index: when playing, points to activeLyricIndex; when waiting/idle/pre-intro, points to 0 (the first line preview)
   const focusIndex = activeLyricIndex >= 0 ? activeLyricIndex : 0;
@@ -2129,7 +2129,6 @@ export default function RoomSession() {
   const currLine = lyrics.length > 0 ? (lyrics[focusIndex] || null) : null;
   const next1Line = focusIndex + 1 < lyrics.length ? lyrics[focusIndex + 1] : null;
 
-  const animDuration = lyricsSettings.animationDuration ?? 0.25;
 
   const filteredSongs = filterSongs(availableSongs, searchQuery);
 
@@ -2825,7 +2824,6 @@ export default function RoomSession() {
                   focusIndex={focusIndex}
                   lyricsSettings={lyricsSettings}
                   isHighlighted={isHighlighted}
-                  animDuration={animDuration}
                   sectionsCount={sectionsCount}
                   applyTextCase={applyTextCase}
                   getFontFamilyStyle={getFontFamilyStyle}

@@ -11,22 +11,13 @@ export interface LyricStyleSettings {
   color?: string; // hex color string, e.g. '#F472B6'
 }
 
-export type ElrcTransition = 'smooth_sweep' | 'karaoke' | 'current_only' | 'instant';
-export type LineTransition = 'fade' | 'slide' | 'instant';
-
 export interface LyricsAppearanceSettings {
   highlighted: LyricStyleSettings;
   unhighlighted: LyricStyleSettings;
   alignment: 'left' | 'center' | 'right';
   verticalAlignment: 'top' | 'center' | 'bottom';
   visibleLines: number; // Number of parallel lyric sections (1–5)
-  lineTransition?: LineTransition;
-  highlightCurrentLine: boolean; // on / off
-  animationDuration: number; // in seconds, e.g. 0.25
   elrcDisplayLeadInMs?: number; // Optional line-display lead-in for eLRC lyrics, in milliseconds.
-  elrcTransition?: ElrcTransition;
-  elrcHighlightMode?: ElrcTransition | 'progressive_sweeping'; // 'smooth_sweep' | 'karaoke' | 'current_only' | 'instant'
-  wordHighlightAnimation?: 'smooth' | 'instant' | 'fade' | 'off'; // 'smooth' | 'instant' | 'fade' | 'off'
   customFontName?: string | null;
   customFontFileName?: string | null;
   customFontId?: string | null;
@@ -59,13 +50,7 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
   alignment: 'center',
   verticalAlignment: 'center',
   visibleLines: 2,
-  lineTransition: 'fade',
-  highlightCurrentLine: true,
-  animationDuration: 0.25,
   elrcDisplayLeadInMs: 0,
-  elrcTransition: 'smooth_sweep',
-  elrcHighlightMode: 'smooth_sweep',
-  wordHighlightAnimation: 'smooth',
   customFontName: null,
   customFontFileName: null,
   customFontId: null,
@@ -140,23 +125,7 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
     visibleLines: Number.isInteger(parsed.visibleLines) && parsed.visibleLines >= 1 && parsed.visibleLines <= 5
       ? parsed.visibleLines
       : DEFAULT_LYRICS_SETTINGS.visibleLines,
-    lineTransition: ['fade', 'slide', 'instant'].includes(parsed.lineTransition) ? parsed.lineTransition : DEFAULT_LYRICS_SETTINGS.lineTransition,
-    highlightCurrentLine: typeof parsed.highlightCurrentLine === 'boolean' ? parsed.highlightCurrentLine : DEFAULT_LYRICS_SETTINGS.highlightCurrentLine,
-    animationDuration: typeof parsed.animationDuration === 'number' && !isNaN(parsed.animationDuration) ? parsed.animationDuration : DEFAULT_LYRICS_SETTINGS.animationDuration,
     elrcDisplayLeadInMs: typeof parsed.elrcDisplayLeadInMs === 'number' && Number.isFinite(parsed.elrcDisplayLeadInMs) ? Math.max(0, Math.min(5000, Math.round(parsed.elrcDisplayLeadInMs))) : (DEFAULT_LYRICS_SETTINGS.elrcDisplayLeadInMs ?? 0),
-    elrcTransition: (() => {
-      const rawMode = parsed.elrcTransition || parsed.elrcHighlightMode;
-      if (rawMode === 'progressive_sweeping' || rawMode === 'smooth_sweep') return 'smooth_sweep';
-      if (rawMode === 'karaoke' || rawMode === 'current_only' || rawMode === 'instant') return rawMode;
-      return DEFAULT_LYRICS_SETTINGS.elrcTransition ?? 'smooth_sweep';
-    })(),
-    elrcHighlightMode: (() => {
-      const rawMode = parsed.elrcTransition || parsed.elrcHighlightMode;
-      if (rawMode === 'progressive_sweeping' || rawMode === 'smooth_sweep') return 'smooth_sweep';
-      if (rawMode === 'karaoke' || rawMode === 'current_only' || rawMode === 'instant') return rawMode;
-      return DEFAULT_LYRICS_SETTINGS.elrcHighlightMode ?? 'smooth_sweep';
-    })(),
-    wordHighlightAnimation: ['smooth', 'instant', 'fade', 'off'].includes(parsed.wordHighlightAnimation) ? parsed.wordHighlightAnimation : DEFAULT_LYRICS_SETTINGS.wordHighlightAnimation,
     customFontName: typeof parsed.customFontName === 'string' && parsed.customFontName.trim() ? parsed.customFontName.trim() : null,
     customFontFileName: typeof parsed.customFontFileName === 'string' && parsed.customFontFileName.trim() ? parsed.customFontFileName.trim() : null,
     customFontId: typeof parsed.customFontId === 'string' && parsed.customFontId.trim() ? parsed.customFontId.trim() : null,

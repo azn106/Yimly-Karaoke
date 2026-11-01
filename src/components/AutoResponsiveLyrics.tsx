@@ -19,7 +19,6 @@ interface AutoResponsiveLyricsProps {
   focusIndex: number;
   lyricsSettings: LyricsAppearanceSettings;
   isHighlighted: boolean;
-  animDuration?: number;
   sectionsCount?: number;
   applyTextCase: (text: string, textCase?: string) => string;
   getFontFamilyStyle: (fontId?: string, customFontName?: string | null) => string;
@@ -50,7 +49,6 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   focusIndex,
   lyricsSettings,
   isHighlighted,
-  animDuration = 0.25,
   sectionsCount = 2,
   applyTextCase,
   getFontFamilyStyle,
@@ -68,7 +66,6 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
   const sectionCount = Math.max(1, Math.min(5, Math.round(sectionsCount || 2)));
   const safeFocusIndex = Math.max(0, Math.min(Math.max(0, lyrics.length - 1), focusIndex));
-  const transitionStyle = lyricsSettings.lineTransition || 'fade';
 
   const isDebugEnabled = Boolean(
     showDebugHUD ||
@@ -126,14 +123,12 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         maxWidth = Math.max(groupEl.offsetWidth, rect.width / appliedScale);
       }
 
-      // STABLE LAYOUT: Calculate projected height based on font metrics, not actual dynamic content.
-      // This ensures the scale remains rock-solid as lyrics change.
+      // STABLE LAYOUT: Allocate fixed vertical space per section based on font metrics.
       const baseFontSize = lyricsSettings.highlighted.size || 48;
       const lineSpacing = lyricsSettings.highlighted.lineSpacing || 1.2;
       const singleLineHeight = baseFontSize * lineSpacing;
       
-      // We allocate space for roughly 2.5 lines per section to allow for occasional wrapping 
-      // without affecting overall layout scaling.
+      // Allocate space for 2.5 lines per section to handle wrapping without affecting scale.
       const sectionHeightAllocation = singleLineHeight * 2.5; 
       const gapBase = Math.max(4, Math.round(baseFontSize * 0.2));
       const gaps = Math.max(0, sectionCount - 1);
@@ -163,7 +158,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         dpr: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
       });
     });
-  }, [lyricsSettings, sectionCount, isHighlighted, isPreview]);
+  }, [lyricsSettings.highlighted.size, lyricsSettings.highlighted.lineSpacing, sectionCount, isPreview]);
 
   useLayoutEffect(() => {
     recalculateLayout();
@@ -206,111 +201,84 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   }, [recalculateLayout]);
 
   const renderLine = (line: LyricLine | undefined, lineIndex: number, sectionIndex: number, slotIndex: number) => {
-    const active = Boolean(line) && lineIndex === safeFocusIndex;
-    const direction = sectionIndex % 2 === 0 ? 1 : -1;
-    const motionOffset = transitionStyle === 'slide' ? direction * 14 : 0;
-    const textAlignment = lyricsSettings.alignment || 'center';
-    const vertAlignment = lyricsSettings.verticalAlignment || 'center';
-    const rowJustify = textAlignment === 'left' ? 'justify-start' : textAlignment === 'right' ? 'justify-end' : 'justify-center';
-    
-    // Vertical alignment inside the fixed-height section
-    const sectionAlign = vertAlignment === 'top' ? 'justify-start' : vertAlignment === 'bottom' ? 'justify-end' : 'justify-center';
-    
-    const duration = transitionStyle === 'instant' ? 0 : animDuration;
-
     if (!line) {
       return (
         <div 
-          className={`lyric-line-row flex items-center ${rowJustify} shrink-0 w-full min-h-[1.2em]`} 
+          className="lyric-line-row flex items-center justify-center shrink-0 w-full min-h-[1.2em]" 
           key={`row-${sectionIndex}-${slotIndex}`} 
         />
       );
     }
 
+    const textAlignment = lyricsSettings.alignment || 'center';
+    const rowJustify = textAlignment === 'left' ? 'justify-start' : textAlignment === 'right' ? 'justify-end' : 'justify-center';
+    
     const highColor = lyricsSettings.highlighted.color || '#F472B6';
     const lowColor = lyricsSettings.unhighlighted.color || '#d4d4d8';
     const highOpacity = lyricsSettings.highlighted.opacity ?? 1;
     const lowOpacity = lyricsSettings.unhighlighted.opacity ?? 0.45;
-    const leadIn = (lyricsSettings.elrcDisplayLeadInMs || 0) / 1000;
     const adjustedTime = currentTime + lyricOffset / 1000;
-    const nextLineTime = lyrics[lineIndex + 1]?.time ?? (line.time + 5);
-
-    const isPlaybackInLineRange = adjustedTime >= line.time && adjustedTime < nextLineTime;
-    const isLineHighlighted = isHighlighted && lyricsSettings.highlightCurrentLine !== false && isPlaybackInLineRange;
     const displayStyle = lyricsSettings.highlighted;
 
+    // TRANSITION TIMING:
+    // Transition starts at the first word's timestamp of the INCOMING line.
+    // Duration is hardcoded to 1.5s.
+    const transitionStartTime = line.words?.[0]?.start ?? line.time;
+    const transitionDuration = 1.5;
+    
+    // Calculate the delay for the entry animation relative to when this component mounts (scheduling time).
+    // If adjustedTime is already past transitionStartTime (e.g. on seek), delay is 0.
+    const transitionDelay = Math.max(0, transitionStartTime - adjustedTime);
+
     const wordNodes = line.words?.length ? line.words.map((word, wordIndex) => {
-      const nextWordTime = line.words?.[wordIndex + 1]?.start ?? nextLineTime;
-      const wordDuration = Math.max(0.08, nextWordTime - word.start);
-      const rawMode = lyricsSettings.elrcTransition || lyricsSettings.elrcHighlightMode || 'smooth_sweep';
-      const mode = rawMode === 'progressive_sweeping' ? 'smooth_sweep' : rawMode;
-      
-      const past = isLineHighlighted && (isPreview ? wordIndex === 0 : adjustedTime >= nextWordTime);
-      const current = isLineHighlighted && (isPreview ? wordIndex === 1 : adjustedTime >= word.start && adjustedTime < nextWordTime);
-
-      if (mode === 'smooth_sweep') {
-        let wordStyle: React.CSSProperties;
-        if (past) {
-          wordStyle = { color: highColor, opacity: highOpacity, textShadow: `0 0 25px ${highColor}80` };
-        } else if (current) {
-          const progress = isPreview ? 60 : Math.min(100, Math.max(0, ((adjustedTime - word.start) / wordDuration) * 100));
-          wordStyle = {
-            backgroundImage: `linear-gradient(to right, ${highColor} 0%, ${highColor} ${progress}%, ${lowColor} ${progress}%, ${lowColor} 100%)`,
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            opacity: highOpacity,
-            filter: `drop-shadow(0 0 8px ${highColor}70)`,
-          };
-        } else {
-          wordStyle = { color: lowColor, opacity: lowOpacity };
-        }
-        return <span key={`word-${wordIndex}-${word.text}`} className="inline-block relative text-center select-none" style={wordStyle}>{applyTextCase(word.text, isLineHighlighted ? lyricsSettings.highlighted.textCase : lyricsSettings.unhighlighted.textCase)}</span>;
-      }
-
-      if (mode === 'instant') {
-        const wordHighlighted = isLineHighlighted && (isPreview ? wordIndex <= 1 : adjustedTime >= word.start);
-        return <span key={`word-${wordIndex}-${word.text}`} className="inline-block text-center select-none" style={{ color: wordHighlighted ? highColor : lowColor, opacity: wordHighlighted ? highOpacity : lowOpacity, textShadow: current ? `0 0 25px ${highColor}80` : 'none' }}>{applyTextCase(word.text, wordHighlighted ? lyricsSettings.highlighted.textCase : lyricsSettings.unhighlighted.textCase)}</span>;
-      }
-
-      const wordHighlighted = isLineHighlighted && (isPreview
-        ? (mode === 'current_only' ? wordIndex === 1 : wordIndex <= 1)
-        : (mode === 'current_only' ? current : adjustedTime >= word.start));
+      // PERMANENT HIGHLIGHTING: Word stays highlighted once its timestamp is passed.
+      const wordHighlighted = isHighlighted && (isPreview ? wordIndex <= 1 : adjustedTime >= word.start);
       const wordColor = wordHighlighted ? highColor : lowColor;
       const wordOpacity = wordHighlighted ? highOpacity : lowOpacity;
-      const animation = lyricsSettings.wordHighlightAnimation || 'smooth';
-      const wordTransition = animation === 'instant' || animation === 'off'
-        ? { duration: 0 }
-        : animation === 'fade'
-          ? { duration: 0.25, ease: 'easeInOut' as const }
-          : { duration: 0.15, ease: 'easeOut' as const };
-      const glow = animation === 'off' ? 'none' : current ? `0 0 25px ${highColor}80` : 'none';
-      return <motion.span key={`word-${wordIndex}-${word.text}`} animate={{ scale: 1, color: wordColor, opacity: wordOpacity }} transition={wordTransition} className={animation === 'instant' || animation === 'off' ? 'inline-block text-center select-none' : 'inline-block transition-colors text-center select-none'} style={{ textShadow: glow, scale: 1 }}>{applyTextCase(word.text, wordHighlighted ? lyricsSettings.highlighted.textCase : lyricsSettings.unhighlighted.textCase)}</motion.span>;
+      
+      const glow = wordHighlighted ? `0 0 25px ${highColor}80` : 'none';
+      
+      return (
+        <span 
+          key={`word-${wordIndex}-${word.text}`} 
+          className="inline-block transition-colors duration-200 text-center select-none"
+          style={{ color: wordColor, opacity: wordOpacity, textShadow: glow }}
+        >
+          {applyTextCase(word.text, wordHighlighted ? lyricsSettings.highlighted.textCase : lyricsSettings.unhighlighted.textCase)}
+        </span>
+      );
     }) : null;
 
     return (
-      <div className={`lyric-line-row flex h-full items-center ${rowJustify} shrink-0 w-full overflow-visible py-1 px-2`} key={`row-${sectionIndex}-${slotIndex}`}>
-        <AnimatePresence mode="wait">
+      <div className={`lyric-line-row flex h-full items-center ${rowJustify} shrink-0 w-full overflow-visible py-1 px-2 absolute inset-0`} key={`row-${sectionIndex}-${slotIndex}`}>
+        <AnimatePresence mode="popLayout">
           <motion.p
             key={`section-${sectionIndex}-slot-${slotIndex}-${line.time}-${line.text}`}
-            initial={{ opacity: transitionStyle === 'instant' ? 1 : 0, y: motionOffset }}
-            animate={{ opacity: active ? highOpacity : lowOpacity, y: 0 }}
-            exit={{ opacity: 0, y: -motionOffset }}
-            transition={{ duration, ease: 'easeOut' }}
+            // Simultaneous Left-to-Right Wipe:
+            // The wipereveal/exit happens at transitionStartTime.
+            // Before transitionStartTime, the incoming line is scheduled but fully hidden by clipPath.
+            initial={{ clipPath: 'inset(0 100% 0 0)', opacity: 0 }}
+            animate={{ clipPath: 'inset(0 0% 0 0)', opacity: highOpacity }}
+            exit={{ clipPath: 'inset(0 0 0 100%)', opacity: 0 }}
+            transition={{ 
+              duration: transitionDuration, 
+              ease: "linear",
+              delay: transitionDelay
+            }}
             style={{
               fontFamily: getFontFamilyStyle(displayStyle.font, lyricsSettings.customFontName),
               fontSize: `${displayStyle.size}px`,
               fontWeight: displayStyle.weight,
-              color: active ? (highColor || '#F472B6') : (lowColor || '#d4d4d8'),
+              color: highColor,
               letterSpacing: `${displayStyle.letterSpacing}px`,
               lineHeight: displayStyle.lineSpacing,
               textAlign: textAlignment,
-              textShadow: active && isLineHighlighted ? `0 0 35px ${highColor}75` : 'none',
             }}
             className={`w-full whitespace-normal break-words leading-tight ${getAlignmentClass(textAlignment)}`}
           >
             {wordNodes
               ? <span className={`flex flex-wrap items-center ${rowJustify} gap-x-[0.3em] gap-y-1 w-full`} style={{ textAlign: textAlignment }}>{wordNodes}</span>
-              : applyTextCase(line.text || '♪ ♪ ♪', active ? lyricsSettings.highlighted.textCase : lyricsSettings.unhighlighted.textCase)}
+              : applyTextCase(line.text || '♪ ♪ ♪', lyricsSettings.highlighted.textCase)}
           </motion.p>
         </AnimatePresence>
       </div>
@@ -356,7 +324,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
           return (
             <div 
               key={`lyric-section-${sectionIndex}`} 
-              className={`w-full flex flex-col ${sectionAlign} items-center overflow-visible flex-1`} 
+              className={`w-full flex flex-col ${sectionAlign} items-center overflow-visible flex-1 relative`} 
               style={{ minHeight: 0 }}
             >
               {Array.from({ length: 1 }, (_, slotIndex) => {

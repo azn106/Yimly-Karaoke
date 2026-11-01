@@ -372,7 +372,7 @@ export default function Settings() {
               ]}
               focusIndex={2}
               lyricsSettings={lyricsSettings}
-              isHighlighted={lyricsSettings.highlightCurrentLine !== false}
+              isHighlighted={true}
               sectionsCount={lyricsSettings.visibleLines ?? 2}
               applyTextCase={applyTextCase}
               getFontFamilyStyle={getFontFamilyStyle}
@@ -421,36 +421,6 @@ export default function Settings() {
           {/* TAB 1: CURRENT / HIGHLIGHTED SETTINGS */}
           {activeTab === 'highlighted' && (
             <div className="space-y-6">
-              {/* Highlight Current Line Toggle & Color Banner */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-[#08090E] border border-white/5 items-center">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
-                      Highlight Current Line
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateSetting((prev) => ({
-                          ...prev,
-                          highlightCurrentLine: prev.highlightCurrentLine === false ? true : false
-                        }))
-                      }
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                        lyricsSettings.highlightCurrentLine !== false ? 'bg-[#F472B6]' : 'bg-white/20'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          lyricsSettings.highlightCurrentLine !== false ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Apply accent glow, custom color, and display emphasis to the active lyric line.
-                  </p>
-                </div>
 
                 {/* Highlight Color Preset Picker */}
                 <div>
@@ -498,7 +468,7 @@ export default function Settings() {
                     />
                   </div>
                 </div>
-              </div>
+
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Font */}
@@ -1135,66 +1105,7 @@ export default function Settings() {
                 </p>
               </div>
 
-              {/* Line Transition Style */}
-              <div>
-                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-3">
-                  Line Transition
-                </label>
-                <div className="grid grid-cols-3 gap-3 max-w-md">
-                  {[
-                    { id: 'fade', label: 'Fade', desc: 'Soft fade between lines' },
-                    { id: 'slide', label: 'Slide', desc: 'Sections move in opposite directions' },
-                    { id: 'instant', label: 'Instant', desc: 'No line transition' }
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => updateSetting((prev) => ({ ...prev, lineTransition: item.id as any }))}
-                      className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1 transition-all ${
-                        (lyricsSettings.lineTransition || 'fade') === item.id
-                          ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
-                          : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
-                      }`}
-                    >
-                      <span className="text-sm font-black">{item.label}</span>
-                      <span className="text-[10px] font-normal opacity-80 text-center">{item.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              {/* Transition / Animation Duration */}
-              <div>
-                <div className="flex justify-between items-center mb-2 max-w-md">
-                  <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                    Lyric Transition Speed
-                  </label>
-                  <span className="text-xs font-mono text-[#F472B6] font-bold">
-                    {lyricsSettings.animationDuration ?? 0.25}s
-                  </span>
-                </div>
-                <div className="max-w-md">
-                  <input
-                    type="range"
-                    min="0.05"
-                    max="0.80"
-                    step="0.05"
-                    value={lyricsSettings.animationDuration ?? 0.25}
-                    onChange={(e) =>
-                      updateSetting((prev) => ({
-                        ...prev,
-                        animationDuration: Number(e.target.value)
-                      }))
-                    }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
-                  />
-                  <div className="flex justify-between text-[10px] text-zinc-500 mt-1 font-mono">
-                    <span>Fast (0.05s)</span>
-                    <span>Standard (0.25s)</span>
-                    <span>Smooth (0.80s)</span>
-                  </div>
-                </div>
-              </div>
 
               {/* eLRC Playback Line Lead-In */}
               <div className="pt-4 border-t border-white/10">
@@ -1228,105 +1139,7 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* ELRC Transition Mode */}
-              <div className="pt-4 border-t border-white/10">
-                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">
-                  ELRC Transition
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
-                  {[
-                    {
-                      id: 'smooth_sweep',
-                      label: 'Smooth Sweep',
-                      desc: 'The highlight smoothly travels across each word from left to right using the ELRC timestamps.'
-                    },
-                    {
-                      id: 'karaoke',
-                      label: 'Karaoke',
-                      desc: 'Preserve the existing karaoke-style ELRC behavior (past + current accumulate).'
-                    },
-                    {
-                      id: 'current_only',
-                      label: 'Current Word',
-                      desc: 'Preserve the existing current-word highlighting behavior.'
-                    },
-                    {
-                      id: 'instant',
-                      label: 'Instant',
-                      desc: "When a word's timestamp is reached, the entire word becomes highlighted immediately."
-                    }
-                  ].map((mode) => {
-                    const activeMode = lyricsSettings.elrcTransition || lyricsSettings.elrcHighlightMode || 'smooth_sweep';
-                    const isSelected = activeMode === mode.id || (activeMode === 'progressive_sweeping' && mode.id === 'smooth_sweep');
 
-                    return (
-                      <button
-                        key={mode.id}
-                        type="button"
-                        onClick={() =>
-                          updateSetting((prev) => ({
-                            ...prev,
-                            elrcTransition: mode.id as any,
-                            elrcHighlightMode: mode.id as any
-                          }))
-                        }
-                        className={`py-3.5 px-4 rounded-2xl border font-bold text-xs flex flex-col items-start gap-1.5 transition-all text-left ${
-                          isSelected
-                            ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25 ring-2 ring-[#F472B6]/30'
-                            : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-sm font-black">{mode.label}</span>
-                          {isSelected && (
-                            <span className="px-2 py-0.5 bg-white/20 text-white rounded-full text-[10px] font-extrabold uppercase">
-                              Active
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] font-normal leading-relaxed opacity-85">{mode.desc}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-zinc-500 mt-2.5">
-                  Controls word-level visual transitions and highlighting behavior for Enhanced LRC (.elrc.lrc) files.
-                </p>
-              </div>
-
-              {/* Word Highlight Animation */}
-              <div className="pt-4 border-t border-white/10">
-                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">
-                  Word Highlight Animation
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl">
-                  {[
-                    { id: 'smooth', label: 'Smooth', desc: 'Smooth transition (default)' },
-                    { id: 'instant', label: 'Instant', desc: 'Immediate change' },
-                    { id: 'fade', label: 'Fade', desc: 'Soft crossfade' },
-                    { id: 'off', label: 'Off', desc: 'No animation' }
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() =>
-                        updateSetting((prev) => ({ ...prev, wordHighlightAnimation: item.id as any }))
-                      }
-                      className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1 transition-all ${
-                        (lyricsSettings.wordHighlightAnimation || 'smooth') === item.id
-                          ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
-                          : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
-                      }`}
-                    >
-                      <span className="text-sm font-black">{item.label}</span>
-                      <span className="text-[10px] font-normal opacity-80 text-center">{item.desc}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-zinc-500 mt-2">
-                  Controls the visual animation transition when advancing between words in eLRC lyrics.
-                </p>
-              </div>
             </div>
           )}
         </div>
