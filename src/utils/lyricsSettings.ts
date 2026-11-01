@@ -16,7 +16,10 @@ export interface LyricsAppearanceSettings {
   unhighlighted: LyricStyleSettings;
   alignment: 'left' | 'center' | 'right';
   verticalAlignment: 'top' | 'center' | 'bottom';
-  visibleLines: number; // Number of parallel lyric sections (1–5)
+  /** Legacy shared section count retained for older saved settings. */
+  visibleLines: number;
+  lrcVisibleLines: number; // LRC-only section count (1–5)
+  elrcVisibleLines: number; // eLRC-only section count (1–5)
   elrcDisplayLeadInMs?: number; // Optional line-display lead-in for eLRC lyrics, in milliseconds.
   elrcFadeDurationMs?: number; // eLRC line wipe fade duration, in milliseconds (default: 1500)
   elrcFadeOverlapMs?: number; // eLRC incoming/outgoing overlap, in milliseconds (default: 300)
@@ -52,6 +55,8 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
   alignment: 'center',
   verticalAlignment: 'center',
   visibleLines: 2,
+  lrcVisibleLines: 2,
+  elrcVisibleLines: 2,
   elrcDisplayLeadInMs: 1500,
   elrcFadeDurationMs: 1500,
   elrcFadeOverlapMs: 300,
@@ -101,6 +106,15 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
   const validTextCases = ['original', 'lowercase', 'uppercase', 'titlecase'] as const;
   const validAlignments = ['left', 'center', 'right'] as const;
   const validVerticalAlignments = ['top', 'center', 'bottom'] as const;
+  const legacySectionCount = Number.isInteger(parsed.visibleLines) && parsed.visibleLines >= 1 && parsed.visibleLines <= 5
+    ? parsed.visibleLines
+    : DEFAULT_LYRICS_SETTINGS.visibleLines;
+  const lrcSectionCount = Number.isInteger(parsed.lrcVisibleLines) && parsed.lrcVisibleLines >= 1 && parsed.lrcVisibleLines <= 5
+    ? parsed.lrcVisibleLines
+    : legacySectionCount;
+  const elrcSectionCount = Number.isInteger(parsed.elrcVisibleLines) && parsed.elrcVisibleLines >= 1 && parsed.elrcVisibleLines <= 5
+    ? parsed.elrcVisibleLines
+    : legacySectionCount;
 
   const resolved: LyricsAppearanceSettings = {
     highlighted: {
@@ -125,10 +139,10 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
     },
     alignment: validAlignments.includes(parsed.alignment) ? parsed.alignment : DEFAULT_LYRICS_SETTINGS.alignment,
     verticalAlignment: validVerticalAlignments.includes(parsed.verticalAlignment) ? parsed.verticalAlignment : DEFAULT_LYRICS_SETTINGS.verticalAlignment,
-    // Preserve the user's existing 1–5 selection; it now controls the number of rotating sections.
-    visibleLines: Number.isInteger(parsed.visibleLines) && parsed.visibleLines >= 1 && parsed.visibleLines <= 5
-      ? parsed.visibleLines
-      : DEFAULT_LYRICS_SETTINGS.visibleLines,
+    // Keep the legacy value for older clients while resolving independent format-specific counts.
+    visibleLines: legacySectionCount,
+    lrcVisibleLines: lrcSectionCount,
+    elrcVisibleLines: elrcSectionCount,
     elrcDisplayLeadInMs: typeof parsed.elrcDisplayLeadInMs === 'number' && Number.isFinite(parsed.elrcDisplayLeadInMs) ? Math.max(1500, Math.min(5000, Math.round(parsed.elrcDisplayLeadInMs))) : 1500,
     elrcFadeDurationMs: typeof parsed.elrcFadeDurationMs === 'number' && Number.isFinite(parsed.elrcFadeDurationMs) ? Math.max(300, Math.min(5000, Math.round(parsed.elrcFadeDurationMs))) : 1500,
     elrcFadeOverlapMs: typeof parsed.elrcFadeOverlapMs === 'number' && Number.isFinite(parsed.elrcFadeOverlapMs) ? Math.max(0, Math.min(3000, Math.round(parsed.elrcFadeOverlapMs))) : 300,
