@@ -2122,14 +2122,8 @@ export default function RoomSession() {
   const focusIndex = activeLyricIndex >= 0 ? activeLyricIndex : 0;
 
   // Number of parallel lyric sections (1–5); each section advances through every Nth line.
-  const visibleLinesCount = lyricsSettings.visibleLines ?? 2;
+  const sectionsCount = lyricsSettings.visibleLines ?? 2;
 
-  // Compute surrounding lines based on focusIndex
-  const prev2Line = focusIndex >= 2 ? lyrics[focusIndex - 2] : null;
-  const prev1Line = focusIndex >= 1 ? lyrics[focusIndex - 1] : null;
-  const currLine = lyrics.length > 0 ? (lyrics[focusIndex] || null) : null;
-  const next1Line = focusIndex + 1 < lyrics.length ? lyrics[focusIndex + 1] : null;
-  const next2Line = focusIndex + 2 < lyrics.length ? lyrics[focusIndex + 2] : null;
   const animDuration = lyricsSettings.animationDuration ?? 0.25;
 
   const filteredSongs = filterSongs(availableSongs, searchQuery);
@@ -2827,12 +2821,7 @@ export default function RoomSession() {
                   lyricsSettings={lyricsSettings}
                   isHighlighted={isHighlighted}
                   animDuration={animDuration}
-                  prev2Line={prev2Line}
-                  prev1Line={prev1Line}
-                  currLine={currLine}
-                  next1Line={next1Line}
-                  next2Line={next2Line}
-                  visibleLinesCount={visibleLinesCount}
+                  sectionsCount={sectionsCount}
                   applyTextCase={applyTextCase}
                   getFontFamilyStyle={getFontFamilyStyle}
                   getAlignmentClass={getAlignmentClass}
