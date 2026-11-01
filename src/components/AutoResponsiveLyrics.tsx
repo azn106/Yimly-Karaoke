@@ -414,25 +414,28 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
           const scheduledLineIndex = safeFocusIndex >= sectionIndex
             ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
             : sectionIndex;
-          let currLineIndex = scheduledLineIndex;
+          let currLineIndex = sectionIndex;
 
-          // Do not rotate this section to its next assigned line until the
-          // line currently occupying it has finished its word highlighting.
-          // The other sections can continue advancing independently.
-          let previousOwnedLineIndex = scheduledLineIndex - sectionCount;
-          while (previousOwnedLineIndex >= 0) {
-            const previousOwnedLine = lyrics[previousOwnedLineIndex];
-            const previousIntervals = previousOwnedLine?.words?.length
-              ? computeWordIntervals(previousOwnedLine.words)
+          // Advance this section one line at a time, and only after the line
+          // currently occupying it has completed its word highlighting.
+          // This prevents a later scheduled line from skipping an unfinished one.
+          for (
+            let nextLineIndex = sectionIndex + sectionCount;
+            nextLineIndex <= scheduledLineIndex;
+            nextLineIndex += sectionCount
+          ) {
+            const previousLineIndex = nextLineIndex - sectionCount;
+            const previousLine = lyrics[previousLineIndex];
+            const previousIntervals = previousLine?.words?.length
+              ? computeWordIntervals(previousLine.words)
               : [];
             const previousLastInterval = previousIntervals[previousIntervals.length - 1];
             const previousLineEnd = previousLastInterval?.end
-              ?? lyrics[previousOwnedLineIndex + 1]?.time
+              ?? lyrics[previousLineIndex + 1]?.time
               ?? Infinity;
 
-            if (adjustedTime < previousLineEnd) {
-              currLineIndex = previousOwnedLineIndex;
-              previousOwnedLineIndex -= sectionCount;
+            if (adjustedTime >= previousLineEnd) {
+              currLineIndex = nextLineIndex;
             } else {
               break;
             }
