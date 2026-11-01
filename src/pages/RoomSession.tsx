@@ -16,9 +16,10 @@ import {
 } from '../utils/lyricsSettings';
 import { 
   Play, Pause, SkipForward, RotateCcw, Mic, Music, 
-  FileText, ArrowLeft, Plus, Radio, Check, AlertCircle, 
+  FileText, ArrowLeft, Plus, Check, AlertCircle, 
   User, Library as LibraryIcon, Search, X, RefreshCw,
-  Maximize2, Minimize2, Info, LogOut, QrCode, Clock, Volume2, Disc3
+  Maximize2, Minimize2, Info, LogOut, QrCode, Clock, Volume2, Disc3,
+  ChevronUp, ChevronDown
 } from 'lucide-react';
 import { filterSongs, SearchableSong } from '../lib/search-utils';
 import { getAuthToken } from '../lib/auth';
@@ -193,6 +194,7 @@ export default function RoomSession() {
     }
   };
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  const [isHeaderExpanded, setIsHeaderExpanded] = useState(true);
   const [isRestartingSession, setIsRestartingSession] = useState(false);
 
   // Overflow menu and modals state (Host Only)
@@ -2275,8 +2277,8 @@ export default function RoomSession() {
   // -------------------------------------------------------------
   return (
     <div id="room-session-root" className="fixed inset-0 flex h-full w-full bg-[#08090E] text-white overflow-hidden flex-col font-sans select-none">
-      {/* Room Song Catalog / Add to Queue Modal (Guests Only) */}
-      {!isHost && showLibrary && (
+      {/* Room Song Catalog / Add to Queue Modal */}
+      {showLibrary && (
         <div data-modal-container="library" className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-8">
           <div className="w-full max-w-3xl bg-[#12131D] border border-white/10 rounded-3xl flex flex-col h-[85vh] shadow-2xl overflow-hidden">
             {/* Modal Header */}
@@ -2523,155 +2525,202 @@ export default function RoomSession() {
       )}
 
       {/* Top Room Navigation Bar */}
-      <header id="room-session-header" className="px-4 md:px-6 py-3 border-b border-white/5 bg-[#0D0E17]/95 backdrop-blur-md flex items-center justify-between relative z-50 shrink-0 select-none">
-        {/* Left Side: ↻ Start New Session, Room Code, [ LIVE ] */}
-        <div className="flex items-center gap-3 md:gap-4 min-w-0">
-          {/* ↻ Start New Session Button */}
-          {isHost ? (
-            <button 
-              data-tv-id="header-start-session-button"
-              onClick={handleStartNewSession}
-              disabled={isRestartingSession}
-              className="p-2 bg-white/5 hover:bg-[#F472B6]/20 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-all border border-white/10 flex items-center justify-center shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
-              title="Start New Session"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRestartingSession ? 'animate-spin text-[#F472B6]' : ''}`} />
-            </button>
-          ) : (
-            <button 
-              onClick={() => navigate(session?.roomCode ? `/join?session=${session.roomCode.replace(/\s+/g, '')}` : '/join')}
-              className="p-2 hover:bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors shrink-0"
-              title="Re-join / Change Name"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
-          
-          {/* Room Code */}
-          <span className="text-base md:text-xl font-mono font-black text-white tracking-widest shrink-0">
-            {session?.roomCode}
-          </span>
-
-          {/* [ LIVE ] Badge */}
-          <span className="px-2.5 py-0.5 rounded-full bg-[#F472B6]/15 text-[#F472B6] text-[11px] font-bold border border-[#F472B6]/30 flex items-center gap-1.5 shrink-0 uppercase tracking-wider">
-            <Radio className="w-2.5 h-2.5 animate-pulse" /> LIVE
-          </span>
-        </div>
-
-        {/* Right Side: Instrumental Toggle, Offset Controls, Fullscreen */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {isHost && (
-            <>
-              {/* Instrumental Toggle in Top Navigation */}
+      <header id="room-session-header" className="px-4 md:px-6 py-2.5 border-b border-white/5 bg-[#0D0E17]/95 backdrop-blur-md flex flex-col relative z-50 shrink-0 select-none">
+        <div className="flex items-center justify-between w-full">
+          {/* Left Side: Restart/Rejoin, Add Song (host only), Horizontal Queue */}
+          <div className="flex items-center gap-3 min-w-0 shrink-0">
+            {/* ↻ Start New Session / Rejoin Button */}
+            {isHost ? (
               <button 
-                data-tv-id="inst-toggle-button"
-                onClick={handleToggleInstrumental}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E] ${
-                  variant === 'instrumental' 
-                    ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25' 
-                    : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'
-                }`}
-                title="Switch between Original Vocal and Instrumental backing track"
+                data-tv-id="header-start-session-button"
+                onClick={handleStartNewSession}
+                disabled={isRestartingSession}
+                className="p-2 bg-white/5 hover:bg-[#F472B6]/20 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-all border border-white/10 flex items-center justify-center shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+                title="Start New Session"
               >
-                <Music className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">Inst:</span> {variant === 'instrumental' ? 'ON' : 'OFF'}
+                <RefreshCw className={`w-4 h-4 ${isRestartingSession ? 'animate-spin text-[#F472B6]' : ''}`} />
               </button>
-
-              {/* Lyrics Format Toggle (eLRC / LRC) */}
+            ) : (
               <button 
-                data-tv-id="lyrics-format-toggle"
-                onClick={handleToggleLyricsFormat}
-                disabled={!currentSongDetails?.hasElrc}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E] ${
-                  !currentSongDetails?.hasElrc 
-                    ? 'opacity-50 cursor-not-allowed bg-white/5 text-zinc-500 border-white/5'
-                    : lyricsFormat === 'elrc'
-                    ? 'bg-cyan-500 text-white border-cyan-500 shadow-lg shadow-cyan-500/25'
-                    : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'
-                }`}
-                title={
-                  !currentSongDetails?.hasElrc
-                    ? 'Enhanced LRC (eLRC) not available for this song (LRC mode active)'
-                    : `Switch lyric format (Current: ${lyricsFormat.toUpperCase()})`
-                }
+                onClick={() => navigate(session?.roomCode ? `/join?session=${session.roomCode.replace(/\s+/g, '')}` : '/join')}
+                className="p-2 hover:bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors shrink-0"
+                title="Re-join / Change Name"
               >
-                <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="hidden xs:inline">Lyrics:</span> {lyricsFormat.toUpperCase()}
+                <ArrowLeft className="w-4 h-4" />
               </button>
+            )}
 
-              {/* Offset Tuner in Top Navigation */}
-              <div className="hidden sm:flex items-center gap-1 bg-[#08090E] px-2 py-1 rounded-xl border border-white/10 text-xs">
-                <span className="text-zinc-500 text-[11px] font-medium hidden md:inline pl-1">
-                  {lyricsFormat.toUpperCase()} Offset
-                </span>
-                <button 
-                  data-tv-id="offset-minus-button"
-                  onClick={() => handleOffsetChange(-250)}
-                  className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
-                  title="-250ms"
-                >
-                  -250ms
-                </button>
+            {/* Add Song Button (Host Only) */}
+            {isHost && (
+              <button
+                data-tv-id="header-add-song-button"
+                onClick={() => setShowLibrary(true)}
+                className="px-3 py-1.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 text-xs shadow-md shadow-[#F472B6]/20 shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Song</span>
+              </button>
+            )}
+          </div>
+
+          {/* Middle: Horizontal Upcoming-Song Queue */}
+          <div className="hidden md:flex items-center gap-2 overflow-x-auto px-3 py-1 flex-1 mx-4 scrollbar-none max-w-xl">
+            {(() => {
+              const currentIndex = currentSong ? queue.findIndex(q => q.id === currentSong.id || q.songId === currentSong.songId) : -1;
+              const upcomingQueue = currentIndex >= 0 ? queue.slice(currentIndex + 1) : queue;
+              if (upcomingQueue.length === 0) {
+                return (
+                  <span className="text-xs text-zinc-500 italic px-2">No upcoming songs in queue</span>
+                );
+              }
+              return upcomingQueue.map((item, index) => {
+                const singerName = item.userName || (item.userId ? `Singer ${item.userId}` : 'Guest');
+                return (
+                  <div 
+                    key={item.id || index}
+                    className="bg-[#12131D] border border-white/10 rounded-xl px-3 py-1 flex flex-col justify-center shrink-0 min-w-[150px] max-w-[200px]"
+                  >
+                    <div className="text-xs font-bold text-white truncate">
+                      {item.songTitle} - {item.artistName || item.artist || 'Unknown Artist'}
+                    </div>
+                    <div className="text-[10px] text-zinc-400 truncate">
+                      {singerName}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+
+          {/* Right Side: Header Controls & Collapse/Expand Toggle */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {isHeaderExpanded && (
+              <div className="flex items-center gap-2 sm:gap-3 animate-fadeIn">
+                {isHost && (
+                  <>
+                    {/* Instrumental Toggle */}
+                    <button 
+                      data-tv-id="inst-toggle-button"
+                      onClick={handleToggleInstrumental}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${
+                        variant === 'instrumental' 
+                          ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25' 
+                          : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'
+                      }`}
+                      title="Switch between Original Vocal and Instrumental backing track"
+                    >
+                      <Music className="w-3.5 h-3.5" />
+                      <span className="hidden xs:inline">Inst:</span> {variant === 'instrumental' ? 'ON' : 'OFF'}
+                    </button>
+
+                    {/* Lyrics Format Toggle */}
+                    <button 
+                      data-tv-id="lyrics-format-toggle"
+                      onClick={handleToggleLyricsFormat}
+                      disabled={!currentSongDetails?.hasElrc}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${
+                        !currentSongDetails?.hasElrc 
+                          ? 'opacity-50 cursor-not-allowed bg-white/5 text-zinc-500 border-white/5'
+                          : lyricsFormat === 'elrc'
+                          ? 'bg-cyan-500 text-white border-cyan-500 shadow-lg shadow-cyan-500/25'
+                          : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'
+                      }`}
+                      title={
+                        !currentSongDetails?.hasElrc
+                          ? 'Enhanced LRC (eLRC) not available for this song (LRC mode active)'
+                          : `Switch lyric format (Current: ${lyricsFormat.toUpperCase()})`
+                      }
+                    >
+                      <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="hidden xs:inline">Lyrics:</span> {lyricsFormat.toUpperCase()}
+                    </button>
+
+                    {/* Offset Tuner */}
+                    <div className="hidden sm:flex items-center gap-1 bg-[#08090E] px-2 py-1 rounded-xl border border-white/10 text-xs">
+                      <span className="text-zinc-500 text-[11px] font-medium hidden md:inline pl-1">
+                        {lyricsFormat.toUpperCase()} Offset
+                      </span>
+                      <button 
+                        data-tv-id="offset-minus-button"
+                        onClick={() => handleOffsetChange(-250)}
+                        className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
+                        title="-250ms"
+                      >
+                        -250ms
+                      </button>
+                      <button
+                        data-tv-id="offset-sync-button"
+                        onClick={handleSyncReset}
+                        className="px-1.5 py-0.5 font-mono text-[#F472B6] hover:text-[#ff7ab8] font-bold text-[11px] rounded hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
+                        title={`Reset ${lyricsFormat.toUpperCase()} offset to 0ms`}
+                      >
+                        {activeOffset > 0 ? `+${activeOffset}` : activeOffset}ms
+                      </button>
+                      <button 
+                        data-tv-id="offset-plus-button"
+                        onClick={() => handleOffsetChange(250)}
+                        className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
+                        title="+250ms"
+                      >
+                        +250ms
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* Fullscreen Toggle */}
                 <button
-                  data-tv-id="offset-sync-button"
-                  onClick={handleSyncReset}
-                  className="px-1.5 py-0.5 font-mono text-[#F472B6] hover:text-[#ff7ab8] font-bold text-[11px] rounded hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
-                  title={`Reset ${lyricsFormat.toUpperCase()} offset to 0ms`}
+                  data-tv-id="fullscreen-toggle-button"
+                  onClick={toggleFullscreen}
+                  className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
                 >
-                  {activeOffset > 0 ? `+${activeOffset}` : activeOffset}ms
+                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </button>
-                <button 
-                  data-tv-id="offset-plus-button"
-                  onClick={() => handleOffsetChange(250)}
-                  className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
-                  title="+250ms"
-                >
-                  +250ms
-                </button>
+
+                {/* Session Info Button (Host Only) */}
+                {isHost && (
+                  <button
+                    data-tv-id="session-info-button"
+                    onClick={() => setShowSessionInfoModal(true)}
+                    className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+                    title="Session Info"
+                  >
+                    <Info className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-            </>
-          )}
+            )}
 
-          {/* Fullscreen Toggle Button */}
-          <button
-            data-tv-id="fullscreen-toggle-button"
-            onClick={toggleFullscreen}
-            className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
-            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-
-          {/* Session Info Button (Host Only) */}
-          {isHost && (
+            {/* Collapse/Expand Toggle (Replaces End Session button position) */}
             <button
-              data-tv-id="session-info-button"
-              onClick={() => setShowSessionInfoModal(true)}
-              className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
-              title="Session Info"
+              data-tv-id="header-collapse-toggle"
+              onClick={() => setIsHeaderExpanded(prev => !prev)}
+              className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+              title={isHeaderExpanded ? 'Collapse Header' : 'Expand Header'}
             >
-              <Info className="w-4 h-4" />
+              {isHeaderExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
-          )}
-
-          {/* End Session Button (Host Only) */}
-          {isHost && (
-            <button
-              data-tv-id="end-session-button"
-              onClick={() => setShowEndSessionModal(true)}
-              className="p-2 bg-white/5 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-[#08090E]"
-              title="End Session"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          )}
+          </div>
         </div>
+
+        {/* Expanded Header Area: QR Code */}
+        {isHeaderExpanded && isHost && qrCodeDataUrl && (
+          <div className="flex flex-col items-center pt-3 pb-1 border-t border-white/5 mt-2 transition-all">
+            <img 
+              src={qrCodeDataUrl} 
+              alt="Join Room QR Code" 
+              className="w-40 h-40 object-contain"
+            />
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">JOIN ROOM</span>
+          </div>
+        )}
       </header>
 
       {/* Main Container */}
       <div 
         id="room-session-content"
-        className="flex-1 min-h-0 flex overflow-hidden relative w-full p-3 lg:p-4 gap-3 lg:gap-4"
+        className="flex-1 min-h-0 flex flex-col relative w-full p-3 lg:p-4"
       >
         {/* Main Stage: Lyrics Card Container */}
         <main 
@@ -2685,10 +2734,6 @@ export default function RoomSession() {
           {/* Card Top Header */}
           <div className="relative z-10 flex items-center justify-between p-3.5 sm:p-4 lg:p-5 pb-0 shrink-0">
             <div className="flex items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] text-[10px] font-bold uppercase tracking-wider">
-                <Mic className="w-3 h-3" />
-                <span>Live Lyrics</span>
-              </div>
               {isHost && audioError && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 text-[10px] font-bold">
                   <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
@@ -2714,13 +2759,16 @@ export default function RoomSession() {
                 </button>
               )}
             </div>
-            {currentSong && (
-              <div className="text-xs text-zinc-400 font-medium truncate max-w-[200px] sm:max-w-xs md:max-w-md">
-                <span className="text-white font-bold">{currentSong.songTitle}</span>
-                <span className="mx-1.5 text-zinc-600">•</span>
-                <span>{currentSong.artistName}</span>
-              </div>
-            )}
+
+            <div className="flex items-center gap-3">
+              {currentSong && (
+                <div className="text-xs text-zinc-400 font-medium truncate max-w-[200px] sm:max-w-xs md:max-w-md hidden sm:block">
+                  <span className="text-white font-bold">{currentSong.songTitle}</span>
+                  <span className="mx-1.5 text-zinc-600">•</span>
+                  <span>{currentSong.artistName}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Centered Auto-Responsive Lyrics Stage */}
@@ -2962,128 +3010,6 @@ export default function RoomSession() {
             </>
           )}
         </main>
-
-        {/* Floating Join Room / Queue Card Area (Landscape = 20% width, Portrait = Hidden) */}
-        {isHost && (
-          <aside 
-            id="room-session-sidebar"
-            className="hidden landscape:flex portrait:hidden flex-col h-full landscape:w-[20%] min-w-[210px] max-w-[320px] bg-[#0A0B12]/80 backdrop-blur-xl border-l border-white/10 p-3 lg:p-4 gap-3 lg:gap-4 shadow-2xl z-20 select-none overflow-hidden shrink-0"
-          >
-            {/* Card 1: Join Session / QR Code Card */}
-            <div id="room-session-qr-card" className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 p-3.5 lg:p-4 shadow-xl flex flex-col items-center shrink-0">
-              {/* Ambient Glow matching Homepage Feature Card */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-[#F472B6]/15 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10" />
-
-              <div className="relative z-10 flex flex-col items-center w-full">
-                {/* Header Pill */}
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] text-[10px] font-bold uppercase tracking-wider mb-2.5">
-                  <QrCode className="w-3 h-3" />
-                  <span>Join Session</span>
-                </div>
-
-                {/* QR Code Container */}
-                {qrCodeDataUrl ? (
-                  <div id="room-session-qr-element" className="bg-white p-2 rounded-xl shadow-md mx-auto w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center">
-                    <img 
-                      src={qrCodeDataUrl} 
-                      alt="Join Room QR Code" 
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                ) : (
-                  <div id="room-session-qr-element" className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                    <span className="text-[10px] text-zinc-500 font-mono">Loading QR...</span>
-                  </div>
-                )}
-
-                {/* Session Code */}
-                <div className="text-sm md:text-base font-mono font-black text-white tracking-widest mt-2 text-center">
-                  {session?.roomCode}
-                </div>
-
-                {/* Subtitle */}
-                <div className="text-[10px] text-zinc-400 font-medium text-center mt-0.5">
-                  Scan to Join & Queue
-                </div>
-              </div>
-            </div>
-
-            {/* Card 2: UP NEXT Queue Card */}
-            <div className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 p-3.5 lg:p-4 shadow-xl flex-1 flex flex-col min-h-0">
-              {/* Subtle Ambient Glow */}
-              <div className="absolute bottom-0 right-0 w-32 h-32 bg-[#F472B6]/10 rounded-full blur-2xl pointer-events-none -mr-10 -mb-10" />
-
-              {/* Queue Header */}
-              <div className="relative z-10 flex items-center justify-between px-0.5 mb-2.5 shrink-0">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-white tracking-wide">
-                  <Music className="w-3.5 h-3.5 text-[#F472B6]" />
-                  <span>UP NEXT</span>
-                </div>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/10 border border-white/5 font-mono font-bold text-zinc-300">
-                  {queue.length}
-                </span>
-              </div>
-
-              {/* Scrollable Queue Items */}
-              <div className="relative z-10 flex-1 overflow-y-auto space-y-2 pr-0.5 scrollbar-thin min-h-0">
-                {queue.map((item, index) => {
-                  const isPlaying = item.status === 'playing' && item.songId !== null && item.songId !== undefined;
-                  const singerName = item.userName || (item.userId ? `Singer ${item.userId}` : 'Guest');
-                  const isDownloading = item.songId === null && item.downloadStatus === 'downloading';
-                  const isProcessing = item.songId === null && item.downloadStatus === 'processing';
-                  const isFailed = item.songId === null && item.downloadStatus === 'failed';
-
-                  return (
-                    <div 
-                      key={item.id || index}
-                      className={`p-2.5 rounded-xl border transition-all ${
-                        isPlaying 
-                          ? 'bg-[#1e192c] border-[#F472B6]/40 shadow-sm' 
-                          : 'bg-[#10121d]/80 hover:bg-[#151726] border-white/5'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <h4 className="font-bold text-xs text-white truncate flex-1">
-                          {item.songTitle}
-                        </h4>
-                        {isPlaying && (
-                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-[#F472B6] text-white shrink-0">
-                            LIVE
-                          </span>
-                        )}
-                        {isDownloading && (
-                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-yellow-500/20 text-yellow-500 shrink-0">
-                            DOWNLOADING
-                          </span>
-                        )}
-                        {isProcessing && (
-                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-400 shrink-0 animate-pulse">
-                            PROCESSING
-                          </span>
-                        )}
-                        {isFailed && (
-                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-red-500/20 text-red-500 shrink-0">
-                            FAILED
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-zinc-400 truncate">
-                        {singerName}
-                      </p>
-                    </div>
-                  );
-                })}
-
-                {queue.length === 0 && (
-                  <div className="py-6 text-center text-zinc-500">
-                    <p className="text-xs font-medium">Queue is empty</p>
-                    <p className="text-[10px] text-zinc-600 mt-0.5">Scan to add songs</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </aside>
-        )}
       </div>
 
       {/* Confirmation Modal: End Session */}
@@ -3158,13 +3084,25 @@ export default function RoomSession() {
                 </div>
               </div>
 
-              <button
-                data-tv-id="session-info-close"
-                onClick={() => setShowSessionInfoModal(false)}
-                className="w-full py-3 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
-              >
-                Close
-              </button>
+              <div className="flex flex-col gap-2.5">
+                <button
+                  data-tv-id="session-info-end-session"
+                  onClick={() => {
+                    setShowSessionInfoModal(false);
+                    setShowEndSessionModal(true);
+                  }}
+                  className="w-full py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 font-bold text-sm rounded-xl transition-all border border-red-500/30 focus:outline-none focus:ring-4 focus:ring-red-400"
+                >
+                  End Session
+                </button>
+                <button
+                  data-tv-id="session-info-close"
+                  onClick={() => setShowSessionInfoModal(false)}
+                  className="w-full py-3 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#F472B6]/25 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+                >
+                  Close
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
