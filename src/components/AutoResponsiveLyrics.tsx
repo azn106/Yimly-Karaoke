@@ -409,13 +409,34 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         }}
       >
         {Array.from({ length: sectionCount }, (_, sectionIndex) => {
-          const currLineIndex = safeFocusIndex >= sectionIndex
+          // Pre-fill each section with its first assigned line so the display
+          // never starts with empty sections while waiting for playback.
+          const scheduledLineIndex = safeFocusIndex >= sectionIndex
             ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
-            : -1;
-          
-          // One section owns one chronological lyric line. Its line remains
-          // visible and fully highlighted while other sections advance, then
-          // is replaced only when this section receives its next line.
+            : sectionIndex;
+          let currLineIndex = scheduledLineIndex;
+
+          // Do not rotate this section to its next assigned line until the
+          // line currently occupying it has finished its word highlighting.
+          // The other sections can continue advancing independently.
+          const previousOwnedLineIndex = scheduledLineIndex - sectionCount;
+          if (previousOwnedLineIndex >= 0) {
+            const previousOwnedLine = lyrics[previousOwnedLineIndex];
+            const previousIntervals = previousOwnedLine?.words?.length
+              ? computeWordIntervals(previousOwnedLine.words)
+              : [];
+            const previousLastInterval = previousIntervals[previousIntervals.length - 1];
+            const previousLineEnd = previousLastInterval?.end
+              ?? lyrics[previousOwnedLineIndex + 1]?.time
+              ?? Infinity;
+
+            if (adjustedTime < previousLineEnd) {
+              currLineIndex = previousOwnedLineIndex;
+            }
+          }
+
+          // Each section holds its line through completion, then replaces it
+          // on that section's next turn. This keeps all populated sections visible.
           const currentLine = currLineIndex >= 0 ? lyrics[currLineIndex] : undefined;
 
           return (
