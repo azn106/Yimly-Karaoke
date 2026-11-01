@@ -1,76 +1,13 @@
-@import "tailwindcss";
-
-@font-face {
-  font-family: 'Manrope';
-  src: url('./components/font/Manrope.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Sora';
-  src: url('./components/font/Sora.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Plus Jakarta Sans';
-  src: url('./components/font/PlusJakartaSans.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Instrument Serif';
-  src: url('./components/font/InstrumentSerif.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Urbanist';
-  src: url('./components/font/Urbanist.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Cormorant Garamond';
-  src: url('./components/font/CormorantGaramond.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Lobster';
-  src: url('./components/font/Lobster.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Huggable';
-  src: url('./components/font/Huggable.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Super Sale';
-  src: url('./components/font/Super Sale.otf') format('opentype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
+@font-face{font-family:'LTKaraoke';src:url('./components/font/LTKaraoke-Light.ttf') format('truetype');font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:'LTKaraoke';src:url('./components/font/LTKaraoke-Regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'LTKaraoke';src:url('./components/font/LTKaraoke-Medium.ttf') format('truetype');font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:'LTKaraoke';src:url('./components/font/LTKaraoke-SemiBold.ttf') format('truetype');font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:'LTKaraoke';src:url('./components/font/LTKaraoke-Bold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Dongle';src:url('./components/font/Dongle-Light.ttf') format('truetype');font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:'Dongle';src:url('./components/font/Dongle-Regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Dongle';src:url('./components/font/Dongle-Bold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Lobster';src:url('./components/font/Lobster.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Super Sale';src:url('./components/font/Super Sale.otf') format('opentype');font-weight:400;font-style:normal;font-display:swap}
 
 :root {
   --accent: #F472B6;
