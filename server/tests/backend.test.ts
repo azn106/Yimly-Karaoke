@@ -1525,6 +1525,16 @@ test('Lyrics Font System: retained fonts, LTKaraoke default, removed-font migrat
   assert.strictEqual(DEFAULT_LYRICS_SETTINGS.unhighlighted.font, 'ltkaraoke');
   assert.strictEqual(DEFAULT_LYRICS_SETTINGS.highlighted.weight, '700');
   assert.strictEqual(DEFAULT_LYRICS_SETTINGS.unhighlighted.weight, '500');
+  for (const [font, input, expected] of [
+    ['ltkaraoke', '800', '700'],
+    ['ltkaraoke', '100', '300'],
+    ['dongle', '600', '700'],
+    ['lobster', '700', '400'],
+    ['super-sale', '300', '400'],
+  ]) {
+    const normalized = resolveLyricsSettings({ highlighted: { font, weight: input } });
+    assert.strictEqual(normalized.highlighted.weight, expected, `${font} weight ${input} should normalize to ${expected}`);
+  }
 
   for (const font of ['ltkaraoke', 'dongle', 'lobster', 'super-sale']) {
     const resolved = resolveLyricsSettings({ highlighted: { font }, unhighlighted: { font } });
