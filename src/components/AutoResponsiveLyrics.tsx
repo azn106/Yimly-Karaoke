@@ -94,7 +94,8 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   const baseFontSizeInit = lyricsSettings.highlighted.size || 48;
   const lineSpacingInit = lyricsSettings.highlighted.lineSpacing || 1.2;
   const singleLineHeightInit = baseFontSizeInit * lineSpacingInit;
-  const sectionHeightAllocInit = singleLineHeightInit * 2.5;
+  // Initial portrait-safe allocation: each previous/current lyric slot can wrap to 3 rows.
+  const sectionHeightAllocInit = singleLineHeightInit * 3 * 2;
   const gapsInit = Math.max(0, sectionCount - 1);
   const initialProjectedHeight = (sectionCount * sectionHeightAllocInit) + (gapsInit * Math.max(4, Math.round(baseFontSizeInit * 0.2)));
 
@@ -134,13 +135,14 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         maxWidth = Math.max(groupEl.offsetWidth, rect.width / appliedScale);
       }
 
-      // STABLE LAYOUT: Allocate fixed vertical space per section based on font metrics.
+      // STABLE LAYOUT: Each of the two reserved lyric slots gets enough height
+      // for the orientation-specific wrapped-line capacity. The slot positions
+      // remain fixed while playback advances.
       const baseFontSize = lyricsSettings.highlighted.size || 48;
       const lineSpacing = lyricsSettings.highlighted.lineSpacing || 1.2;
       const singleLineHeight = baseFontSize * lineSpacing;
-      
-      // Allocate space for 2.5 lines per section to handle wrapping without affecting scale.
-      const sectionHeightAllocation = singleLineHeight * 2.5; 
+      const rowsPerLyric = stageWidth >= stageHeight ? 2 : 3;
+      const sectionHeightAllocation = singleLineHeight * rowsPerLyric * 2;
       const gapBase = Math.max(4, Math.round(baseFontSize * 0.2));
       const gaps = Math.max(0, sectionCount - 1);
       const gap = gapBase;
