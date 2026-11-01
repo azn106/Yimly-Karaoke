@@ -1052,9 +1052,9 @@ export default function Settings() {
               {/* Visible Lines Count */}
               <div>
                 <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-3">
-                  Visible Line Count
+                  Number of Sections
                 </label>
-                <div className="grid grid-cols-3 gap-3 max-w-md">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 max-w-4xl">
                   {[
                     { count: 1, label: '1 Section', desc: '1, 2, 3…' },
                     { count: 2, label: '2 Sections', desc: '1,3… / 2,4…' },
