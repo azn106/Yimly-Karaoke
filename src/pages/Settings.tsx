@@ -772,78 +772,11 @@ export default function Settings() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Font */}
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">
-                    Font Family
-                  </label>
-                  <select
-                    value={lyricsSettings.unhighlighted.font}
-                    onChange={(e) =>
-                      updateSetting((prev) => ({
-                        ...prev,
-                        unhighlighted: { ...prev.unhighlighted, font: e.target.value }
-                      }))
-                    }
-                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F472B6]"
-                  >
-                    {LYRICS_FONT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Weight */}
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">
-                    Font Weight
-                  </label>
-                  <select
-                    value={lyricsSettings.unhighlighted.weight}
-                    onChange={(e) =>
-                      updateSetting((prev) => ({
-                        ...prev,
-                        unhighlighted: { ...prev.unhighlighted, weight: e.target.value }
-                      }))
-                    }
-                    className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F472B6]"
-                  >
-                    <option value="100">Thin (100)</option>
-                    <option value="300">Light (300)</option>
-                    <option value="400">Regular (400)</option>
-                    <option value="500">Medium (500)</option>
-                    <option value="600">Semi Bold (600)</option>
-                    <option value="700">Bold (700)</option>
-                    <option value="800">Extra Bold (800)</option>
-                    <option value="900">Black (900)</option>
-                  </select>
-                </div>
-
-                {/* Size */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                      Font Size
-                    </label>
-                    <span className="text-xs font-mono text-[#F472B6] font-bold">
-                      {lyricsSettings.unhighlighted.size}px
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="12"
-                    max="44"
-                    value={lyricsSettings.unhighlighted.size}
-                    onChange={(e) =>
-                      updateSetting((prev) => ({
-                        ...prev,
-                        unhighlighted: { ...prev.unhighlighted, size: Number(e.target.value) }
-                      }))
-                    }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
-                  />
+                {/* No Font/Weight/Size/Spacing for Unhighlighted - they use highlighted metrics for stability */}
+                <div className="col-span-full bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+                  <p className="text-xs text-zinc-400">
+                    Typography metrics (Font, Size, Weight, Spacing) are shared with the highlighted style to ensure a stable, jump-free layout.
+                  </p>
                 </div>
 
                 {/* Opacity */}
@@ -895,57 +828,6 @@ export default function Settings() {
                     <option value="uppercase">UPPERCASE</option>
                     <option value="titlecase">Title Case</option>
                   </select>
-                </div>
-
-                {/* Letter Spacing */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                      Letter Spacing
-                    </label>
-                    <span className="text-xs font-mono text-[#F472B6] font-bold">
-                      {lyricsSettings.unhighlighted.letterSpacing}px
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="-4"
-                    max="12"
-                    value={lyricsSettings.unhighlighted.letterSpacing}
-                    onChange={(e) =>
-                      updateSetting((prev) => ({
-                        ...prev,
-                        unhighlighted: { ...prev.unhighlighted, letterSpacing: Number(e.target.value) }
-                      }))
-                    }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
-                  />
-                </div>
-
-                {/* Line Spacing */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                      Line Spacing (Height)
-                    </label>
-                    <span className="text-xs font-mono text-[#F472B6] font-bold">
-                      {lyricsSettings.unhighlighted.lineSpacing}x
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1.0"
-                    max="2.2"
-                    step="0.05"
-                    value={lyricsSettings.unhighlighted.lineSpacing}
-                    onChange={(e) =>
-                      updateSetting((prev) => ({
-                        ...prev,
-                        unhighlighted: { ...prev.unhighlighted, lineSpacing: Number(e.target.value) }
-                      }))
-                    }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6]"
-                  />
                 </div>
               </div>
             </div>
@@ -1121,15 +1003,15 @@ export default function Settings() {
                   <div className="flex items-center gap-2 self-start sm:self-auto">
                     <input
                       type="number"
-                      min={0}
+                      min={1500}
                       max={5000}
                       step={50}
-                      value={lyricsSettings.elrcDisplayLeadInMs ?? 0}
+                      value={lyricsSettings.elrcDisplayLeadInMs ?? 1500}
                       onChange={(e) => {
                         const value = Number.parseInt(e.target.value, 10);
                         updateSetting((prev) => ({
                           ...prev,
-                          elrcDisplayLeadInMs: Number.isFinite(value) ? Math.max(0, Math.min(5000, value)) : 0,
+                          elrcDisplayLeadInMs: Number.isFinite(value) ? Math.max(1500, Math.min(5000, value)) : 1500,
                         }));
                       }}
                       className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#F472B6]"

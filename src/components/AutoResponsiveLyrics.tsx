@@ -221,14 +221,18 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const displayStyle = lyricsSettings.highlighted;
 
     // TRANSITION TIMING:
-    // Transition starts at the first word's timestamp of the INCOMING line.
-    // Duration is hardcoded to 1.5s.
+    // The incoming line is scheduled 'elrcDisplayLeadInMs' early.
+    // The simultaneous 1.5s wipe must FINISH at transitionStartTime.
+    // So the transition must START at (transitionStartTime - 1.5s).
+    // The delay from scheduling (now) to transition start is:
+    // delay = (transitionStartTime - 1.5) - adjustedTime
+    // Since RoomSession schedules exactly at (transitionStartTime - lead),
+    // then at mount: adjustedTime = transitionStartTime - lead
+    // So: delay = (transitionStartTime - 1.5) - (transitionStartTime - lead) = lead - 1.5
     const transitionStartTime = line.words?.[0]?.start ?? line.time;
+    const leadSec = (lyricsSettings.elrcDisplayLeadInMs || 1500) / 1000;
     const transitionDuration = 1.5;
-    
-    // Calculate the delay for the entry animation relative to when this component mounts (scheduling time).
-    // If adjustedTime is already past transitionStartTime (e.g. on seek), delay is 0.
-    const transitionDelay = Math.max(0, transitionStartTime - adjustedTime);
+    const transitionDelay = Math.max(0, leadSec - transitionDuration);
 
     const wordNodes = line.words?.length ? line.words.map((word, wordIndex) => {
       // PERMANENT HIGHLIGHTING: Word stays highlighted once its timestamp is passed.
@@ -249,8 +253,11 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
       );
     }) : null;
 
+    const vertAlignment = lyricsSettings.verticalAlignment || 'center';
+    const rowAlign = vertAlignment === 'top' ? 'items-start' : vertAlignment === 'bottom' ? 'items-end' : 'items-center';
+
     return (
-      <div className={`lyric-line-row flex h-full items-center ${rowJustify} shrink-0 w-full overflow-visible py-1 px-2 absolute inset-0`} key={`row-${sectionIndex}-${slotIndex}`}>
+      <div className={`lyric-line-row flex h-full ${rowAlign} ${rowJustify} shrink-0 w-full overflow-visible py-1 px-2 absolute inset-0`} key={`row-${sectionIndex}-${slotIndex}`}>
         <AnimatePresence mode="popLayout">
           <motion.p
             key={`section-${sectionIndex}-slot-${slotIndex}-${line.time}-${line.text}`}
