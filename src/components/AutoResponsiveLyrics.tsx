@@ -229,7 +229,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const highColor = lyricsSettings.highlighted.color || '#F472B6';
     const lowColor = lyricsSettings.unhighlighted.color || '#d4d4d8';
     const highOpacity = lyricsSettings.highlighted.opacity ?? 1;
-    const lowOpacity = lyricsSettings.unhighlighted.opacity ?? 0.45;
+    const lowOpacity = lyricsSettings.unhighlighted.opacity ?? 0.8;
     const displayStyle = lyricsSettings.highlighted;
 
     // TRANSITION TIMING:
