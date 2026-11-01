@@ -43,7 +43,7 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
     font: 'ltkaraoke',
     size: 20,
     weight: '500',
-    opacity: 0.45,
+    opacity: 0.8,
     letterSpacing: 0,
     lineSpacing: 1.4,
     textCase: 'original',
