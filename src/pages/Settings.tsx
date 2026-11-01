@@ -38,6 +38,34 @@ import {
   LyricsMode,
 } from '../utils/karaokeDefaultsSettings';
 
+const LYRIC_FONT_WEIGHTS: Record<string, Array<{ value: string; label: string }>> = {
+  ltkaraoke: [
+    { value: '300', label: 'Light (300)' },
+    { value: '400', label: 'Regular (400)' },
+    { value: '500', label: 'Medium (500)' },
+    { value: '600', label: 'Semi Bold (600)' },
+    { value: '700', label: 'Bold (700)' },
+  ],
+  dongle: [
+    { value: '300', label: 'Light (300)' },
+    { value: '400', label: 'Regular (400)' },
+    { value: '700', label: 'Bold (700)' },
+  ],
+  lobster: [{ value: '400', label: 'Regular (400)' }],
+  'super-sale': [{ value: '400', label: 'Regular (400)' }],
+  custom: [
+    { value: '100', label: 'Thin (100)' },
+    { value: '300', label: 'Light (300)' },
+    { value: '400', label: 'Regular (400)' },
+    { value: '500', label: 'Medium (500)' },
+    { value: '600', label: 'Semi Bold (600)' },
+    { value: '700', label: 'Bold (700)' },
+    { value: '800', label: 'Extra Bold (800)' },
+    { value: '900', label: 'Black (900)' },
+  ],
+};
+
+
 export default function Settings() {
   const context = useOutletContext<{ user: any }>();
   const user = context?.user;
@@ -597,14 +625,9 @@ export default function Settings() {
                     }
                     className="w-full bg-[#08090E] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F472B6]"
                   >
-                    <option value="100">Thin (100)</option>
-                    <option value="300">Light (300)</option>
-                    <option value="400">Regular (400)</option>
-                    <option value="500">Medium (500)</option>
-                    <option value="600">Semi Bold (600)</option>
-                    <option value="700">Bold (700)</option>
-                    <option value="800">Extra Bold (800)</option>
-                    <option value="900">Black (900)</option>
+                    {(LYRIC_FONT_WEIGHTS[lyricsSettings.highlighted.font] || LYRIC_FONT_WEIGHTS.ltkaraoke).map((weight) => (
+                      <option key={weight.value} value={weight.value}>{weight.label}</option>
+                    ))}
                   </select>
                 </div>
 
