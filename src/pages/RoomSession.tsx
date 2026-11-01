@@ -609,6 +609,25 @@ export default function RoomSession() {
 
         if (bestCandidate) {
           safeFocus(bestCandidate);
+
+          // safeFocus intentionally prevents the browser from scrolling the room page.
+          // When navigating the song catalogue, scroll only its list viewport so the
+          // newly focused song action remains visible on TV screens.
+          if (showLibrary) {
+            const listViewport = bestCandidate.closest<HTMLElement>('[data-tv-scroll-container="library"]');
+            if (listViewport) {
+              const focusedRect = bestCandidate.getBoundingClientRect();
+              const viewportRect = listViewport.getBoundingClientRect();
+              const topOverflow = focusedRect.top - viewportRect.top;
+              const bottomOverflow = focusedRect.bottom - viewportRect.bottom;
+
+              if (topOverflow < 0) {
+                listViewport.scrollTop += topOverflow - 12;
+              } else if (bottomOverflow > 0) {
+                listViewport.scrollTop += bottomOverflow + 12;
+              }
+            }
+          }
         }
         // When no candidate exists in the requested direction, keep focus at the current boundary
       }
@@ -2382,7 +2401,7 @@ export default function RoomSession() {
             </div>
 
             {/* Song List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            <div data-tv-scroll-container="library" className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-2">
               {!searchQuery.trim() ? (
                 availableSongs.map((song) => {
                   const isAdding = addingSongId === song.id;
