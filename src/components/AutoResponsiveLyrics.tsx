@@ -205,20 +205,24 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     };
   }, [recalculateLayout]);
 
-  const renderLine = (line: LyricLine | undefined, lineIndex: number, sectionIndex: number) => {
-    if (!line) return <div className="lyric-line-row w-full min-h-[1.2em]" key={`empty-${sectionIndex}`} />;
-    const active = lineIndex === safeFocusIndex;
+  const renderLine = (line: LyricLine | undefined, lineIndex: number, sectionIndex: number, slotIndex: number) => {
+    const active = Boolean(line) && lineIndex === safeFocusIndex;
     const highlighted = active && isHighlighted && lyricsSettings.highlightCurrentLine !== false;
     const style = highlighted ? lyricsSettings.highlighted : lyricsSettings.unhighlighted;
+    const direction = sectionIndex < (sectionCount - 1) / 2 ? -1 : sectionIndex > (sectionCount - 1) / 2 ? 1 : 0;
+    const motionOffset = transitionStyle === 'slide' ? direction * 14 : 0;
+    const duration = transitionStyle === 'instant' ? 0 : animDuration;
+
+    if (!line) {
+      return <div className="lyric-line-row flex items-center justify-center shrink-0 w-full min-h-[1.2em]" key={`row-${sectionIndex}-${slotIndex}`} />;
+    }
+
     const highColor = lyricsSettings.highlighted.color || '#F472B6';
     const lowColor = lyricsSettings.unhighlighted.color || '#d4d4d8';
     const highOpacity = lyricsSettings.highlighted.opacity ?? 1;
     const lowOpacity = lyricsSettings.unhighlighted.opacity ?? 0.45;
     const adjustedTime = currentTime + lyricOffset / 1000;
     const nextLineTime = lyrics[lineIndex + 1]?.time ?? (line.time + 3);
-    const direction = sectionIndex < (sectionCount - 1) / 2 ? -1 : sectionIndex > (sectionCount - 1) / 2 ? 1 : 0;
-    const motionOffset = transitionStyle === 'slide' ? direction * 14 : 0;
-    const duration = transitionStyle === 'instant' ? 0 : animDuration;
 
     const wordNodes = line.words?.length ? line.words.map((word, wordIndex) => {
       const nextWordTime = line.words?.[wordIndex + 1]?.start ?? nextLineTime;
@@ -236,8 +240,10 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
           const progress = isPreview ? 60 : Math.min(100, Math.max(0, ((adjustedTime - word.start) / wordDuration) * 100));
           wordStyle = {
             backgroundImage: `linear-gradient(to right, ${highColor} 0%, ${highColor} ${progress}%, ${lowColor} ${progress}%, ${lowColor} 100%)`,
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            opacity: highOpacity, filter: `drop-shadow(0 0 8px ${highColor}70)`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            opacity: highOpacity,
+            filter: `drop-shadow(0 0 8px ${highColor}70)`,
           };
         } else {
           wordStyle = { color: lowColor, opacity: lowOpacity };
@@ -256,22 +262,22 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
       const wordColor = wordHighlighted ? highColor : lowColor;
       const wordOpacity = wordHighlighted ? highOpacity : lowOpacity;
       const animation = lyricsSettings.wordHighlightAnimation || 'smooth';
-      const wordTransition = animation === 'instant' || animation === 'off' ? { duration: 0 } : animation === 'fade' ? { duration: 0.25, ease: 'easeInOut' as const } : { duration: 0.15, ease: 'easeOut' as const };
+      const wordTransition = animation === 'instant' || animation === 'off'
+        ? { duration: 0 }
+        : animation === 'fade'
+          ? { duration: 0.25, ease: 'easeInOut' as const }
+          : { duration: 0.15, ease: 'easeOut' as const };
       const glow = animation === 'off' ? 'none' : current ? `0 0 25px ${highColor}80` : 'none';
       return <motion.span key={`word-${wordIndex}-${word.text}`} animate={{ scale: 1, color: wordColor, opacity: wordOpacity }} transition={wordTransition} className={animation === 'instant' || animation === 'off' ? 'inline-block text-center select-none' : 'inline-block transition-colors text-center select-none'} style={{ textShadow: glow, scale: 1 }}>{applyTextCase(word.text, wordHighlighted ? lyricsSettings.highlighted.textCase : lyricsSettings.unhighlighted.textCase)}</motion.span>;
     }) : null;
 
-    const initialOpacity = transitionStyle === 'instant' ? 1 : 0;
     return (
-      <div className="lyric-line-row flex items-center justify-center shrink-0 w-full overflow-visible py-1 px-2 text-center" key={`row-${sectionIndex}`}>
+      <div className="lyric-line-row flex items-center justify-center shrink-0 w-full overflow-visible py-1 px-2 text-center" key={`row-${sectionIndex}-${slotIndex}`}>
         <AnimatePresence mode="wait">
           <motion.p
-            key={`section-${sectionIndex}-${line.time}-${line.text}`}
-            initial={{ opacity: initialOpacity, y: motionOffset }}
-            animate={{
-              opacity: style.opacity ?? (highlighted ? 1 : 0.45),
-              y: 0,
-            }}
+            key={`section-${sectionIndex}-slot-${slotIndex}-${line.time}-${line.text}`}
+            initial={{ opacity: transitionStyle === 'instant' ? 1 : 0, y: motionOffset }}
+            animate={{ opacity: style.opacity ?? (highlighted ? 1 : 0.45), y: 0 }}
             exit={{ opacity: 0, y: -motionOffset }}
             transition={{ duration, ease: 'easeOut' }}
             style={{
@@ -317,7 +323,14 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         </>
       )}
       <div ref={groupRef} className="w-full max-w-5xl mx-auto flex flex-col justify-center items-center text-center overflow-visible" style={{ gap: `${effectiveGap}px`, transform: scale < 1 ? `scale(${scale})` : 'none', transformOrigin: 'center center', width: '100%' }}>
-        {Array.from({ length: sectionCount }, (_, sectionIndex) => renderLine(lyrics[groupStartIndex + sectionIndex], groupStartIndex + sectionIndex, sectionIndex))}
+        {Array.from({ length: sectionCount }, (_, sectionIndex) => (
+          <div key={`lyric-section-${sectionIndex}`} className="w-full flex flex-col justify-center items-center overflow-visible" style={{ gap: `${effectiveGap}px` }}>
+            {Array.from({ length: 3 }, (_, slotIndex) => {
+              const lineIndex = groupStartIndex + sectionIndex + (slotIndex * sectionCount);
+              return renderLine(lyrics[lineIndex], lineIndex, sectionIndex, slotIndex);
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
