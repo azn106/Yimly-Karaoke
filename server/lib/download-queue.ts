@@ -5,7 +5,7 @@ import { execFile, exec, ChildProcess } from 'child_process';
 import NodeID3 from 'node-id3';
 import { db } from '../db/index.js';
 import { downloadJobs, downloadTrackJobs, libraries, queueItems, playlists, playlistSongs, songs } from '../db/schema.js';
-import { eq, and, asc, inArray, sql } from 'drizzle-orm';
+import { eq, and, asc, inArray, sql, ne } from 'drizzle-orm';
 import { scanLibrary } from './scanner.js';
 import { fetchLyrics, saveLrcSidecar, stripLrcTimestamps } from './lyrics.js';
 import { matchSpotifyTrackToYouTube } from './youtube-matcher.js';
@@ -377,8 +377,25 @@ export class DownloadQueueManager {
         if (existing.length > 0) {
           playlistId = existing[0].id;
           let coverPathVal = existing[0].coverPath;
-          if (params.playlistCoverUrl && !coverPathVal) {
-            coverPathVal = await this.downloadAndSavePlaylistCover(params.playlistCoverUrl);
+          if (params.playlistCoverUrl) {
+            const newCover = await this.downloadAndSavePlaylistCover(params.playlistCoverUrl);
+            if (newCover) {
+              if (coverPathVal && coverPathVal !== newCover) {
+                try {
+                  const otherUsing = await db.select({ id: playlists.id })
+                    .from(playlists)
+                    .where(and(eq(playlists.coverPath, coverPathVal), ne(playlists.id, playlistId)))
+                    .limit(1);
+
+                  if (otherUsing.length === 0) {
+                    const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
+                    const oldPath = path.join(dataDir, 'playlist_covers', path.basename(coverPathVal));
+                    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+                  }
+                } catch {}
+              }
+              coverPathVal = newCover;
+            }
           }
           await db.update(playlists).set({
             name: params.playlistName?.trim() || existing[0].name,
@@ -1162,14 +1179,15 @@ export class DownloadQueueManager {
     }
   }
 
-  private async downloadAndSavePlaylistCover(coverUrl: string): Promise<string | null> {
+  public async downloadAndSavePlaylistCover(coverUrl: string): Promise<string | null> {
     try {
       const res = await fetch(coverUrl);
       if (res.ok) {
         const buffer = Buffer.from(await res.arrayBuffer());
         const ext = coverUrl.includes('.png') ? '.png' : '.jpg';
         const filename = `playlist_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`;
-        const playlistCoversDir = path.join(process.cwd(), 'data', 'playlist_covers');
+        const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');
+        const playlistCoversDir = path.join(dataDir, 'playlist_covers');
         if (!fs.existsSync(playlistCoversDir)) {
           fs.mkdirSync(playlistCoversDir, { recursive: true });
         }

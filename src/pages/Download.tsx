@@ -20,6 +20,8 @@ interface ResolvedTrack {
 
 interface ResolvedResult {
   type: 'track' | 'album' | 'playlist' | 'search';
+  id?: string;
+  spotifyId?: string;
   title?: string;
   artist?: string;
   artworkUrl?: string;
@@ -252,6 +254,9 @@ export default function DownloadMusic() {
           quality,
           downloadLyrics,
           playlistName: result.title,
+          playlistCoverUrl: result.artworkUrl,
+          spotifyPlaylistId: result.spotifyId || result.id,
+          sourceType: result.type,
           tracks: chosenTracks,
         }),
       });
