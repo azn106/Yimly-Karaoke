@@ -25,7 +25,7 @@ const httpServer = createServer(app);
 const wss = new WebSocketServer({ server: httpServer, path: '/ws/karaoke' });
 setupWebSockets(wss);
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 const isProd = process.env.NODE_ENV === 'production';
 
 if (isPreviewMode && isProd) {

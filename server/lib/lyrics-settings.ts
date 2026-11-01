@@ -17,6 +17,8 @@ export interface LyricsAppearanceSettings {
   verticalAlignment: 'top' | 'center' | 'bottom';
   visibleLines: number;
   elrcDisplayLeadInMs?: number;
+  elrcFadeDurationMs?: number;
+  elrcFadeOverlapMs?: number;
   customFontName?: string | null;
   customFontFileName?: string | null;
   customFontId?: string | null;
@@ -50,6 +52,8 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
   verticalAlignment: 'center',
   visibleLines: 2,
   elrcDisplayLeadInMs: 1500,
+  elrcFadeDurationMs: 1500,
+  elrcFadeOverlapMs: 300,
   customFontName: null,
   customFontFileName: null,
   customFontId: null,
@@ -118,6 +122,8 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
       ? parsed.visibleLines
       : DEFAULT_LYRICS_SETTINGS.visibleLines,
     elrcDisplayLeadInMs: typeof parsed.elrcDisplayLeadInMs === 'number' && Number.isFinite(parsed.elrcDisplayLeadInMs) ? Math.max(1500, Math.min(5000, Math.round(parsed.elrcDisplayLeadInMs))) : 1500,
+    elrcFadeDurationMs: typeof parsed.elrcFadeDurationMs === 'number' && Number.isFinite(parsed.elrcFadeDurationMs) ? Math.max(300, Math.min(5000, Math.round(parsed.elrcFadeDurationMs))) : 1500,
+    elrcFadeOverlapMs: typeof parsed.elrcFadeOverlapMs === 'number' && Number.isFinite(parsed.elrcFadeOverlapMs) ? Math.max(0, Math.min(3000, Math.round(parsed.elrcFadeOverlapMs))) : 300,
     customFontName: typeof parsed.customFontName === 'string' && parsed.customFontName.trim() ? parsed.customFontName.trim() : null,
     customFontFileName: typeof parsed.customFontFileName === 'string' && parsed.customFontFileName.trim() ? parsed.customFontFileName.trim() : null,
     customFontId: typeof parsed.customFontId === 'string' && parsed.customFontId.trim() ? parsed.customFontId.trim() : null,

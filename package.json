@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "AUTO_REGISTER_SAMPLE_LIBRARY=true tsx watch server.ts",
+    "dev": "DISABLE_HMR=true AUTO_REGISTER_SAMPLE_LIBRARY=true tsx watch server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
     "start": "NODE_ENV=production node dist/server.js",
     "preview": "npm run start",

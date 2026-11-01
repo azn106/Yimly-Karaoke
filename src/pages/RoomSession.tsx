@@ -76,6 +76,8 @@ export default function RoomSession() {
   const audioOutput = isDisplay && searchParams.get('audioOutput') === '1';
   const [displayAudioBlocked, setDisplayAudioBlocked] = useState(false);
   const lastSyncSentAtRef = useRef(0);
+  const lastSyncPositionRef = useRef(0);
+  const lastSyncAtRef = useRef(performance.now());
 
   useEffect(() => {
     if (sessionId && urlControllerId) {
@@ -918,7 +920,12 @@ export default function RoomSession() {
               if (typeof msg.payload?.playing === 'boolean') setPlaying(msg.payload.playing);
               if (Number.isFinite(Number(msg.payload?.position))) {
                 const syncedPosition = Number(msg.payload.position);
-                setCurrentTime(syncedPosition);
+                const isHostAudioActive = isHost && audioRef.current && !audioRef.current.paused;
+                if (!isHostAudioActive) {
+                  setCurrentTime(syncedPosition);
+                }
+                lastSyncPositionRef.current = syncedPosition;
+                lastSyncAtRef.current = performance.now();
                 if (isDisplay && audioOutput && audioRef.current) {
                   if (Math.abs(audioRef.current.currentTime - syncedPosition) > 0.65) audioRef.current.currentTime = syncedPosition;
                   if (msg.payload.playing) audioRef.current.play().then(() => setDisplayAudioBlocked(false)).catch(() => setDisplayAudioBlocked(true));
@@ -2047,11 +2054,16 @@ export default function RoomSession() {
 
   // High-frequency smooth animation loop for lyric sweep and position
   useEffect(() => {
-    if (!isHost || !playing) return;
+    if (!playing) return;
     let rafId: number;
     const updateLoop = () => {
       if (audioRef.current && !audioRef.current.paused) {
         setCurrentTime(audioRef.current.currentTime);
+      } else if (!isHost) {
+        // Smoothly extrapolate time between 500ms WebSocket SYNC pulses for guests/displays
+        const elapsed = (performance.now() - lastSyncAtRef.current) / 1000;
+        const extrapolated = Math.max(0, lastSyncPositionRef.current + elapsed);
+        setCurrentTime(extrapolated);
       }
       rafId = requestAnimationFrame(updateLoop);
     };
@@ -2103,15 +2115,36 @@ export default function RoomSession() {
   const activeOffset = lyricsFormat === 'elrc' ? elrcOffset : lrcOffset;
   const adjustedTime = currentTime + (activeOffset / 1000);
   // Advance line display only; word highlighting retains the original eLRC timestamps.
-  const lineDisplayTime = adjustedTime + (lyricsFormat === 'elrc' ? (lyricsSettings.elrcDisplayLeadInMs ?? 0) / 1000 : 0);
+  // Effective lead incorporates Extra eLRC Display Lead and the transition requirement (2 * duration - overlap)
+  const fadeDurationSec = (lyricsSettings.elrcFadeDurationMs ?? 1500) / 1000;
+  const fadeOverlapSec = Math.min(fadeDurationSec, (lyricsSettings.elrcFadeOverlapMs ?? 300) / 1000);
+  const transitionLeadSec = Math.max(fadeDurationSec, 2 * fadeDurationSec - fadeOverlapSec);
+  const displayLeadSec = (lyricsSettings.elrcDisplayLeadInMs ?? 1500) / 1000;
+  const effectiveLeadSec = Math.max(displayLeadSec, transitionLeadSec);
 
-  // Active lyric index: only valid if playback has started AND adjustedTime has reached the first lyric's timestamp
-  const firstLyricTime = lyrics[0]?.time ?? 0;
+  const lineDisplayTime = adjustedTime + (lyricsFormat === 'elrc' ? effectiveLeadSec : 0);
+
+  // Authoritative transition target timestamp:
+  // For eLRC lines with word timestamps, use the first word's original timestamp as the authoritative transition target.
+  // Fall back to line.time when word timestamps are unavailable.
+  // Standard LRC mode uses line.time.
+  const getLineTargetTime = (l: LyricLine | undefined): number => {
+    if (!l) return 0;
+    if (lyricsFormat === 'elrc' && l.words && l.words.length > 0 && typeof l.words[0].start === 'number') {
+      return l.words[0].start;
+    }
+    return l.time;
+  };
+
+  // Active lyric index: only valid if playback has started AND lineDisplayTime has reached the first lyric's transition target
+  const firstLyricTargetTime = getLineTargetTime(lyrics[0]);
   let activeLyricIndex = -1;
-  if (isPlaybackActive && lyrics.length > 0 && lineDisplayTime >= firstLyricTime) {
+  if (isPlaybackActive && lyrics.length > 0 && lineDisplayTime >= firstLyricTargetTime) {
     activeLyricIndex = lyrics.findIndex((l, idx) => {
       const nextLine = lyrics[idx + 1];
-      return lineDisplayTime >= l.time && (!nextLine || lineDisplayTime < nextLine.time);
+      const thisTarget = getLineTargetTime(l);
+      const nextTarget = nextLine ? getLineTargetTime(nextLine) : Infinity;
+      return lineDisplayTime >= thisTarget && lineDisplayTime < nextTarget;
     });
   }
 
@@ -2830,6 +2863,7 @@ export default function RoomSession() {
                   getAlignmentClass={getAlignmentClass}
                   currentTime={currentTime}
                   lyricOffset={activeOffset}
+                  lyricsFormat={lyricsFormat}
                 />
               ) : (
                 /* Fallback when no synced LRC is available */

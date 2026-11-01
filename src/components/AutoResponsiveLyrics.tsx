@@ -27,6 +27,7 @@ interface AutoResponsiveLyricsProps {
   currentTime?: number;
   lyricOffset?: number;
   showDebugHUD?: boolean;
+  lyricsFormat?: 'elrc' | 'lrc';
 }
 
 interface DiagnosticData {
@@ -57,6 +58,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   currentTime = 0,
   lyricOffset = 0,
   showDebugHUD,
+  lyricsFormat,
 }) => {
   const stageRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<HTMLDivElement>(null);
@@ -221,22 +223,43 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const displayStyle = lyricsSettings.highlighted;
 
     // TRANSITION TIMING:
-    // The incoming line is scheduled 'elrcDisplayLeadInMs' early.
-    // The simultaneous 1.5s wipe must FINISH at transitionStartTime.
-    // So the transition must START at (transitionStartTime - 1.5s).
-    // The delay from scheduling (now) to transition start is:
-    // delay = (transitionStartTime - 1.5) - adjustedTime
-    // Since RoomSession schedules exactly at (transitionStartTime - lead),
-    // then at mount: adjustedTime = transitionStartTime - lead
-    // So: delay = (transitionStartTime - 1.5) - (transitionStartTime - lead) = lead - 1.5
-    const transitionStartTime = line.words?.[0]?.start ?? line.time;
-    const leadSec = (lyricsSettings.elrcDisplayLeadInMs || 1500) / 1000;
-    const transitionDuration = 1.5;
-    const transitionDelay = Math.max(0, leadSec - transitionDuration);
+    // For eLRC lines with word timestamps, use the first word's original timestamp as the authoritative transition target.
+    // Fall back to line.time when word timestamps are unavailable.
+    // eLRC Fade Duration: controls how long incoming and outgoing line wipes take.
+    // eLRC Fade Overlap: controls how early the incoming line starts relative to the outgoing line finishing.
+    const isElrcMode = lyricsFormat ? lyricsFormat === 'elrc' : Boolean(line.words && line.words.length > 0);
+    const hasWords = Boolean(line.words && line.words.length > 0 && typeof line.words[0].start === 'number');
+    const transitionTargetTime = (isElrcMode && hasWords) ? line.words![0].start : line.time;
+
+    const fadeDurationSec = isElrcMode ? (lyricsSettings.elrcFadeDurationMs ?? 1500) / 1000 : 1.5;
+    const fadeOverlapSec = isElrcMode ? Math.min(fadeDurationSec, (lyricsSettings.elrcFadeOverlapMs ?? 300) / 1000) : 0;
+    const transitionLeadSec = Math.max(fadeDurationSec, 2 * fadeDurationSec - fadeOverlapSec);
+    const displayLeadSec = isElrcMode ? (lyricsSettings.elrcDisplayLeadInMs ?? 1500) / 1000 : 0;
+    const effectiveLeadSec = isElrcMode ? Math.max(displayLeadSec, transitionLeadSec) : 0;
+
+    const inDelay = isElrcMode ? Math.max(0, effectiveLeadSec - fadeDurationSec) : 0;
+    const outDelay = isElrcMode ? Math.max(0, effectiveLeadSec - (2 * fadeDurationSec - fadeOverlapSec)) : 0;
+    const transitionDuration = fadeDurationSec;
+
+    // Smooth word-by-word highlighting:
+    // Determine the highest active word index reached in this line.
+    // Word order is authoritative; no earlier word is skipped when consecutive timestamps are close or identical.
+    let maxActiveWordIndex = -1;
+    if (line.words?.length) {
+      if (isPreview) {
+        maxActiveWordIndex = Math.min(1, line.words.length - 1);
+      } else if (isHighlighted) {
+        for (let i = 0; i < line.words.length; i++) {
+          if (adjustedTime >= line.words[i].start) {
+            maxActiveWordIndex = i;
+          }
+        }
+      }
+    }
 
     const wordNodes = line.words?.length ? line.words.map((word, wordIndex) => {
-      // PERMANENT HIGHLIGHTING: Word stays highlighted once its timestamp is passed.
-      const wordHighlighted = isHighlighted && (isPreview ? wordIndex <= 1 : adjustedTime >= word.start);
+      // PERMANENT HIGHLIGHTING: Word stays highlighted once its timestamp is reached.
+      const wordHighlighted = wordIndex <= maxActiveWordIndex;
       const wordColor = wordHighlighted ? highColor : lowColor;
       const wordOpacity = wordHighlighted ? highOpacity : lowOpacity;
       
@@ -245,7 +268,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
       return (
         <span 
           key={`word-${wordIndex}-${word.text}`} 
-          className="inline-block transition-colors duration-200 text-center select-none"
+          className="inline-block transition-all duration-150 ease-out text-center select-none"
           style={{ color: wordColor, opacity: wordOpacity, textShadow: glow }}
         >
           {applyTextCase(word.text, wordHighlighted ? lyricsSettings.highlighted.textCase : lyricsSettings.unhighlighted.textCase)}
@@ -260,17 +283,28 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
       <div className={`lyric-line-row flex h-full ${rowAlign} ${rowJustify} shrink-0 w-full overflow-visible py-1 px-2 absolute inset-0`} key={`row-${sectionIndex}-${slotIndex}`}>
         <AnimatePresence mode="popLayout">
           <motion.p
-            key={`section-${sectionIndex}-slot-${slotIndex}-${line.time}-${line.text}`}
-            // Simultaneous Left-to-Right Wipe:
-            // The wipereveal/exit happens at transitionStartTime.
-            // Before transitionStartTime, the incoming line is scheduled but fully hidden by clipPath.
+            key={`section-${sectionIndex}-slot-${slotIndex}-${lineIndex}-${line.time}-${line.text}`}
+            // Configured Wipe:
+            // The incoming line wipes in with inDelay and duration.
+            // The outgoing line wipes out with outDelay and duration.
             initial={{ clipPath: 'inset(0 100% 0 0)', opacity: 0 }}
-            animate={{ clipPath: 'inset(0 0% 0 0)', opacity: highOpacity }}
-            exit={{ clipPath: 'inset(0 0 0 100%)', opacity: 0 }}
-            transition={{ 
-              duration: transitionDuration, 
-              ease: "linear",
-              delay: transitionDelay
+            animate={{ 
+              clipPath: 'inset(0 0% 0 0)', 
+              opacity: highOpacity,
+              transition: {
+                duration: transitionDuration,
+                ease: 'linear',
+                delay: inDelay
+              }
+            }}
+            exit={{ 
+              clipPath: 'inset(0 0 0 100%)', 
+              opacity: 0,
+              transition: {
+                duration: transitionDuration,
+                ease: 'linear',
+                delay: outDelay
+              }
             }}
             style={{
               fontFamily: getFontFamilyStyle(displayStyle.font, lyricsSettings.customFontName),

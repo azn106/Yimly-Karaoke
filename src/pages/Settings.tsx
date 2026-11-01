@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { 
   Plus, Folder, RefreshCw, Trash2, AlertCircle, HardDrive, 
@@ -292,8 +292,98 @@ export default function Settings() {
     });
   };
 
+  // Dedicated local input state for Extra eLRC Display Lead to decouple typing from clamping
+  const [leadInInput, setLeadInInput] = useState<string>(() => String(lyricsSettings.elrcDisplayLeadInMs ?? 1500));
+  const isLeadInFocusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isLeadInFocusedRef.current) {
+      setLeadInInput(String(lyricsSettings.elrcDisplayLeadInMs ?? 1500));
+    }
+  }, [lyricsSettings.elrcDisplayLeadInMs]);
+
+  const commitLeadInValue = () => {
+    const trimmed = leadInInput.trim();
+    if (!trimmed) {
+      setLeadInInput(String(lyricsSettings.elrcDisplayLeadInMs ?? 1500));
+      return;
+    }
+    const parsed = parseInt(trimmed, 10);
+    if (isNaN(parsed)) {
+      setLeadInInput(String(lyricsSettings.elrcDisplayLeadInMs ?? 1500));
+      return;
+    }
+    const clamped = Math.max(1500, Math.min(5000, parsed));
+    setLeadInInput(String(clamped));
+    updateSetting((prev) => ({
+      ...prev,
+      elrcDisplayLeadInMs: clamped,
+    }));
+  };
+
+  // Dedicated local input state for eLRC Fade Duration
+  const [fadeDurationInput, setFadeDurationInput] = useState<string>(() => String(lyricsSettings.elrcFadeDurationMs ?? 1500));
+  const isFadeDurationFocusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isFadeDurationFocusedRef.current) {
+      setFadeDurationInput(String(lyricsSettings.elrcFadeDurationMs ?? 1500));
+    }
+  }, [lyricsSettings.elrcFadeDurationMs]);
+
+  const commitFadeDurationValue = () => {
+    const trimmed = fadeDurationInput.trim();
+    if (!trimmed) {
+      setFadeDurationInput(String(lyricsSettings.elrcFadeDurationMs ?? 1500));
+      return;
+    }
+    const parsed = parseInt(trimmed, 10);
+    if (isNaN(parsed)) {
+      setFadeDurationInput(String(lyricsSettings.elrcFadeDurationMs ?? 1500));
+      return;
+    }
+    const clamped = Math.max(300, Math.min(5000, parsed));
+    setFadeDurationInput(String(clamped));
+    updateSetting((prev) => ({
+      ...prev,
+      elrcFadeDurationMs: clamped,
+    }));
+  };
+
+  // Dedicated local input state for eLRC Fade Overlap
+  const [fadeOverlapInput, setFadeOverlapInput] = useState<string>(() => String(lyricsSettings.elrcFadeOverlapMs ?? 300));
+  const isFadeOverlapFocusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isFadeOverlapFocusedRef.current) {
+      setFadeOverlapInput(String(lyricsSettings.elrcFadeOverlapMs ?? 300));
+    }
+  }, [lyricsSettings.elrcFadeOverlapMs]);
+
+  const commitFadeOverlapValue = () => {
+    const trimmed = fadeOverlapInput.trim();
+    if (!trimmed) {
+      setFadeOverlapInput(String(lyricsSettings.elrcFadeOverlapMs ?? 300));
+      return;
+    }
+    const parsed = parseInt(trimmed, 10);
+    if (isNaN(parsed)) {
+      setFadeOverlapInput(String(lyricsSettings.elrcFadeOverlapMs ?? 300));
+      return;
+    }
+    const clamped = Math.max(0, Math.min(3000, parsed));
+    setFadeOverlapInput(String(clamped));
+    updateSetting((prev) => ({
+      ...prev,
+      elrcFadeOverlapMs: clamped,
+    }));
+  };
+
   const resetLyricsToDefault = () => {
     setLyricsSettings(DEFAULT_LYRICS_SETTINGS);
+    setLeadInInput(String(DEFAULT_LYRICS_SETTINGS.elrcDisplayLeadInMs ?? 1500));
+    setFadeDurationInput(String(DEFAULT_LYRICS_SETTINGS.elrcFadeDurationMs ?? 1500));
+    setFadeOverlapInput(String(DEFAULT_LYRICS_SETTINGS.elrcFadeOverlapMs ?? 300));
     saveLyricsSettings(DEFAULT_LYRICS_SETTINGS);
   };
 
@@ -1006,13 +1096,20 @@ export default function Settings() {
                       min={1500}
                       max={5000}
                       step={50}
-                      value={lyricsSettings.elrcDisplayLeadInMs ?? 1500}
-                      onChange={(e) => {
-                        const value = Number.parseInt(e.target.value, 10);
-                        updateSetting((prev) => ({
-                          ...prev,
-                          elrcDisplayLeadInMs: Number.isFinite(value) ? Math.max(1500, Math.min(5000, value)) : 1500,
-                        }));
+                      value={leadInInput}
+                      onChange={(e) => setLeadInInput(e.target.value)}
+                      onFocus={() => {
+                        isLeadInFocusedRef.current = true;
+                      }}
+                      onBlur={() => {
+                        isLeadInFocusedRef.current = false;
+                        commitLeadInValue();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          commitLeadInValue();
+                          e.currentTarget.blur();
+                        }
                       }}
                       className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#F472B6]"
                     />
@@ -1021,6 +1118,83 @@ export default function Settings() {
                 </div>
               </div>
 
+              {/* eLRC Fade Duration */}
+              <div className="pt-4 border-t border-white/10">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 max-w-2xl">
+                  <div>
+                    <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
+                      eLRC Fade Duration (ms)
+                    </label>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Controls how long incoming and outgoing line wipes take.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <input
+                      type="number"
+                      min={300}
+                      max={5000}
+                      step={50}
+                      value={fadeDurationInput}
+                      onChange={(e) => setFadeDurationInput(e.target.value)}
+                      onFocus={() => {
+                        isFadeDurationFocusedRef.current = true;
+                      }}
+                      onBlur={() => {
+                        isFadeDurationFocusedRef.current = false;
+                        commitFadeDurationValue();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          commitFadeDurationValue();
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#F472B6]"
+                    />
+                    <span className="text-xs text-zinc-400 font-mono font-medium">ms</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* eLRC Fade Overlap */}
+              <div className="pt-4 border-t border-white/10">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 max-w-2xl">
+                  <div>
+                    <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
+                      eLRC Fade Overlap (ms)
+                    </label>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Controls how early the incoming line starts relative to the outgoing line finishing.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <input
+                      type="number"
+                      min={0}
+                      max={3000}
+                      step={50}
+                      value={fadeOverlapInput}
+                      onChange={(e) => setFadeOverlapInput(e.target.value)}
+                      onFocus={() => {
+                        isFadeOverlapFocusedRef.current = true;
+                      }}
+                      onBlur={() => {
+                        isFadeOverlapFocusedRef.current = false;
+                        commitFadeOverlapValue();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          commitFadeOverlapValue();
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      className="w-24 px-3 py-1.5 bg-[#141622] border border-white/10 rounded-lg text-xs font-mono text-white text-right focus:outline-none focus:border-[#F472B6]"
+                    />
+                    <span className="text-xs text-zinc-400 font-mono font-medium">ms</span>
+                  </div>
+                </div>
+              </div>
 
             </div>
           )}
