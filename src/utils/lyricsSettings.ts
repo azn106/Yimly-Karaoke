@@ -1,7 +1,7 @@
 import { loadAndRegisterCustomFont } from './customFontStorage';
 
 export interface LyricStyleSettings {
-  font: string; // 'manrope' | 'sora' | 'plus-jakarta-sans' | 'instrument-serif' | 'urbanist' | 'cormorant-garamond' | 'lobster' | 'super-sale' | 'huggable' | 'custom'
+  font: string; // 'ltkaraoke' | 'dongle' | 'lobster' | 'super-sale' | 'custom'
   size: number; // in px, e.g. 48
   weight: string; // '100' | '300' | '400' | '500' | '600' | '700' | '800' | '900'
   letterSpacing: number; // in px, e.g. -1, 0, 1, 2
@@ -34,9 +34,9 @@ export interface LyricsAppearanceSettings {
 
 export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
   highlighted: {
-    font: 'manrope',
+    font: 'ltkaraoke',
     size: 48,
-    weight: '800',
+    weight: '700',
     letterSpacing: -1,
     lineSpacing: 1.2,
     textCase: 'original',
@@ -44,7 +44,7 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
     color: '#F472B6'
   },
   unhighlighted: {
-    font: 'manrope',
+    font: 'ltkaraoke',
     size: 20,
     weight: '500',
     opacity: 0.45,
@@ -72,22 +72,14 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
 const STORAGE_KEY = 'yimly_lyrics_appearance_settings_v1';
 
 export function sanitizeLyricsFont(fontVal: any): string {
-  if (typeof fontVal !== 'string' || !fontVal.trim()) {
-    return 'manrope';
-  }
+  if (typeof fontVal !== 'string' || !fontVal.trim()) return 'ltkaraoke';
   const norm = fontVal.toLowerCase().trim().replace(/_/g, '-').replace(/\s+/g, '-');
   if (norm === 'custom') return 'custom';
-  if (norm === 'manrope') return 'manrope';
-  if (norm === 'sora') return 'sora';
-  if (norm === 'plus-jakarta-sans' || norm === 'plusjakartasans') return 'plus-jakarta-sans';
-  if (norm === 'instrument-serif' || norm === 'instrumentserif') return 'instrument-serif';
-  if (norm === 'urbanist') return 'urbanist';
-  if (norm === 'cormorant-garamond' || norm === 'cormorantgaramond') return 'cormorant-garamond';
+  if (norm === 'ltkaraoke' || norm === 'lt-karaoke') return 'ltkaraoke';
+  if (norm === 'dongle') return 'dongle';
   if (norm === 'lobster') return 'lobster';
   if (norm === 'super-sale' || norm === 'supersale') return 'super-sale';
-  if (norm === 'huggable') return 'huggable';
-  // Any removed built-in font (system, sans, serif, mono, display, rounded) or unknown -> fallback to manrope
-  return 'manrope';
+  return 'ltkaraoke';
 }
 
 /**
@@ -267,118 +259,37 @@ export interface LyricFontOption {
 }
 
 export const LYRICS_FONT_OPTIONS: LyricFontOption[] = [
-  {
-    value: 'manrope',
-    label: 'Manrope — Modern Premium',
-    fontFamily: '"Manrope", system-ui, -apple-system, sans-serif'
-  },
-  {
-    value: 'sora',
-    label: 'Sora — Sleek/Futuristic',
-    fontFamily: '"Sora", system-ui, -apple-system, sans-serif'
-  },
-  {
-    value: 'plus-jakarta-sans',
-    label: 'Plus Jakarta Sans — Spotify-like',
-    fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif'
-  },
-  {
-    value: 'instrument-serif',
-    label: 'Instrument Serif — Luxury',
-    fontFamily: '"Instrument Serif", Georgia, "Times New Roman", serif'
-  },
-  {
-    value: 'urbanist',
-    label: 'Urbanist — Stylish Lyrics',
-    fontFamily: '"Urbanist", system-ui, -apple-system, sans-serif'
-  },
-  {
-    value: 'cormorant-garamond',
-    label: 'Cormorant Garamond — Emotional',
-    fontFamily: '"Cormorant Garamond", Garamond, Georgia, serif'
-  },
-  {
-    value: 'lobster',
-    label: 'Lobster — Script / Playful',
-    fontFamily: '"Lobster", cursive, sans-serif'
-  },
-  {
-    value: 'super-sale',
-    label: 'Super Sale',
-    fontFamily: '"Super Sale", Impact, "Arial Black", system-ui, sans-serif'
-  },
-  {
-    value: 'huggable',
-    label: 'Huggable',
-    fontFamily: '"Huggable", "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif'
-  },
-  {
-    value: 'custom',
-    label: 'Custom Font',
-    fontFamily: 'custom'
-  }
+  { value: 'ltkaraoke', label: 'LTKaraoke — Default Lyrics', fontFamily: '"LTKaraoke", sans-serif' },
+  { value: 'dongle', label: 'Dongle', fontFamily: '"Dongle", sans-serif' },
+  { value: 'lobster', label: 'Lobster', fontFamily: '"Lobster", cursive, sans-serif' },
+  { value: 'super-sale', label: 'Super Sale', fontFamily: '"Super Sale", Impact, sans-serif' },
+  { value: 'custom', label: 'Custom Font', fontFamily: 'custom' }
 ];
 
 export function getFontFamilyStyle(fontKey: string, customFontName?: string | null): string {
   const normalized = (fontKey || '').toLowerCase().trim().replace(/_/g, '-').replace(/\s+/g, '-');
-  if (normalized === 'custom' && customFontName) {
-    return `"${customFontName}", sans-serif`;
-  }
+  if (normalized === 'custom' && customFontName) return `"${customFontName}", sans-serif`;
   switch (normalized) {
-    case 'manrope':
-      return '"Manrope", system-ui, -apple-system, sans-serif';
-    case 'sora':
-      return '"Sora", system-ui, -apple-system, sans-serif';
-    case 'plus-jakarta-sans':
-    case 'plusjakartasans':
-      return '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif';
-    case 'instrument-serif':
-    case 'instrumentserif':
-      return '"Instrument Serif", Georgia, "Times New Roman", serif';
-    case 'urbanist':
-      return '"Urbanist", system-ui, -apple-system, sans-serif';
-    case 'cormorant-garamond':
-    case 'cormorantgaramond':
-      return '"Cormorant Garamond", Garamond, Georgia, serif';
-    case 'lobster':
-      return '"Lobster", cursive, sans-serif';
+    case 'ltkaraoke':
+    case 'lt-karaoke': return '"LTKaraoke", sans-serif';
+    case 'dongle': return '"Dongle", sans-serif';
+    case 'lobster': return '"Lobster", cursive, sans-serif';
     case 'super-sale':
-    case 'supersale':
-      return '"Super Sale", Impact, "Arial Black", system-ui, sans-serif';
-    case 'huggable':
-      return '"Huggable", "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif';
-    default:
-      return '"Manrope", system-ui, -apple-system, sans-serif';
+    case 'supersale': return '"Super Sale", Impact, sans-serif';
+    default: return '"LTKaraoke", sans-serif';
   }
 }
 
 export function getFontFamilyClass(fontKey: string): string {
   const normalized = (fontKey || '').toLowerCase().trim().replace(/_/g, '-').replace(/\s+/g, '-');
   switch (normalized) {
-    case 'manrope':
-      return 'font-["Manrope",sans-serif]';
-    case 'sora':
-      return 'font-["Sora",sans-serif]';
-    case 'plus-jakarta-sans':
-    case 'plusjakartasans':
-      return 'font-["Plus_Jakarta_Sans",sans-serif]';
-    case 'instrument-serif':
-    case 'instrumentserif':
-      return 'font-["Instrument_Serif",serif]';
-    case 'urbanist':
-      return 'font-["Urbanist",sans-serif]';
-    case 'cormorant-garamond':
-    case 'cormorantgaramond':
-      return 'font-["Cormorant_Garamond",serif]';
-    case 'lobster':
-      return 'font-["Lobster",cursive]';
+    case 'ltkaraoke':
+    case 'lt-karaoke': return 'font-["LTKaraoke",sans-serif]';
+    case 'dongle': return 'font-["Dongle",sans-serif]';
+    case 'lobster': return 'font-["Lobster",cursive]';
     case 'super-sale':
-    case 'supersale':
-      return 'font-["Super_Sale",sans-serif]';
-    case 'huggable':
-      return 'font-["Huggable",sans-serif]';
-    default:
-      return 'font-["Manrope",sans-serif]';
+    case 'supersale': return 'font-["Super_Sale",sans-serif]';
+    default: return 'font-["LTKaraoke",sans-serif]';
   }
 }
 
