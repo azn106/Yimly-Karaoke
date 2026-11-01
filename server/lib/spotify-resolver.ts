@@ -36,6 +36,105 @@ export interface SpotifyResolvedEntity {
   tracks: SpotifyResolvedTrack[];
 }
 
+/**
+ * Validate that an artwork URL is a well-formed http(s) URL.
+ */
+export function isValidArtworkUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed || trimmed.startsWith('data:')) return false;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    if (!parsed.hostname || !parsed.hostname.includes('.')) return false;
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sunnify artwork extraction algorithm from Spotify public embed metadata:
+ * 1. Extract coverArt.sources and select highest-resolution available image.
+ * 2. If unavailable, fall back to visualIdentity.image and select highest-resolution available image.
+ * 3. Validate the returned image URL.
+ */
+export function extractEmbedArtworkFromEntity(entity: any): string | null {
+  if (!entity) return null;
+
+  // 1. Extract coverArt.sources and select the highest-resolution available image
+  let bestCoverUrl: string | null = null;
+  let bestCoverRes = 0;
+
+  const coverArtSources = entity.coverArt?.sources;
+  if (Array.isArray(coverArtSources) && coverArtSources.length > 0) {
+    const validSources = coverArtSources.filter((s: any) => s && typeof s.url === 'string' && isValidArtworkUrl(s.url));
+    if (validSources.length > 0) {
+      validSources.sort((a: any, b: any) => {
+        const resA = (Number(a.width) || 0) * (Number(a.height) || 0) || Number(a.width) || Number(a.height) || 0;
+        const resB = (Number(b.width) || 0) * (Number(b.height) || 0) || Number(b.width) || Number(b.height) || 0;
+        return resB - resA;
+      });
+      bestCoverUrl = validSources[0].url;
+      bestCoverRes = (Number(validSources[0].width) || 0) * (Number(validSources[0].height) || 0);
+    }
+  }
+
+  // 2. If unavailable (or if visualIdentity provides a higher resolution image), check visualIdentity.image
+  const visualIdentityImage = entity.visualIdentity?.image;
+  if (visualIdentityImage) {
+    const imageList = Array.isArray(visualIdentityImage) ? visualIdentityImage : [visualIdentityImage];
+    const validImages = imageList.filter((img: any) => img && typeof img.url === 'string' && isValidArtworkUrl(img.url));
+    if (validImages.length > 0) {
+      validImages.sort((a: any, b: any) => {
+        const resA = (Number(a.maxWidth) || 0) * (Number(a.maxHeight) || 0) || Number(a.maxWidth) || Number(a.maxHeight) || 0;
+        const resB = (Number(b.maxWidth) || 0) * (Number(b.maxHeight) || 0) || Number(b.maxWidth) || Number(b.maxHeight) || 0;
+        return resB - resA;
+      });
+      const highestVisualRes = (Number(validImages[0].maxWidth) || 0) * (Number(validImages[0].maxHeight) || 0);
+      if (!bestCoverUrl || highestVisualRes > bestCoverRes) {
+        bestCoverUrl = validImages[0].url;
+      }
+    }
+  }
+
+  return bestCoverUrl && isValidArtworkUrl(bestCoverUrl) ? bestCoverUrl : null;
+}
+
+/**
+ * Sunnify public embed artwork extractor for Spotify playlists.
+ * Used as a fallback when GraphQL Pathfinder or oEmbed does not provide artwork.
+ */
+export async function extractSpotifyEmbedArtwork(playlistId: string): Promise<string | null> {
+  try {
+    const embedUrl = `https://open.spotify.com/embed/playlist/${playlistId}`;
+    const res = await fetch(embedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      return null;
+    }
+
+    const html = await res.text();
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([^<]+)<\/script>/);
+    if (!nextDataMatch) {
+      return null;
+    }
+
+    const data = JSON.parse(nextDataMatch[1]);
+    const entity = data.props?.pageProps?.state?.data?.entity;
+    return extractEmbedArtworkFromEntity(entity);
+  } catch (err) {
+    console.warn(`[Spotify Embed Artwork] Fallback notice for playlist ${playlistId}:`, err);
+    return null;
+  }
+}
+
 function parseSpotifyUrl(input: string): { type: 'track' | 'album' | 'playlist' | null; id: string | null } {
   const clean = input.trim();
   
@@ -609,9 +708,17 @@ export async function resolveSpotifyPlaylist(id: string): Promise<SpotifyResolve
       if (offset === 0) {
         playlistTitle = pl.name || playlistTitle;
         expectedTotal = pl.content?.totalCount || 0;
-        const coverSource = pl.images?.items?.[0]?.sources?.[0]?.url;
-        if (coverSource) {
-          playlistArtworkUrl = coverSource;
+        const sources = pl.images?.items?.[0]?.sources;
+        if (Array.isArray(sources) && sources.length > 0) {
+          const validSources = sources.filter((s: any) => s && typeof s.url === 'string' && isValidArtworkUrl(s.url));
+          if (validSources.length > 0) {
+            validSources.sort((a: any, b: any) => {
+              const resA = (Number(a.width) || 0) * (Number(a.height) || 0) || Number(a.width) || Number(a.height) || 0;
+              const resB = (Number(b.width) || 0) * (Number(b.height) || 0) || Number(b.width) || Number(b.height) || 0;
+              return resB - resA;
+            });
+            playlistArtworkUrl = validSources[0].url;
+          }
         }
       }
 
@@ -658,6 +765,18 @@ export async function resolveSpotifyPlaylist(id: string): Promise<SpotifyResolve
     }
   }
 
+  // Sunnify fallback: If primary resolver (GraphQL Pathfinder & oEmbed) did not retrieve a valid artwork URL
+  if (!playlistArtworkUrl || !isValidArtworkUrl(playlistArtworkUrl)) {
+    try {
+      const fallbackArtwork = await extractSpotifyEmbedArtwork(id);
+      if (fallbackArtwork && isValidArtworkUrl(fallbackArtwork)) {
+        playlistArtworkUrl = fallbackArtwork;
+      }
+    } catch (e) {
+      console.warn('[Spotify] Sunnify embed artwork fallback notice:', e);
+    }
+  }
+
   // 3. Fallback: Parse Embed HTML if GraphQL was completely unreachable (e.g. mock test environment)
   if (!graphQLSucceeded && allTracks.length === 0) {
     console.log('[Spotify] Falling back to embed HTML parsing...');
@@ -677,8 +796,11 @@ export async function resolveSpotifyPlaylist(id: string): Promise<SpotifyResolve
           const entity = data.props?.pageProps?.state?.data?.entity;
           if (entity) {
             playlistTitle = entity.name || entity.title || playlistTitle;
-            if (entity.coverArt?.sources?.[0]?.url) {
-              playlistArtworkUrl = entity.coverArt.sources[0].url;
+            if (!playlistArtworkUrl || !isValidArtworkUrl(playlistArtworkUrl)) {
+              const embedCover = extractEmbedArtworkFromEntity(entity);
+              if (embedCover && isValidArtworkUrl(embedCover)) {
+                playlistArtworkUrl = embedCover;
+              }
             }
 
             if (Array.isArray(entity.trackList)) {
