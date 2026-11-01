@@ -291,3 +291,25 @@ test('Setting Independence and Resolver Parity Suite', async (t) => {
     assert.strictEqual(resolvedInvalid.verticalAlignment, 'center');
   });
 });
+
+test('LRC and eLRC section counts resolve independently', () => {
+  const input = {
+    visibleLines: 2,
+    lrcVisibleLines: 1,
+    elrcVisibleLines: 5,
+  };
+
+  for (const resolver of [resolveLyricsSettings, clientResolveLyricsSettings]) {
+    const resolved = resolver(input);
+    assert.strictEqual(resolved.lrcVisibleLines, 1);
+    assert.strictEqual(resolved.elrcVisibleLines, 5);
+  }
+});
+
+test('Legacy shared section count migrates to both format-specific counts', () => {
+  for (const resolver of [resolveLyricsSettings, clientResolveLyricsSettings]) {
+    const resolved = resolver({ visibleLines: 4 });
+    assert.strictEqual(resolved.lrcVisibleLines, 4);
+    assert.strictEqual(resolved.elrcVisibleLines, 4);
+  }
+});
