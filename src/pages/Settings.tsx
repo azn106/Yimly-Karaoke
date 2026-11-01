@@ -786,7 +786,7 @@ export default function Settings() {
                       Opacity
                     </label>
                     <span className="text-xs font-mono text-[#F472B6] font-bold">
-                      {Math.round((lyricsSettings.unhighlighted.opacity ?? 0.45) * 100)}%
+                      {Math.round((lyricsSettings.unhighlighted.opacity ?? 0.8) * 100)}%
                     </span>
                   </div>
                   <input
