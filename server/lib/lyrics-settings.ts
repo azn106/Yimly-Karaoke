@@ -32,9 +32,9 @@ export interface LyricsAppearanceSettings {
 
 export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
   highlighted: {
-    font: 'manrope',
+    font: 'ltkaraoke',
     size: 48,
-    weight: '800',
+    weight: '700',
     letterSpacing: -1,
     lineSpacing: 1.2,
     textCase: 'original',
@@ -42,7 +42,7 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
     color: '#FF4FA3'
   },
   unhighlighted: {
-    font: 'manrope',
+    font: 'ltkaraoke',
     size: 20,
     weight: '500',
     opacity: 0.45,
@@ -68,22 +68,14 @@ export const DEFAULT_LYRICS_SETTINGS: LyricsAppearanceSettings = {
 };
 
 export function sanitizeLyricsFont(fontVal: any): string {
-  if (typeof fontVal !== 'string' || !fontVal.trim()) {
-    return 'manrope';
-  }
+  if (typeof fontVal !== 'string' || !fontVal.trim()) return 'ltkaraoke';
   const norm = fontVal.toLowerCase().trim().replace(/_/g, '-').replace(/\s+/g, '-');
   if (norm === 'custom') return 'custom';
-  if (norm === 'manrope') return 'manrope';
-  if (norm === 'sora') return 'sora';
-  if (norm === 'plus-jakarta-sans' || norm === 'plusjakartasans') return 'plus-jakarta-sans';
-  if (norm === 'instrument-serif' || norm === 'instrumentserif') return 'instrument-serif';
-  if (norm === 'urbanist') return 'urbanist';
-  if (norm === 'cormorant-garamond' || norm === 'cormorantgaramond') return 'cormorant-garamond';
+  if (norm === 'ltkaraoke' || norm === 'lt-karaoke') return 'ltkaraoke';
+  if (norm === 'dongle') return 'dongle';
   if (norm === 'lobster') return 'lobster';
   if (norm === 'super-sale' || norm === 'supersale') return 'super-sale';
-  if (norm === 'huggable') return 'huggable';
-  // Obsolete built-in font (e.g. system, sans, serif, mono, display, rounded) or unknown -> fallback to manrope
-  return 'manrope';
+  return 'ltkaraoke';
 }
 
 export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
