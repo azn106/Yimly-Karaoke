@@ -276,4 +276,18 @@ test('Setting Independence and Resolver Parity Suite', async (t) => {
       assert.strictEqual(clientRes.elrcFadeOverlapMs, tc.expectedOverlap);
     }
   });
+
+  await t.test('Vertical Alignment Resolution Suite', () => {
+    const resolvedDefault = resolveLyricsSettings({});
+    assert.strictEqual(resolvedDefault.verticalAlignment, 'center');
+
+    const resolvedTop = resolveLyricsSettings({ verticalAlignment: 'top' });
+    assert.strictEqual(resolvedTop.verticalAlignment, 'top');
+
+    const resolvedBottom = resolveLyricsSettings({ verticalAlignment: 'bottom' });
+    assert.strictEqual(resolvedBottom.verticalAlignment, 'bottom');
+
+    const resolvedInvalid = resolveLyricsSettings({ verticalAlignment: 'invalid_align' });
+    assert.strictEqual(resolvedInvalid.verticalAlignment, 'center');
+  });
 });

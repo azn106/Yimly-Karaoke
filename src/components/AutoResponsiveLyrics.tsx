@@ -91,10 +91,17 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
       return false;
     }
   });
+  const baseFontSizeInit = lyricsSettings.highlighted.size || 48;
+  const lineSpacingInit = lyricsSettings.highlighted.lineSpacing || 1.2;
+  const singleLineHeightInit = baseFontSizeInit * lineSpacingInit;
+  const sectionHeightAllocInit = singleLineHeightInit * 2.5;
+  const gapsInit = Math.max(0, sectionCount - 1);
+  const initialProjectedHeight = (sectionCount * sectionHeightAllocInit) + (gapsInit * Math.max(4, Math.round(baseFontSizeInit * 0.2)));
+
   const [diagData, setDiagData] = useState<DiagnosticData>({
     containerWidth: 0, containerHeight: 0, unscaledGroupWidth: 0,
-    unscaledGroupHeight: 0, scale: 1, gap: 12, currFontSize: 48,
-    unhighFontSize: 20, lineSpacing: 1.2, windowWidth: 0,
+    unscaledGroupHeight: initialProjectedHeight, scale: 1, gap: Math.max(4, Math.round(baseFontSizeInit * 0.2)), currFontSize: baseFontSizeInit,
+    unhighFontSize: 20, lineSpacing: lineSpacingInit, windowWidth: 0,
     windowHeight: 0, dpr: 1,
   });
 
@@ -361,8 +368,15 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     );
   };
 
+  const vertAlignment = lyricsSettings.verticalAlignment || 'center';
+  const stageAlignmentClass = vertAlignment === 'top'
+    ? 'justify-start pt-3 sm:pt-4'
+    : vertAlignment === 'bottom'
+    ? 'justify-end pb-3 sm:pb-4'
+    : 'justify-center';
+
   return (
-    <div ref={stageRef} className="w-full flex-1 h-full min-h-0 flex flex-col justify-center items-center overflow-hidden relative select-none">
+    <div ref={stageRef} className={`w-full flex-1 h-full min-h-0 flex flex-col ${stageAlignmentClass} items-center overflow-hidden relative select-none`}>
       {isDebugEnabled && (
         <>
           <button type="button" onClick={() => setShowDebug((prev) => !prev)} className="absolute bottom-2 right-2 z-50 text-[10px] font-mono bg-black/70 hover:bg-black/90 text-zinc-300 border border-white/20 px-2 py-1 rounded-md opacity-60 hover:opacity-100 transition-opacity flex items-center gap-1 cursor-pointer" title="Toggle TV Diagnostics HUD">
