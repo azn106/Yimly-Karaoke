@@ -78,6 +78,19 @@ export function sanitizeLyricsFont(fontVal: any): string {
   return 'ltkaraoke';
 }
 
+export function sanitizeLyricsWeight(fontVal: string, weightVal: any): string {
+  const font = sanitizeLyricsFont(fontVal);
+  const requested = Number(weightVal);
+  const weights = font === 'ltkaraoke' ? ['300', '400', '500', '600', '700']
+    : font === 'dongle' ? ['300', '400', '700']
+    : font === 'lobster' || font === 'super-sale' ? ['400']
+    : ['100', '300', '400', '500', '600', '700', '800', '900'];
+  if (!Number.isFinite(requested)) return weights.includes('400') ? '400' : weights[0];
+  return weights.reduce((best, current) =>
+    Math.abs(Number(current) - requested) < Math.abs(Number(best) - requested) ? current : best
+  , weights[0]);
+}
+
 export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
   const parsed = (raw && typeof raw === 'object') ? raw : {};
   const high = (parsed.highlighted && typeof parsed.highlighted === 'object') ? parsed.highlighted : {};
@@ -90,7 +103,7 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
     highlighted: {
       font: sanitizeLyricsFont(high.font),
       size: typeof high.size === 'number' && !isNaN(high.size) ? high.size : DEFAULT_LYRICS_SETTINGS.highlighted.size,
-      weight: high.weight ? String(high.weight) : DEFAULT_LYRICS_SETTINGS.highlighted.weight,
+      weight: sanitizeLyricsWeight(sanitizeLyricsFont(high.font), high.weight ?? DEFAULT_LYRICS_SETTINGS.highlighted.weight),
       letterSpacing: typeof high.letterSpacing === 'number' && !isNaN(high.letterSpacing) ? high.letterSpacing : DEFAULT_LYRICS_SETTINGS.highlighted.letterSpacing,
       lineSpacing: typeof high.lineSpacing === 'number' && !isNaN(high.lineSpacing) ? high.lineSpacing : DEFAULT_LYRICS_SETTINGS.highlighted.lineSpacing,
       textCase: validTextCases.includes(high.textCase) ? high.textCase : DEFAULT_LYRICS_SETTINGS.highlighted.textCase,
@@ -100,7 +113,7 @@ export function resolveLyricsSettings(raw?: any): LyricsAppearanceSettings {
     unhighlighted: {
       font: sanitizeLyricsFont(unhigh.font),
       size: typeof unhigh.size === 'number' && !isNaN(unhigh.size) ? unhigh.size : DEFAULT_LYRICS_SETTINGS.unhighlighted.size,
-      weight: unhigh.weight ? String(unhigh.weight) : DEFAULT_LYRICS_SETTINGS.unhighlighted.weight,
+      weight: sanitizeLyricsWeight(sanitizeLyricsFont(unhigh.font), unhigh.weight ?? DEFAULT_LYRICS_SETTINGS.unhighlighted.weight),
       letterSpacing: typeof unhigh.letterSpacing === 'number' && !isNaN(unhigh.letterSpacing) ? unhigh.letterSpacing : DEFAULT_LYRICS_SETTINGS.unhighlighted.letterSpacing,
       lineSpacing: typeof unhigh.lineSpacing === 'number' && !isNaN(unhigh.lineSpacing) ? unhigh.lineSpacing : DEFAULT_LYRICS_SETTINGS.unhighlighted.lineSpacing,
       textCase: validTextCases.includes(unhigh.textCase) ? unhigh.textCase : DEFAULT_LYRICS_SETTINGS.unhighlighted.textCase,
