@@ -2121,8 +2121,8 @@ export default function RoomSession() {
   // Focus line index: when playing, points to activeLyricIndex; when waiting/idle/pre-intro, points to 0 (the first line preview)
   const focusIndex = activeLyricIndex >= 0 ? activeLyricIndex : 0;
 
-  // Visible lines support (1, 3, or 5 lines)
-  const visibleLinesCount = lyricsSettings.visibleLines ?? 3;
+  // Number of parallel lyric sections (1–5); each section advances through every Nth line.
+  const visibleLinesCount = lyricsSettings.visibleLines ?? 2;
 
   // Compute surrounding lines based on focusIndex
   const prev2Line = focusIndex >= 2 ? lyrics[focusIndex - 2] : null;
