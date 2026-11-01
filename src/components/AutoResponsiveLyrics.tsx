@@ -54,6 +54,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   sectionsCount = 2,
   applyTextCase,
   getFontFamilyStyle,
+  getAlignmentClass,
   isPreview = false,
   currentTime = 0,
   lyricOffset = 0,
@@ -67,8 +68,6 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
   const sectionCount = Math.max(1, Math.min(5, Math.round(sectionsCount || 2)));
   const safeFocusIndex = Math.max(0, Math.min(Math.max(0, lyrics.length - 1), focusIndex));
-  // Keep each group of N consecutive lyric lines visible together, one line per section.
-  const groupStartIndex = Math.floor(safeFocusIndex / sectionCount) * sectionCount;
   const transitionStyle = lyricsSettings.lineTransition || 'fade';
 
   const isDebugEnabled = Boolean(
@@ -204,8 +203,10 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const active = Boolean(line) && lineIndex === safeFocusIndex;
     const highlighted = active && isHighlighted && lyricsSettings.highlightCurrentLine !== false;
     const style = highlighted ? lyricsSettings.highlighted : lyricsSettings.unhighlighted;
-    const direction = sectionIndex < (sectionCount - 1) / 2 ? -1 : sectionIndex > (sectionCount - 1) / 2 ? 1 : 0;
+    const direction = sectionIndex % 2 === 0 ? 1 : -1;
     const motionOffset = transitionStyle === 'slide' ? direction * 14 : 0;
+    const textAlignment = lyricsSettings.alignment || 'center';
+    const rowJustify = textAlignment === 'left' ? 'justify-start' : textAlignment === 'right' ? 'justify-end' : 'justify-center';
     const duration = transitionStyle === 'instant' ? 0 : animDuration;
 
     if (!line) {
@@ -267,7 +268,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     }) : null;
 
     return (
-      <div className="lyric-line-row flex items-center justify-center shrink-0 w-full overflow-visible py-1 px-2 text-center" key={`row-${sectionIndex}-${slotIndex}`}>
+      <div className={`lyric-line-row flex items-center ${rowJustify} shrink-0 w-full overflow-visible py-1 px-2`} key={`row-${sectionIndex}-${slotIndex}`}>
         <AnimatePresence mode="wait">
           <motion.p
             key={`section-${sectionIndex}-slot-${slotIndex}-${line.time}-${line.text}`}
@@ -282,13 +283,13 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
               color: style.color || (highlighted ? highColor : lowColor),
               letterSpacing: `${style.letterSpacing}px`,
               lineHeight: style.lineSpacing,
-              textAlign: 'center',
+              textAlign: textAlignment,
               textShadow: highlighted ? `0 0 35px ${highColor}75` : 'none',
             }}
-            className="w-full whitespace-normal break-words leading-tight text-center"
+            className={`w-full whitespace-normal break-words leading-tight ${getAlignmentClass(textAlignment)}`}
           >
             {wordNodes
-              ? <span className="flex flex-wrap items-center justify-center gap-x-[0.3em] gap-y-1 w-full text-center">{wordNodes}</span>
+              ? <span className={`flex flex-wrap items-center ${rowJustify} gap-x-[0.3em] gap-y-1 w-full`} style={{ textAlign: textAlignment }}>{wordNodes}</span>
               : applyTextCase(line.text || '♪ ♪ ♪', style.textCase)}
           </motion.p>
         </AnimatePresence>
@@ -320,9 +321,13 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
       <div ref={groupRef} className="w-full max-w-5xl mx-auto flex flex-col justify-center items-center text-center overflow-visible" style={{ gap: `${effectiveGap}px`, transform: scale < 1 ? `scale(${scale})` : 'none', transformOrigin: 'center center', width: '100%' }}>
         {Array.from({ length: sectionCount }, (_, sectionIndex) => (
           <div key={`lyric-section-${sectionIndex}`} className="w-full flex flex-col justify-center items-center overflow-visible" style={{ gap: `${effectiveGap}px` }}>
-            {Array.from({ length: 3 }, (_, slotIndex) => {
-              const lineIndex = groupStartIndex + sectionIndex + (slotIndex * sectionCount);
-              return renderLine(lyrics[lineIndex], lineIndex, sectionIndex, slotIndex);
+            {Array.from({ length: 1 }, (_, slotIndex) => {
+              // Each section retains the latest line in its own sequence. Only the section
+              // whose turn matches focusIndex receives a new line; the others stay unchanged.
+              const lineIndex = safeFocusIndex >= sectionIndex
+                ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
+                : -1;
+              return renderLine(lineIndex >= 0 ? lyrics[lineIndex] : undefined, lineIndex, sectionIndex, 0);
             })}
           </div>
         ))}
