@@ -347,7 +347,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
               transition: {
                 duration: transitionDuration,
                 ease: 'linear',
-                delay: outDelay
+                // Keep the previous lyric visible until the incoming lyric begins its wipe.
+              // Both transitions then finish together at the next word's target timestamp.
+              delay: inDelay
               }
             }}
             style={{
