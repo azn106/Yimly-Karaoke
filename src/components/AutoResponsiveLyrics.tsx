@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from
 import { motion, AnimatePresence } from 'motion/react';
 import { LyricsAppearanceSettings } from '../utils/lyricsSettings';
 import { Tv, Bug } from 'lucide-react';
+import { computeWordIntervals, calculateWordProgress, getLineSingingEndTime } from '../utils/lyricsProgress';
 
 export interface LyricWord {
   text: string;
@@ -68,6 +69,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
   const sectionCount = Math.max(1, Math.min(5, Math.round(sectionsCount || 2)));
   const safeFocusIndex = Math.max(0, Math.min(Math.max(0, lyrics.length - 1), focusIndex));
+  const adjustedTime = currentTime + (lyricOffset / 1000);
 
   const isDebugEnabled = Boolean(
     showDebugHUD ||
@@ -202,7 +204,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     };
   }, [recalculateLayout]);
 
-  const renderLine = (line: LyricLine | undefined, lineIndex: number, sectionIndex: number, slotIndex: number) => {
+  const renderLine = (line: LyricLine | undefined, lineIndex: number, sectionIndex: number, slotIndex: number, isOverlap: boolean = false) => {
     if (!line) {
       return (
         <div 
@@ -219,7 +221,6 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const lowColor = lyricsSettings.unhighlighted.color || '#d4d4d8';
     const highOpacity = lyricsSettings.highlighted.opacity ?? 1;
     const lowOpacity = lyricsSettings.unhighlighted.opacity ?? 0.45;
-    const adjustedTime = currentTime + lyricOffset / 1000;
     const displayStyle = lyricsSettings.highlighted;
 
     // TRANSITION TIMING:
@@ -241,37 +242,66 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const outDelay = isElrcMode ? Math.max(0, effectiveLeadSec - (2 * fadeDurationSec - fadeOverlapSec)) : 0;
     const transitionDuration = fadeDurationSec;
 
-    // Smooth word-by-word highlighting:
-    // Determine the highest active word index reached in this line.
-    // Word order is authoritative; no earlier word is skipped when consecutive timestamps are close or identical.
-    let maxActiveWordIndex = -1;
-    if (line.words?.length) {
-      if (isPreview) {
-        maxActiveWordIndex = Math.min(1, line.words.length - 1);
-      } else if (isHighlighted) {
-        for (let i = 0; i < line.words.length; i++) {
-          if (adjustedTime >= line.words[i].start) {
-            maxActiveWordIndex = i;
-          }
-        }
-      }
-    }
+    // CONTINUOUS LEFT-TO-RIGHT WORD HIGHLIGHTING:
+    const wordIntervals = line.words?.length ? computeWordIntervals(line.words) : [];
+
+    // Singing timing boundaries: the line starts at the first word's start, and finishes at the final word's end.
+    const firstInterval = wordIntervals[0];
+    const lastInterval = wordIntervals[wordIntervals.length - 1];
+    const lineSingingStartTime = firstInterval ? firstInterval.start : line.time;
+    const lineSingingEndTime = lastInterval ? lastInterval.end : line.time;
+
+    // For eLRC lines, isLinePast is true only once playback time has actually passed the final word's singing end.
+    // Display lead time in safeFocusIndex must not prematurely force the final word to 100% while still being sung.
+    const isLinePast = wordIntervals.length > 0
+      ? adjustedTime >= lineSingingEndTime
+      : (lineIndex >= 0 && lineIndex < safeFocusIndex);
+
+    const isLineActive = wordIntervals.length > 0
+      ? (adjustedTime >= lineSingingStartTime && adjustedTime < lineSingingEndTime)
+      : (isHighlighted && lineIndex === safeFocusIndex);
+
+    const wordProgressList = line.words?.length
+      ? calculateWordProgress(line.words, wordIntervals, adjustedTime, isLineActive, isLinePast, isPreview)
+      : [];
+
+    const activeTextCase = lyricsSettings.highlighted.textCase || lyricsSettings.unhighlighted.textCase;
 
     const wordNodes = line.words?.length ? line.words.map((word, wordIndex) => {
-      // PERMANENT HIGHLIGHTING: Word stays highlighted once its timestamp is reached.
-      const wordHighlighted = wordIndex <= maxActiveWordIndex;
-      const wordColor = wordHighlighted ? highColor : lowColor;
-      const wordOpacity = wordHighlighted ? highOpacity : lowOpacity;
-      
-      const glow = wordHighlighted ? `0 0 25px ${highColor}80` : 'none';
-      
+      const fillPercent = wordProgressList[wordIndex] ?? 0;
+      const isFullyHighlighted = fillPercent >= 100;
+      const hasStarted = fillPercent > 0;
+      const transformedText = applyTextCase(word.text, activeTextCase);
+
       return (
         <span 
           key={`word-${wordIndex}-${word.text}`} 
-          className="inline-block transition-all duration-150 ease-out text-center select-none"
-          style={{ color: wordColor, opacity: wordOpacity, textShadow: glow }}
+          className="relative inline-block select-none whitespace-nowrap"
         >
-          {applyTextCase(word.text, wordHighlighted ? lyricsSettings.highlighted.textCase : lyricsSettings.unhighlighted.textCase)}
+          {/* Base unhighlighted text: defines stable dimensions and unhighlighted appearance */}
+          <span 
+            className="inline-block"
+            style={{ color: lowColor, opacity: lowOpacity, textShadow: 'none' }}
+          >
+            {transformedText}
+          </span>
+
+          {/* Progressive karaoke highlight overlay: clipped left-to-right as sung */}
+          {hasStarted && (
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 pointer-events-none select-none inline-block overflow-hidden whitespace-nowrap"
+              style={{
+                color: highColor,
+                opacity: highOpacity,
+                textShadow: `0 0 25px ${highColor}80`,
+                clipPath: isFullyHighlighted ? 'none' : `inset(0 ${(100 - fillPercent).toFixed(2)}% 0 0)`,
+                WebkitClipPath: isFullyHighlighted ? 'none' : `inset(0 ${(100 - fillPercent).toFixed(2)}% 0 0)`,
+              }}
+            >
+              {transformedText}
+            </span>
+          )}
         </span>
       );
     }) : null;
@@ -279,8 +309,13 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const vertAlignment = lyricsSettings.verticalAlignment || 'center';
     const rowAlign = vertAlignment === 'top' ? 'items-start' : vertAlignment === 'bottom' ? 'items-end' : 'items-center';
 
+    const isLineActiveOrPast = isLineActive || isLinePast;
+    const standardLrcColor = isLineActiveOrPast ? highColor : lowColor;
+    const standardLrcOpacity = isLineActiveOrPast ? highOpacity : lowOpacity;
+    const standardLrcGlow = isLineActiveOrPast ? `0 0 25px ${highColor}80` : 'none';
+
     return (
-      <div className={`lyric-line-row flex h-full ${rowAlign} ${rowJustify} shrink-0 w-full overflow-visible py-1 px-2 absolute inset-0`} key={`row-${sectionIndex}-${slotIndex}`}>
+      <div className={`lyric-line-row flex ${isOverlap ? 'relative flex-1 my-0.5' : 'h-full absolute inset-0'} ${rowAlign} ${rowJustify} shrink-0 w-full overflow-visible py-1 px-2`} key={`row-${sectionIndex}-${slotIndex}-${lineIndex}`}>
         <AnimatePresence mode="popLayout">
           <motion.p
             key={`section-${sectionIndex}-slot-${slotIndex}-${lineIndex}-${line.time}-${line.text}`}
@@ -310,7 +345,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
               fontFamily: getFontFamilyStyle(displayStyle.font, lyricsSettings.customFontName),
               fontSize: `${displayStyle.size}px`,
               fontWeight: displayStyle.weight,
-              color: highColor,
+              color: wordNodes ? highColor : standardLrcColor,
               letterSpacing: `${displayStyle.letterSpacing}px`,
               lineHeight: displayStyle.lineSpacing,
               textAlign: textAlignment,
@@ -319,7 +354,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
           >
             {wordNodes
               ? <span className={`flex flex-wrap items-center ${rowJustify} gap-x-[0.3em] gap-y-1 w-full`} style={{ textAlign: textAlignment }}>{wordNodes}</span>
-              : applyTextCase(line.text || '♪ ♪ ♪', lyricsSettings.highlighted.textCase)}
+              : <span style={{ opacity: standardLrcOpacity, textShadow: standardLrcGlow }}>{applyTextCase(line.text || '♪ ♪ ♪', lyricsSettings.highlighted.textCase)}</span>}
           </motion.p>
         </AnimatePresence>
       </div>
@@ -362,17 +397,40 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
           const vertAlignment = lyricsSettings.verticalAlignment || 'center';
           const sectionAlign = vertAlignment === 'top' ? 'justify-start' : vertAlignment === 'bottom' ? 'justify-end' : 'justify-center';
           
+          const currLineIndex = safeFocusIndex >= sectionIndex
+            ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
+            : -1;
+          
+          const prevLineIndex = currLineIndex >= sectionCount
+            ? currLineIndex - sectionCount
+            : -1;
+
+          const prevLine = prevLineIndex >= 0 ? lyrics[prevLineIndex] : undefined;
+          const prevLineEnd = getLineSingingEndTime(prevLine);
+          const isPrevFinished = prevLineIndex < 0 || !prevLine || adjustedTime >= prevLineEnd;
+
+          const sectionLineIndices: number[] = [];
+          if (!isPrevFinished && prevLineIndex >= 0) {
+            sectionLineIndices.push(prevLineIndex);
+          }
+          if (currLineIndex >= 0 && (isPrevFinished || currLineIndex !== prevLineIndex)) {
+            sectionLineIndices.push(currLineIndex);
+          }
+          if (sectionLineIndices.length === 0 && currLineIndex >= 0) {
+            sectionLineIndices.push(currLineIndex);
+          }
+
+          const isOverlap = sectionLineIndices.length > 1;
+
           return (
             <div 
               key={`lyric-section-${sectionIndex}`} 
               className={`w-full flex flex-col ${sectionAlign} items-center overflow-visible flex-1 relative`} 
               style={{ minHeight: 0 }}
             >
-              {Array.from({ length: 1 }, (_, slotIndex) => {
-                const lineIndex = safeFocusIndex >= sectionIndex
-                  ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
-                  : -1;
-                return renderLine(lineIndex >= 0 ? lyrics[lineIndex] : undefined, lineIndex, sectionIndex, 0);
+              {sectionLineIndices.map((lineIndex, slotIndex) => {
+                const line = lineIndex >= 0 ? lyrics[lineIndex] : undefined;
+                return renderLine(line, lineIndex, sectionIndex, slotIndex, isOverlap);
               })}
             </div>
           );
