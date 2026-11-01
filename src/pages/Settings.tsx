@@ -373,7 +373,8 @@ export default function Settings() {
               focusIndex={2}
               lyricsSettings={lyricsSettings}
               isHighlighted={true}
-              sectionsCount={lyricsSettings.visibleLines ?? 2}
+              sectionsCount={lyricsSettings.elrcVisibleLines ?? lyricsSettings.visibleLines ?? 2}
+              lyricsFormat="elrc"
               applyTextCase={applyTextCase}
               getFontFamilyStyle={getFontFamilyStyle}
               getAlignmentClass={getAlignmentClass}
@@ -952,40 +953,45 @@ export default function Settings() {
                 </p>
               </div>
 
-              {/* Visible Lines Count */}
-              <div>
-                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-3">
-                  Number of Sections
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 max-w-4xl">
-                  {[
-                    { count: 1, label: '1 Section', desc: '1 → 2 → 3' },
-                    { count: 2, label: '2 Sections', desc: '1 → 3 → 5 / 2 → 4 → 6' },
-                    { count: 3, label: '3 Sections', desc: '1 → 4 → 7 / 2 → 5 → 8 / 3 → 6 → 9' },
-                    { count: 4, label: '4 Sections', desc: '1 → 5 → 9 / 2 → 6 → 10…' },
-                    { count: 5, label: '5 Sections', desc: '1 → 6 → 11 / 2 → 7 → 12…' }
-                  ].map((item) => (
-                    <button
-                      key={item.count}
-                      type="button"
-                      onClick={() =>
-                        updateSetting((prev) => ({ ...prev, visibleLines: item.count }))
-                      }
-                      className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1 transition-all ${
-                        (lyricsSettings.visibleLines ?? 2) === item.count
-                          ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
-                          : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
-                      }`}
-                    >
-                      <span className="text-sm font-black">{item.label}</span>
-                      <span className="text-[10px] font-normal opacity-80">{item.desc}</span>
-                    </button>
-                  ))}
+              {/* Independent LRC / eLRC section counts */}
+              {([
+                { key: 'lrcVisibleLines' as const, label: 'LRC Number of Sections' },
+                { key: 'elrcVisibleLines' as const, label: 'eLRC Number of Sections' },
+              ]).map((sectionSetting) => (
+                <div key={sectionSetting.key} className="pt-4 border-t border-white/5">
+                  <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-3">
+                    {sectionSetting.label}
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 max-w-4xl">
+                    {[
+                      { count: 1, label: '1 Section', desc: '1 → 2 → 3' },
+                      { count: 2, label: '2 Sections', desc: '1 → 3 → 5 / 2 → 4 → 6' },
+                      { count: 3, label: '3 Sections', desc: '1 → 4 → 7 / 2 → 5 → 8 / 3 → 6 → 9' },
+                      { count: 4, label: '4 Sections', desc: '1 → 5 → 9 / 2 → 6 → 10…' },
+                      { count: 5, label: '5 Sections', desc: '1 → 6 → 11 / 2 → 7 → 12…' }
+                    ].map((item) => (
+                      <button
+                        key={item.count}
+                        type="button"
+                        onClick={() =>
+                          updateSetting((prev) => ({ ...prev, [sectionSetting.key]: item.count }))
+                        }
+                        className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1 transition-all ${
+                          (lyricsSettings[sectionSetting.key] ?? lyricsSettings.visibleLines ?? 2) === item.count
+                            ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25'
+                            : 'bg-[#08090E] text-zinc-400 border-white/10 hover:text-white hover:border-white/20'
+                        }`}
+                      >
+                        <span className="text-sm font-black">{item.label}</span>
+                        <span className="text-[10px] font-normal opacity-80">{item.desc}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <p className="text-xs text-zinc-500 mt-2">
-                  Each section shows one line at a time. Lines rotate through the sections in order, and each section keeps its line until its next turn.
-                </p>
-              </div>
+              ))}
+              <p className="text-xs text-zinc-500 mt-2">
+                LRC and eLRC have independent section counts. Each section shows one line at a time and keeps it until its next turn.
+              </p>
 
 
 
