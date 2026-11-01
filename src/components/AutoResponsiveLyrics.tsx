@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from
 import { motion, AnimatePresence } from 'motion/react';
 import { LyricsAppearanceSettings } from '../utils/lyricsSettings';
 import { Tv, Bug } from 'lucide-react';
-import { computeWordIntervals, calculateWordProgress, getLineSingingEndTime } from '../utils/lyricsProgress';
+import { computeWordIntervals, calculateWordProgress } from '../utils/lyricsProgress';
 
 export interface LyricWord {
   text: string;
@@ -417,16 +417,11 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             : -1;
 
           const prevLine = prevLineIndex >= 0 ? lyrics[prevLineIndex] : undefined;
-          const prevLineEnd = getLineSingingEndTime(prevLine);
-          const isPrevFinished = prevLineIndex < 0 || !prevLine || adjustedTime >= prevLineEnd;
 
-          // Every section always reserves the same two physical lyric slots.
-          // The previous line occupies slot 0 while it is still being sung; the
-          // current line always remains in slot 1, so its position never jumps
-          // when the previous line completes.
-          const previousLine = !isPrevFinished && prevLineIndex >= 0
-            ? lyrics[prevLineIndex]
-            : undefined;
+          // Keep the completed line in this section until the section rotates
+          // again. Finishing its singing/highlight must not clear the slot while
+          // the other sections continue advancing.
+          const previousLine = prevLine;
           const currentLine = currLineIndex >= 0 ? lyrics[currLineIndex] : undefined;
 
           return (
