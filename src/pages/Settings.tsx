@@ -1047,11 +1047,11 @@ export default function Settings() {
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 max-w-4xl">
                   {[
-                    { count: 1, label: '1 Section', desc: '1, 2, 3' },
-                    { count: 2, label: '2 Sections', desc: '1,3,5 / 2,4,6' },
-                    { count: 3, label: '3 Sections', desc: '1,4,7 / 2,5,8 / 3,6,9' },
-                    { count: 4, label: '4 Sections', desc: '1,5,9 / 2,6,10…' },
-                    { count: 5, label: '5 Sections', desc: '1,6,11 / 2,7,12…' }
+                    { count: 1, label: '1 Section', desc: '1 → 2 → 3' },
+                    { count: 2, label: '2 Sections', desc: '1 → 3 → 5 / 2 → 4 → 6' },
+                    { count: 3, label: '3 Sections', desc: '1 → 4 → 7 / 2 → 5 → 8 / 3 → 6 → 9' },
+                    { count: 4, label: '4 Sections', desc: '1 → 5 → 9 / 2 → 6 → 10…' },
+                    { count: 5, label: '5 Sections', desc: '1 → 6 → 11 / 2 → 7 → 12…' }
                   ].map((item) => (
                     <button
                       key={item.count}
@@ -1071,7 +1071,7 @@ export default function Settings() {
                   ))}
                 </div>
                 <p className="text-xs text-zinc-500 mt-2">
-                  Sets the number of parallel sections. Each section shows three lines from its own sequence; together they preserve the original lyric order.
+                  Each section shows one line at a time. Lines rotate through the sections in order, and each section keeps its line until its next turn.
                 </p>
               </div>
 
