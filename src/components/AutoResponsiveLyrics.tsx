@@ -419,8 +419,8 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
           // Do not rotate this section to its next assigned line until the
           // line currently occupying it has finished its word highlighting.
           // The other sections can continue advancing independently.
-          const previousOwnedLineIndex = scheduledLineIndex - sectionCount;
-          if (previousOwnedLineIndex >= 0) {
+          let previousOwnedLineIndex = scheduledLineIndex - sectionCount;
+          while (previousOwnedLineIndex >= 0) {
             const previousOwnedLine = lyrics[previousOwnedLineIndex];
             const previousIntervals = previousOwnedLine?.words?.length
               ? computeWordIntervals(previousOwnedLine.words)
@@ -432,6 +432,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
             if (adjustedTime < previousLineEnd) {
               currLineIndex = previousOwnedLineIndex;
+              previousOwnedLineIndex -= sectionCount;
+            } else {
+              break;
             }
           }
 
