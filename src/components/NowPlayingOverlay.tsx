@@ -3,29 +3,31 @@ import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic
 import { usePlayback } from '../context/PlaybackContext';
 import EqualizerIndicator from './EqualizerIndicator';
 
-type TimedLyricLine = { time: number; text: string; id: string };
+type LyricWord = { text: string; start: number };
+type TimedLyricLine = { time: number; text: string; id: string; words?: LyricWord[] };
 
-function parseLrcLyrics(content: string): TimedLyricLine[] {
+function parseLrcLyrics(content: string, format: 'lrc' | 'elrc'): TimedLyricLine[] {
   const parsed: TimedLyricLine[] = [];
-  const timestampPattern = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+  const lineTag = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+  const wordTag = /<\s*(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\s*>/g;
+  const toSeconds = (m: RegExpMatchArray) => Number(m[1]) * 60 + Number(m[2]) + (m[3] ? Number('0.' + m[3]) : 0);
   content.split(/\r?\n/).forEach((rawLine, lineIndex) => {
-    const matches = [...rawLine.matchAll(timestampPattern)];
-    if (matches.length === 0) return;
-    const text = rawLine.replace(timestampPattern, '').trim();
-    if (!text || /^\[(?:ar|al|ti|by|re|ve|offset|length|tool|kana):/i.test(text)) return;
-    for (const match of matches) {
-      const minutes = Number(match[1]);
-      const seconds = Number(match[2]);
-      const fraction = match[3] ? Number('0.' + match[3]) : 0;
-      if (seconds >= 60) continue;
-      parsed.push({
-        time: minutes * 60 + seconds + fraction,
-        text,
-        id: lineIndex + '-' + match.index,
-      });
+    const tags = [...rawLine.matchAll(lineTag)]; if (!tags.length) return;
+    const body = rawLine.replace(lineTag, '').trim();
+    if (!body || /^\[(?:ar|al|ti|by|re|ve|offset|length|tool|kana):/i.test(body)) return;
+    const wordTags = [...body.matchAll(wordTag)];
+    for (const tag of tags) {
+      if (Number(tag[2]) >= 60) continue;
+      let words: LyricWord[] | undefined; let text = body;
+      if (format === 'elrc' && wordTags.length) {
+        const chunks = body.split(wordTag);
+        words = wordTags.map((word, i) => ({ text: (chunks[i + 1] || '').replace(/<[^>]*>/g, '').trim(), start: toSeconds(word) })).filter(word => word.text);
+        text = words.map(word => word.text).join(' '); if (!words.length) words = undefined;
+      }
+      if (text) parsed.push({ time: toSeconds(tag), text, id: lineIndex + '-' + tag.index, words });
     }
   });
-  return parsed.sort((a, b) => a.time - b.time);
+  return parsed.sort((x, y) => x.time - y.time);
 }
 
 export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overlay' | 'panel' }) {
@@ -41,6 +43,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   const [showLyrics, setShowLyrics] = useState(false);
   const [isLyricsFullscreen, setIsLyricsFullscreen] = useState(false);
   const [lyricsLines, setLyricsLines] = useState<TimedLyricLine[]>([]);
+  const [lyricsFormat, setLyricsFormat] = useState<'lrc' | 'elrc'>('lrc');
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [lyricsUnavailable, setLyricsUnavailable] = useState(false);
   const activeLyricRef = useRef<HTMLDivElement>(null);
@@ -183,41 +186,25 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
 
   useEffect(() => {
     if (!showLyrics || !currentSong?.id) return;
-    const controller = new AbortController();
-    setLyricsLoading(true);
-    setLyricsUnavailable(false);
-    fetch('/api/songs/' + currentSong.id + '/lyrics?format=lrc', {
-      signal: controller.signal,
-      credentials: 'same-origin',
-      headers: { Accept: 'text/plain' },
-    })
-      .then(async response => {
-        if (!response.ok) throw new Error('Lyrics unavailable');
-        return response.text();
-      })
-      .then(content => {
-        if (controller.signal.aborted) return;
-        const parsed = parseLrcLyrics(content);
-        setLyricsLines(parsed);
-        setLyricsUnavailable(parsed.length === 0);
-      })
-      .catch(error => {
-        if (!controller.signal.aborted) {
-          setLyricsLines([]);
-          setLyricsUnavailable(true);
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLyricsLoading(false);
-      });
+    const controller = new AbortController(); setLyricsLoading(true); setLyricsUnavailable(false);
+    const loadLyrics = async () => {
+      try {
+        const response = await fetch('/api/songs/' + currentSong.id + '/lyrics?format=elrc', { signal: controller.signal, credentials: 'same-origin', headers: { Accept: 'text/plain' } });
+        if (response.ok) { const parsed = parseLrcLyrics(await response.text(), 'elrc'); if (parsed.length && parsed.some(line => line.words?.length)) { if (controller.signal.aborted) return; setLyricsFormat('elrc'); setLyricsLines(parsed); setLyricsUnavailable(false); return; } }
+      } catch { if (controller.signal.aborted) return; }
+      try {
+        const response = await fetch('/api/songs/' + currentSong.id + '/lyrics?format=lrc', { signal: controller.signal, credentials: 'same-origin', headers: { Accept: 'text/plain' } });
+        if (!response.ok) throw new Error('Lyrics unavailable'); const parsed = parseLrcLyrics(await response.text(), 'lrc');
+        if (controller.signal.aborted) return; setLyricsFormat('lrc'); setLyricsLines(parsed); setLyricsUnavailable(parsed.length === 0);
+      } catch { if (!controller.signal.aborted) { setLyricsLines([]); setLyricsUnavailable(true); } }
+    };
+    loadLyrics().finally(() => { if (!controller.signal.aborted) setLyricsLoading(false); });
     return () => controller.abort();
   }, [showLyrics, currentSong?.id]);
 
-  const activeLyricIndex = lyricsLines.reduce((active, line, index) => (
-    line.time <= currentTime ? index : active
-  ), -1);
-  // Keep the active lyric as the first rendered line; future lines flow beneath it.
-  const visibleLyrics = lyricsLines.slice(Math.max(0, activeLyricIndex));
+  const lyricStart = (line?: TimedLyricLine) => line?.words?.length ? line.words[0].start : (line?.time ?? Infinity);
+  const activeLyricIndex = lyricsLines.reduce((active, line, index) => lyricStart(line) <= currentTime ? index : active, -1);
+  const visibleLyrics = lyricsLines.slice(Math.max(0, activeLyricIndex - 2), Math.max(0, activeLyricIndex - 2) + 5);
 
   useEffect(() => {
     if (mode === 'panel' || !isExpanded) return;
@@ -470,12 +457,37 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               ) : lyricsUnavailable ? (
                 <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
               ) : (
-                <div key={'fullscreen-active-lyric-' + (lyricsLines[activeLyricIndex]?.id || 'before-start')} className="min-h-full flex flex-col justify-start items-stretch gap-8 pt-[20vh] pb-8" style={{ animation: 'ykLyricsFadeIn 320ms ease-out both' }}>
-                  {visibleLyrics.map((line) => {
-                    const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
-                    const active = index === activeLyricIndex;
-                    const nearby = Math.abs(index - activeLyricIndex) <= 2;
-                    return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#F09ACB] text-lg sm:text-xl font-bold tracking-wide leading-snug scale-[1.02]' : nearby ? 'text-[#C6B1C4] text-lg sm:text-xl font-medium' : 'text-[#9D8A9C] text-base sm:text-lg font-normal')}>{line.text}</div>;
+                <div className="h-full min-h-0 w-full max-w-5xl mx-auto flex flex-col justify-center gap-1 sm:gap-3 py-2" data-lyrics-format={lyricsFormat}>
+                  {Array.from({ length: 5 }, (_, sectionIndex) => {
+                    let lineIndex = -1;
+                    for (let candidate = sectionIndex; candidate < lyricsLines.length; candidate += 5) {
+                      const candidateStart = lyricStart(lyricsLines[candidate]);
+                      if (candidate <= activeLyricIndex) lineIndex = candidate;
+                      if (candidate > activeLyricIndex) break;
+                      const previousIndex = candidate - 5;
+                      if (previousIndex >= 0) {
+                        const previous = lyricsLines[previousIndex];
+                        const previousEnd = previous.words?.length ? previous.words[previous.words.length - 1].start + 0.45 : (lyricsLines[previousIndex + 1]?.time ?? Infinity);
+                        if (currentTime >= Math.max(previousEnd, candidateStart - 1.5)) lineIndex = candidate;
+                      }
+                    }
+                    const line = lineIndex >= 0 ? lyricsLines[lineIndex] : undefined;
+                    if (!line) return <div key={'empty-' + sectionIndex} className="flex-1 min-h-0" />;
+                    const nextStart = lyricStart(lyricsLines[lineIndex + 1]);
+                    const replacementStart = lyricStart(lyricsLines[lineIndex + 5]);
+                    const singingEnd = line.words?.length ? line.words[line.words.length - 1].start + 0.45 : nextStart;
+                    const fadeEnd = Math.max(singingEnd, replacementStart - 1.5);
+                    const fade = Number.isFinite(fadeEnd) && Number.isFinite(nextStart) ? Math.max(0, Math.min(1, (currentTime - nextStart) / Math.max(0.001, fadeEnd - nextStart))) : 0;
+                    const isActive = currentTime >= lyricStart(line) && currentTime < singingEnd;
+                    return <div key={'section-' + sectionIndex + '-' + line.id} ref={isActive ? fullscreenActiveLyricRef : null} className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden" style={{ opacity: 1 - fade, fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: isActive ? 700 : 500, color: isActive ? '#F09ACB' : '#C6B1C4' }}>
+                      <p className="w-full text-balance break-words" style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: window.matchMedia('(orientation: portrait)').matches ? 2 : 1, overflow: 'hidden' }}>
+                        {line.words?.length ? line.words.map((word, wordIndex) => {
+                          const nextWord = line.words?.[wordIndex + 1]; const end = nextWord?.start ?? word.start + 0.45;
+                          const progress = currentTime <= word.start ? 0 : currentTime >= end ? 1 : (currentTime - word.start) / Math.max(0.001, end - word.start);
+                          return <React.Fragment key={wordIndex}><span style={{ color: progress > 0 ? '#F09ACB' : '#C6B1C4', textShadow: progress > 0 ? '0 0 18px rgba(244,114,182,0.45)' : 'none' }}>{word.text}</span>{' '}</React.Fragment>;
+                        }) : line.text}
+                      </p>
+                    </div>;
                   })}
                 </div>
               )}
