@@ -322,6 +322,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const standardLrcColor = isLineActiveOrPast ? highColor : lowColor;
     const standardLrcOpacity = isLineActiveOrPast ? highOpacity : lowOpacity;
     const standardLrcGlow = isLineActiveOrPast ? `0 0 25px ${highColor}80` : 'none';
+    // Completed eLRC lines remain visible in their section, but recede so the
+    // line currently being sung is the clear visual focus. LRC is unchanged.
+    const previousLineOpacity = isElrcMode && isLinePast ? 0.25 : 1;
 
     return (
       <div className={`lyric-line-row relative flex ${rowAlign} ${rowJustify} w-full h-full min-h-0 overflow-hidden py-1 px-2`} key={`row-${sectionIndex}-${slotIndex}-${lineIndex}`}>
@@ -364,8 +367,8 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             className={`w-full whitespace-normal break-words leading-tight ${getAlignmentClass(textAlignment)}`}
           >
             {wordNodes
-              ? <span className={`flex flex-wrap items-center ${rowJustify} gap-x-[0.3em] gap-y-1 w-full`} style={{ textAlign: textAlignment }}>{wordNodes}</span>
-              : <span style={{ opacity: standardLrcOpacity, textShadow: standardLrcGlow }}>{applyTextCase(line.text || '♪ ♪ ♪', lyricsSettings.highlighted.textCase)}</span>}
+              ? <span className={`flex flex-wrap items-center ${rowJustify} gap-x-[0.3em] gap-y-1 w-full`} style={{ textAlign: textAlignment, opacity: previousLineOpacity }}>{wordNodes}</span>
+              : <span style={{ opacity: standardLrcOpacity * previousLineOpacity, textShadow: standardLrcGlow }}>{applyTextCase(line.text || '♪ ♪ ♪', lyricsSettings.highlighted.textCase)}</span>}
           </motion.p>
         </AnimatePresence>
       </div>
