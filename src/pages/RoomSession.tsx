@@ -2141,7 +2141,9 @@ export default function RoomSession() {
   const displayLeadSec = (lyricsSettings.elrcDisplayLeadInMs ?? 1500) / 1000;
   const effectiveLeadSec = Math.max(displayLeadSec, transitionLeadSec);
 
-  const lineDisplayTime = adjustedTime + (lyricsFormat === 'elrc' ? effectiveLeadSec : 0);
+  // LRC previews each upcoming line one second before its timestamp;
+  // eLRC retains its configured display/transition lead.
+  const lineDisplayTime = adjustedTime + (lyricsFormat === 'elrc' ? effectiveLeadSec : 1);
 
   // Authoritative transition target timestamp:
   // For eLRC lines with word timestamps, use the first word's original timestamp as the authoritative transition target.
