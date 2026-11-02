@@ -299,9 +299,14 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
       ? Math.max(0, Math.min(1, (adjustedTime - lrcFadeStartTime) / lrcFadeDuration))
       : 0;
 
-    // eLRC fades each line out during the 750ms immediately before the
-    // same section slot is replaced. The replacement is sectionCount lines
-    // ahead and appears at the same time used by the section-advance logic.
+    // The outgoing eLRC line starts fading when the following lyric line
+    // begins singing. Its section slot is replaced by the line sectionCount
+    // positions ahead, at the same time used by the section-advance logic.
+    const elrcNextLine = isElrcMode ? lyrics[lineIndex + 1] : undefined;
+    const elrcNextLineStart = elrcNextLine?.words?.length
+      && typeof elrcNextLine.words[0].start === 'number'
+      ? elrcNextLine.words[0].start
+      : elrcNextLine?.time ?? Infinity;
     const elrcReplacementLine = isElrcMode ? lyrics[lineIndex + sectionCount] : undefined;
     const elrcReplacementStart = elrcReplacementLine?.words?.length
       && typeof elrcReplacementLine.words[0].start === 'number'
@@ -310,10 +315,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const elrcReplacementTime = isElrcMode
       ? Math.max(lineSingingEndTime, elrcReplacementStart - elrcDisplayLeadInSec)
       : Infinity;
-    // Begin fading as soon as this line finishes singing, then spread
-    // the fade across the remaining wait so it still reaches zero exactly
-    // when its section slot is replaced.
-    const elrcExitFadeStartTime = lineSingingEndTime;
+    // Keep the outgoing line fully visible until the next line starts singing,
+    // then fade it across the remaining time until its section slot is replaced.
+    const elrcExitFadeStartTime = elrcNextLineStart;
     const elrcExitFadeDuration = Math.max(0.001, elrcReplacementTime - elrcExitFadeStartTime);
     const elrcExitFadeProgress = isElrcMode && Number.isFinite(elrcReplacementTime)
       ? Math.max(0, Math.min(1, (adjustedTime - elrcExitFadeStartTime) / elrcExitFadeDuration))
