@@ -70,6 +70,20 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   const sectionCount = Math.max(1, Math.min(5, Math.round(sectionsCount || 2)));
   const safeFocusIndex = Math.max(0, Math.min(Math.max(0, lyrics.length - 1), focusIndex));
   const adjustedTime = currentTime + (lyricOffset / 1000);
+  // eLRC previews the complete upcoming line 1500ms before its first word;
+  // the uniform 1000ms entrance fade finishes 500ms before singing begins.
+  const elrcDisplayLeadInSec = lyricsFormat === 'elrc'
+    ? Math.max(0, (lyricsSettings.elrcDisplayLeadInMs ?? 1500) / 1000)
+    : 0;
+  const elrcEntranceFadeSec = Math.max(0.1, elrcDisplayLeadInSec - 0.5);
+  const displayFocusIndex = !isPreview && lyricsFormat === 'elrc'
+    ? lyrics.reduce((latestIndex, lyric, index) => {
+        const firstWordStart = lyric.words?.length && typeof lyric.words[0].start === 'number'
+          ? lyric.words[0].start
+          : lyric.time;
+        return adjustedTime >= firstWordStart - elrcDisplayLeadInSec ? index : latestIndex;
+      }, -1)
+    : safeFocusIndex;
 
   const isDebugEnabled = Boolean(
     showDebugHUD ||
@@ -243,10 +257,11 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
     const fadeDurationSec = isElrcMode ? (lyricsSettings.elrcFadeDurationMs ?? 1500) / 1000 : 1.5;
     const fadeOverlapSec = isElrcMode ? Math.min(fadeDurationSec, (lyricsSettings.elrcFadeOverlapMs ?? 300) / 1000) : 0;
-    // Start the incoming lyric transition at its timestamp, not ahead of it.
+    // Fade the whole eLRC line in uniformly, completing 500ms before its
+    // first word. Word-by-word highlighting remains timestamp-driven below.
     const inDelay = 0;
     const outDelay = 0;
-    const transitionDuration = fadeDurationSec;
+    const transitionDuration = isElrcMode ? elrcEntranceFadeSec : fadeDurationSec;
 
     // CONTINUOUS LEFT-TO-RIGHT WORD HIGHLIGHTING:
     const wordIntervals = line.words?.length ? computeWordIntervals(line.words) : [];
@@ -354,10 +369,10 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             // Configured Wipe:
             // The incoming line wipes in with inDelay and duration.
             // The outgoing line wipes out with outDelay and duration.
-            initial={{ clipPath: isElrcMode ? 'inset(0 100% 0 0)' : 'none', opacity: 0 }}
+            initial={{ clipPath: 'none', opacity: 0 }}
             animate={{ 
-              // eLRC keeps its configured wipe; LRC reveals the complete line at once.
-              clipPath: isElrcMode ? 'inset(0 0% 0 0)' : 'none',
+              // Both formats reveal the full line; eLRC uses a uniform opacity fade.
+              clipPath: 'none',
               opacity: highOpacity,
               transition: {
                 duration: transitionDuration,
@@ -456,9 +471,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
           const firstSectionLineTime = lyricsFormat === 'elrc' && firstSectionLine?.words?.length
             ? firstSectionLine.words[0].start
             : firstSectionLine?.time ?? Infinity;
-          const firstLineIsReady = isPreview || adjustedTime >= firstSectionLineTime;
-          const scheduledLineIndex = safeFocusIndex >= sectionIndex
-            ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
+          const firstLineIsReady = isPreview || adjustedTime >= firstSectionLineTime - elrcDisplayLeadInSec;
+          const scheduledLineIndex = displayFocusIndex >= sectionIndex
+            ? displayFocusIndex - ((displayFocusIndex - sectionIndex) % sectionCount)
             : sectionIndex;
           let currLineIndex = firstLineIsReady ? sectionIndex : -1;
 
@@ -480,7 +495,11 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
               ?? lyrics[previousLineIndex + 1]?.time
               ?? Infinity;
             // A section never previews its next LRC line before its timestamp.
-            const sectionAdvanceTime = previousLineEnd;
+            const nextLine = lyrics[nextLineIndex];
+            const nextLineStart = nextLine?.words?.length && typeof nextLine.words[0].start === 'number'
+              ? nextLine.words[0].start
+              : nextLine?.time ?? Infinity;
+            const sectionAdvanceTime = Math.max(previousLineEnd, nextLineStart - elrcDisplayLeadInSec);
 
             if (adjustedTime >= sectionAdvanceTime) {
               currLineIndex = nextLineIndex;
