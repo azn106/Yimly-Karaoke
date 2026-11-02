@@ -347,9 +347,10 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             // Configured Wipe:
             // The incoming line wipes in with inDelay and duration.
             // The outgoing line wipes out with outDelay and duration.
-            initial={{ clipPath: 'inset(0 100% 0 0)', opacity: 0 }}
+            initial={{ clipPath: isElrcMode ? 'inset(0 100% 0 0)' : 'none', opacity: 0 }}
             animate={{ 
-              clipPath: 'inset(0 0% 0 0)', 
+              // eLRC keeps its configured wipe; LRC reveals the complete line at once.
+              clipPath: isElrcMode ? 'inset(0 0% 0 0)' : 'none',
               opacity: highOpacity,
               transition: {
                 duration: transitionDuration,
@@ -359,17 +360,19 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             }}
             variants={{
               exit: (latestIncomingProgress: number) => ({
-                clipPath: 'inset(0 0 0 100%)',
-                // eLRC fades in lockstep with the incoming line's actual word
-                // fill. LRC keeps its existing fade-out transition.
+                clipPath: isElrcMode ? 'inset(0 0 0 100%)' : 'none',
+                // eLRC keeps its word-synchronised wipe/fade. LRC fades
+                // the complete outgoing line uniformly after the next line highlights.
                 opacity: highOpacity * (1 - Math.max(0, Math.min(1, latestIncomingProgress))),
                 transition: {
                   opacity: { duration: 0 },
-                  clipPath: {
-                    duration: isElrcMode ? Math.max(transitionDuration, nextSectionRemainingSec) : transitionDuration,
-                    ease: 'linear',
-                    delay: inDelay
-                  }
+                  ...(isElrcMode ? {
+                    clipPath: {
+                      duration: Math.max(transitionDuration, nextSectionRemainingSec),
+                      ease: 'linear',
+                      delay: inDelay
+                    }
+                  } : {})
                 }
               })
             }}
