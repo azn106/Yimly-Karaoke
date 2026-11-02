@@ -452,8 +452,13 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             const previousLineEnd = previousLastInterval?.end
               ?? lyrics[previousLineIndex + 1]?.time
               ?? Infinity;
+            // LRC rotates the section one second before the next line's
+            // timestamp so the incoming lyric can be previewed unhighlighted.
+            const sectionAdvanceTime = lyricsFormat === 'lrc' && !previousIntervals.length
+              ? previousLineEnd - 1
+              : previousLineEnd;
 
-            if (adjustedTime >= previousLineEnd) {
+            if (adjustedTime >= sectionAdvanceTime) {
               currLineIndex = nextLineIndex;
             } else {
               break;
