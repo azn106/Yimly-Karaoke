@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic, Music, ArrowLeft, ChevronUp, ChevronDown, Volume2, VolumeX, Volume1, Captions, LoaderCircle } from 'lucide-react';
 import { usePlayback } from '../context/PlaybackContext';
 import EqualizerIndicator from './EqualizerIndicator';
+import { computeWordIntervals } from '../utils/lyricsProgress';
 
 type LyricWord = { text: string; start: number };
 type TimedLyricLine = { time: number; text: string; id: string; words?: LyricWord[] };
@@ -466,7 +467,8 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                     const lineStart = lyricStart(line);
                     const nextStart = lyricStart(lyricsLines[index + 1]);
                     const replacementStart = lyricStart(lyricsLines[index + 5]);
-                    const singingEnd = line.words?.length ? line.words[line.words.length - 1].start + 0.45 : nextStart;
+                    const wordIntervals = line.words?.length ? computeWordIntervals(line.words) : [];
+                    const singingEnd = wordIntervals.length ? wordIntervals[wordIntervals.length - 1].end : nextStart;
                     const fadeEnd = Math.max(singingEnd, replacementStart - 1.5);
                     const fadeOut = Number.isFinite(fadeEnd) && Number.isFinite(nextStart) ? Math.max(0, Math.min(1, (currentTime - nextStart) / Math.max(0.001, fadeEnd - nextStart))) : 0;
                     const fadeIn = currentTime < lineStart ? Math.max(0, Math.min(1, (currentTime - (lineStart - 1.5)) / 1.5)) : 1;
@@ -474,8 +476,8 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                     return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden" style={{ opacity: fadeIn * (1 - fadeOut), fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: active ? 700 : 500, color: active ? '#F09ACB' : '#C6B1C4' }}>
                       <p className="w-full text-balance break-words" style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: window.matchMedia('(orientation: portrait)').matches ? 2 : 1, overflow: 'hidden' }}>
                         {line.words?.length ? line.words.map((word, wordIndex) => {
-                          const nextWord = line.words?.[wordIndex + 1]; const end = nextWord?.start ?? word.start + 0.45;
-                          const progress = currentTime <= word.start ? 0 : currentTime >= end ? 1 : (currentTime - word.start) / Math.max(0.001, end - word.start);
+                          const interval = wordIntervals[wordIndex];
+                          const progress = !interval || currentTime <= interval.start ? 0 : currentTime >= interval.end ? 1 : (currentTime - interval.start) / Math.max(0.001, interval.end - interval.start);
                           return <React.Fragment key={wordIndex}><span style={{ color: progress > 0 ? '#F09ACB' : '#C6B1C4', textShadow: progress > 0 ? '0 0 18px rgba(244,114,182,0.45)' : 'none' }}>{word.text}</span>{' '}</React.Fragment>;
                         }) : line.text}
                       </p>
