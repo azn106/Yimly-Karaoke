@@ -281,13 +281,13 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const previousSectionLine = !isElrcMode && lineIndex >= sectionCount
       ? lyrics[lineIndex - sectionCount]
       : undefined;
-    const lrcFadeStartTime = previousSectionLine?.time ?? line.time;
+    const lrcFadeStartTime = (previousSectionLine?.time ?? line.time) + 0.75;
     const lrcFadeDuration = Math.max(0.001, line.time - lrcFadeStartTime);
     const incomingFadeProgress = isElrcMode && wordProgressList.length
       ? wordProgressList.reduce((sum, progress) => sum + progress, 0) / (wordProgressList.length * 100)
       : !isElrcMode
-        // Fade the outgoing LRC line from its own highlight start until the
-        // incoming line reaches its highlight timestamp.
+        // Fade the outgoing LRC line 750ms after its highlight begins;
+        // reach zero when this incoming line starts highlighting.
         ? Math.max(0, Math.min(1, (adjustedTime - lrcFadeStartTime) / lrcFadeDuration))
         : 0;
     const nextSectionRemainingSec = Math.max(0, lineSingingEndTime - adjustedTime);
@@ -338,8 +338,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
     const isLineActiveOrPast = isLineActive || isLinePast;
     const standardLrcColor = isLineActiveOrPast ? highColor : lowColor;
-    const lrcLineFadeProgress = Number.isFinite(nextLrcLineTime) && nextLrcLineTime > line.time
-      ? Math.max(0, Math.min(1, (adjustedTime - line.time) / (nextLrcLineTime - line.time)))
+    const lrcLineFadeStartTime = line.time + 0.75;
+    const lrcLineFadeProgress = Number.isFinite(nextLrcLineTime) && nextLrcLineTime > lrcLineFadeStartTime
+      ? Math.max(0, Math.min(1, (adjustedTime - lrcLineFadeStartTime) / (nextLrcLineTime - lrcLineFadeStartTime)))
       : 0;
     const standardLrcOpacity = !isElrcMode && isLineActiveOrPast
       ? highOpacity * (1 - lrcLineFadeProgress)
@@ -443,10 +444,10 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         }}
       >
         {Array.from({ length: sectionCount }, (_, sectionIndex) => {
-          // A section's first LRC line must not appear until its 1-second
-          // display lead begins. eLRC keeps its existing pre-fill behavior.
+          // A section's first LRC line appears 1.5 seconds before its timestamp.
+          // eLRC keeps its existing pre-fill behavior.
           const firstLineIsReady = lyricsFormat !== 'lrc'
-            || adjustedTime >= (lyrics[sectionIndex]?.time ?? Infinity) - 1;
+            || adjustedTime >= (lyrics[sectionIndex]?.time ?? Infinity) - 1.5;
           const scheduledLineIndex = safeFocusIndex >= sectionIndex
             ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
             : sectionIndex;
@@ -469,10 +470,10 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             const previousLineEnd = previousLastInterval?.end
               ?? lyrics[previousLineIndex + 1]?.time
               ?? Infinity;
-            // LRC rotates the section one second before the next line's
+            // LRC rotates the section 1.5 seconds before the next line's
             // timestamp so the incoming lyric can be previewed unhighlighted.
             const sectionAdvanceTime = lyricsFormat === 'lrc' && !previousIntervals.length
-              ? previousLineEnd - 1
+              ? previousLineEnd - 1.5
               : previousLineEnd;
 
             if (adjustedTime >= sectionAdvanceTime) {
