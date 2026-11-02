@@ -322,9 +322,15 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const standardLrcColor = isLineActiveOrPast ? highColor : lowColor;
     const standardLrcOpacity = isLineActiveOrPast ? highOpacity : lowOpacity;
     const standardLrcGlow = isLineActiveOrPast ? `0 0 25px ${highColor}80` : 'none';
-    // Completed eLRC lines remain visible in their section, but recede so the
-    // line currently being sung is the clear visual focus. LRC is unchanged.
-    const previousLineOpacity = isLinePast ? 0.25 : 1;
+    // Dim an eLRC line on the exact playback update where its final word
+    // reaches 100%. Derive this from the same progress values used to paint
+    // the word highlights, rather than waiting for the next focus-index change.
+    const isElrcHighlightComplete = isElrcMode
+      && wordProgressList.length > 0
+      && wordProgressList.every((progress) => progress >= 100);
+    // Keep the existing previous-line behaviour for LRC; eLRC follows the
+    // completion of its own word-by-word highlight.
+    const previousLineOpacity = (isElrcMode ? isElrcHighlightComplete : isLinePast) ? 0.25 : 1;
 
     return (
       <div className={`lyric-line-row relative flex ${rowAlign} ${rowJustify} w-full h-full min-h-0 overflow-hidden py-1 px-2`} key={`row-${sectionIndex}-${slotIndex}-${lineIndex}`}>
