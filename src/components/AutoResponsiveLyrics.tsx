@@ -254,6 +254,39 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     // CONTINUOUS LEFT-TO-RIGHT WORD HIGHLIGHTING:
     const wordIntervals = line.words?.length ? computeWordIntervals(line.words) : [];
 
+    // Fade this outgoing section line according to the next line assigned to
+    // the same section. The average word fill gives a continuous 0..1 fade
+    // that follows the incoming eLRC highlighting rather than the old line's
+    // completion or a separate wall-clock timer.
+    const nextSectionLine = isElrcMode ? lyrics[lineIndex + sectionCount] : undefined;
+    const nextSectionIntervals = nextSectionLine?.words?.length
+      ? computeWordIntervals(nextSectionLine.words)
+      : [];
+    const nextSectionFirst = nextSectionIntervals[0];
+    const nextSectionLast = nextSectionIntervals[nextSectionIntervals.length - 1];
+    const nextSectionActive = Boolean(
+      nextSectionFirst && nextSectionLast
+      && adjustedTime >= nextSectionFirst.start
+      && adjustedTime < nextSectionLast.end
+    );
+    const nextSectionPast = Boolean(nextSectionLast && adjustedTime >= nextSectionLast.end);
+    const nextSectionProgress = nextSectionLine?.words?.length
+      ? calculateWordProgress(
+          nextSectionLine.words,
+          nextSectionIntervals,
+          adjustedTime,
+          nextSectionActive,
+          nextSectionPast,
+          isPreview
+        )
+      : [];
+    const incomingFadeProgress = nextSectionProgress.length
+      ? nextSectionProgress.reduce((sum, progress) => sum + progress, 0) / (nextSectionProgress.length * 100)
+      : 0;
+    const nextSectionRemainingSec = nextSectionLast
+      ? Math.max(0, nextSectionLast.end - adjustedTime)
+      : transitionDuration;
+
     // Singing timing boundaries: the line starts at the first word's start, and finishes at the final word's end.
     const firstInterval = wordIntervals[0];
     const lastInterval = wordIntervals[wordIntervals.length - 1];
@@ -322,19 +355,12 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const standardLrcColor = isLineActiveOrPast ? highColor : lowColor;
     const standardLrcOpacity = isLineActiveOrPast ? highOpacity : lowOpacity;
     const standardLrcGlow = isLineActiveOrPast ? `0 0 25px ${highColor}80` : 'none';
-    // Dim an eLRC line on the exact playback update where its final word
-    // reaches 100%. Derive this from the same progress values used to paint
-    // the word highlights, rather than waiting for the next focus-index change.
-    const isElrcHighlightComplete = isElrcMode
-      && wordProgressList.length > 0
-      && wordProgressList.every((progress) => progress >= 100);
-    // Keep the existing previous-line behaviour for LRC; eLRC follows the
-    // completion of its own word-by-word highlight.
-    const previousLineOpacity = (isElrcMode ? isElrcHighlightComplete : isLinePast) ? 0.25 : 1;
+    // LRC retains its existing previous-line dimming. eLRC opacity is
+    // driven by the incoming line's word progress in the exit variant below.
 
     return (
       <div className={`lyric-line-row relative flex ${rowAlign} ${rowJustify} w-full h-full min-h-0 overflow-hidden py-1 px-2`} key={`row-${sectionIndex}-${slotIndex}-${lineIndex}`}>
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence mode="popLayout" custom={incomingFadeProgress}>
           <motion.p
             key={`section-${sectionIndex}-slot-${slotIndex}-${lineIndex}-${line.time}-${line.text}`}
             // Configured Wipe:
@@ -350,17 +376,20 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
                 delay: inDelay
               }
             }}
-            exit={{ 
-              clipPath: 'inset(0 0 0 100%)', 
-              opacity: 0,
+            exit={(latestIncomingProgress: number) => ({
+              clipPath: 'inset(0 0 0 100%)',
+              // eLRC fades in lockstep with the incoming line's actual word
+              // fill. LRC keeps its existing fade-out transition.
+              opacity: isElrcMode ? 1 - Math.max(0, Math.min(1, latestIncomingProgress)) : 0,
               transition: {
-                duration: transitionDuration,
-                ease: 'linear',
-                // Keep the previous lyric visible until the incoming lyric begins its wipe.
-              // Both transitions then finish together at the next word's target timestamp.
-              delay: inDelay
+                opacity: isElrcMode ? { duration: 0 } : { duration: transitionDuration, ease: 'linear', delay: inDelay },
+                clipPath: {
+                  duration: isElrcMode ? Math.max(transitionDuration, nextSectionRemainingSec) : transitionDuration,
+                  ease: 'linear',
+                  delay: inDelay
+                }
               }
-            }}
+            })}
             style={{
               fontFamily: getFontFamilyStyle(displayStyle.font, lyricsSettings.customFontName),
               fontSize: `${displayStyle.size}px`,
@@ -373,8 +402,8 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             className={`w-full whitespace-normal break-words leading-tight ${getAlignmentClass(textAlignment)}`}
           >
             {wordNodes
-              ? <span className={`flex flex-wrap items-center ${rowJustify} gap-x-[0.3em] gap-y-1 w-full`} style={{ textAlign: textAlignment, opacity: previousLineOpacity }}>{wordNodes}</span>
-              : <span style={{ opacity: standardLrcOpacity * previousLineOpacity, textShadow: standardLrcGlow }}>{applyTextCase(line.text || '♪ ♪ ♪', lyricsSettings.highlighted.textCase)}</span>}
+              ? <span className={`flex flex-wrap items-center ${rowJustify} gap-x-[0.3em] gap-y-1 w-full`} style={{ textAlign: textAlignment }}>{wordNodes}</span>
+              : <span style={{ opacity: standardLrcOpacity * (isElrcMode ? 1 : (isLinePast ? 0.25 : 1)), textShadow: standardLrcGlow }}>{applyTextCase(line.text || '♪ ♪ ♪', lyricsSettings.highlighted.textCase)}</span>}
           </motion.p>
         </AnimatePresence>
       </div>
