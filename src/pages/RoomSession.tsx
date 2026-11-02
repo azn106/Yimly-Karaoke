@@ -2133,17 +2133,10 @@ export default function RoomSession() {
   const isPlaybackActive = playing || currentTime > 0.05;
   const activeOffset = lyricsFormat === 'elrc' ? elrcOffset : lrcOffset;
   const adjustedTime = currentTime + (activeOffset / 1000);
-  // Advance line display only; word highlighting retains the original eLRC timestamps.
-  // Effective lead incorporates Extra eLRC Display Lead and the transition requirement (2 * duration - overlap)
-  const fadeDurationSec = (lyricsSettings.elrcFadeDurationMs ?? 1500) / 1000;
-  const fadeOverlapSec = Math.min(fadeDurationSec, (lyricsSettings.elrcFadeOverlapMs ?? 300) / 1000);
-  const transitionLeadSec = Math.max(fadeDurationSec, 2 * fadeDurationSec - fadeOverlapSec);
-  const displayLeadSec = (lyricsSettings.elrcDisplayLeadInMs ?? 1500) / 1000;
-  const effectiveLeadSec = Math.max(displayLeadSec, transitionLeadSec);
-
-  // LRC previews each upcoming line one second before its timestamp;
-  // eLRC retains its configured display/transition lead.
-  const lineDisplayTime = adjustedTime + (lyricsFormat === 'elrc' ? effectiveLeadSec : 1);
+  // Select lyrics using the actual playback time. Neither LRC nor eLRC
+  // should appear before its own timestamp; word highlighting also uses the
+  // original eLRC word timestamps.
+  const lineDisplayTime = adjustedTime;
 
   // Authoritative transition target timestamp:
   // For eLRC lines with word timestamps, use the first word's original timestamp as the authoritative transition target.
