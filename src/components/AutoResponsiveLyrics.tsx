@@ -254,39 +254,6 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     // CONTINUOUS LEFT-TO-RIGHT WORD HIGHLIGHTING:
     const wordIntervals = line.words?.length ? computeWordIntervals(line.words) : [];
 
-    // Fade this outgoing section line according to the next line assigned to
-    // the same section. The average word fill gives a continuous 0..1 fade
-    // that follows the incoming eLRC highlighting rather than the old line's
-    // completion or a separate wall-clock timer.
-    const nextSectionLine = isElrcMode ? lyrics[lineIndex + sectionCount] : undefined;
-    const nextSectionIntervals = nextSectionLine?.words?.length
-      ? computeWordIntervals(nextSectionLine.words)
-      : [];
-    const nextSectionFirst = nextSectionIntervals[0];
-    const nextSectionLast = nextSectionIntervals[nextSectionIntervals.length - 1];
-    const nextSectionActive = Boolean(
-      nextSectionFirst && nextSectionLast
-      && adjustedTime >= nextSectionFirst.start
-      && adjustedTime < nextSectionLast.end
-    );
-    const nextSectionPast = Boolean(nextSectionLast && adjustedTime >= nextSectionLast.end);
-    const nextSectionProgress = nextSectionLine?.words?.length
-      ? calculateWordProgress(
-          nextSectionLine.words,
-          nextSectionIntervals,
-          adjustedTime,
-          nextSectionActive,
-          nextSectionPast,
-          isPreview
-        )
-      : [];
-    const incomingFadeProgress = nextSectionProgress.length
-      ? nextSectionProgress.reduce((sum, progress) => sum + progress, 0) / (nextSectionProgress.length * 100)
-      : 0;
-    const nextSectionRemainingSec = nextSectionLast
-      ? Math.max(0, nextSectionLast.end - adjustedTime)
-      : transitionDuration;
-
     // Singing timing boundaries: the line starts at the first word's start, and finishes at the final word's end.
     const firstInterval = wordIntervals[0];
     const lastInterval = wordIntervals[wordIntervals.length - 1];
@@ -306,6 +273,14 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const wordProgressList = line.words?.length
       ? calculateWordProgress(line.words, wordIntervals, adjustedTime, isLineActive, isLinePast, isPreview)
       : [];
+
+    // Average fill of this line becomes the outgoing line's fade target when
+    // this line replaces it. AnimatePresence supplies the latest value while
+    // the previous keyed line is exiting.
+    const incomingFadeProgress = isElrcMode && wordProgressList.length
+      ? wordProgressList.reduce((sum, progress) => sum + progress, 0) / (wordProgressList.length * 100)
+      : 0;
+    const nextSectionRemainingSec = Math.max(0, lineSingingEndTime - adjustedTime);
 
     const activeTextCase = lyricsSettings.highlighted.textCase || lyricsSettings.unhighlighted.textCase;
 
