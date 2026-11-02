@@ -129,12 +129,17 @@ html, body {
   outline-offset: 2px;
 }
 
-/* TV remotes often move focus programmatically and may not trigger :focus-visible. */
-#room-session-root :is(button, a, input, select, textarea, [tabindex]):not([disabled]):not([aria-disabled="true"]):focus,
+/* TV remote focus should feel like pointer hover, not a focus border.
+   The navigation layer applies .yk-tv-focused to the active target. */
 #room-session-root .yk-tv-focused {
-  outline: 3px solid #F472B6 !important;
-  outline-offset: 3px !important;
-  box-shadow: 0 0 0 2px rgba(244, 114, 182, 0.22), 0 0 18px rgba(244, 114, 182, 0.24) !important;
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  filter: brightness(1.18);
+  transform: scale(1.025);
+  transition: filter 140ms ease, transform 140ms ease, background-color 140ms ease, color 140ms ease;
+  position: relative;
+  z-index: 1;
 }
 
 /* Responsive Layout System: Default mobile / narrow-device styles (mobile-first) */
