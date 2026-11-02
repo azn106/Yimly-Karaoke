@@ -324,7 +324,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const standardLrcGlow = isLineActiveOrPast ? `0 0 25px ${highColor}80` : 'none';
     // Completed eLRC lines remain visible in their section, but recede so the
     // line currently being sung is the clear visual focus. LRC is unchanged.
-    const previousLineOpacity = isElrcMode && isLinePast ? 0.25 : 1;
+    const previousLineOpacity = isLinePast ? 0.25 : 1;
 
     return (
       <div className={`lyric-line-row relative flex ${rowAlign} ${rowJustify} w-full h-full min-h-0 overflow-hidden py-1 px-2`} key={`row-${sectionIndex}-${slotIndex}-${lineIndex}`}>
