@@ -243,12 +243,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
     const fadeDurationSec = isElrcMode ? (lyricsSettings.elrcFadeDurationMs ?? 1500) / 1000 : 1.5;
     const fadeOverlapSec = isElrcMode ? Math.min(fadeDurationSec, (lyricsSettings.elrcFadeOverlapMs ?? 300) / 1000) : 0;
-    const transitionLeadSec = Math.max(fadeDurationSec, 2 * fadeDurationSec - fadeOverlapSec);
-    const displayLeadSec = isElrcMode ? (lyricsSettings.elrcDisplayLeadInMs ?? 1500) / 1000 : 0;
-    const effectiveLeadSec = isElrcMode ? Math.max(displayLeadSec, transitionLeadSec) : 0;
-
-    const inDelay = isElrcMode ? Math.max(0, effectiveLeadSec - fadeDurationSec) : 0;
-    const outDelay = isElrcMode ? Math.max(0, effectiveLeadSec - (2 * fadeDurationSec - fadeOverlapSec)) : 0;
+    // Start the incoming lyric transition at its timestamp, not ahead of it.
+    const inDelay = 0;
+    const outDelay = 0;
     const transitionDuration = fadeDurationSec;
 
     // CONTINUOUS LEFT-TO-RIGHT WORD HIGHLIGHTING:
@@ -482,11 +479,8 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             const previousLineEnd = previousLastInterval?.end
               ?? lyrics[previousLineIndex + 1]?.time
               ?? Infinity;
-            // LRC rotates the section 1.5 seconds before the next line's
-            // timestamp so the incoming lyric can be previewed unhighlighted.
-            const sectionAdvanceTime = lyricsFormat === 'lrc' && !previousIntervals.length
-              ? previousLineEnd - 1.5
-              : previousLineEnd;
+            // A section never previews its next LRC line before its timestamp.
+            const sectionAdvanceTime = previousLineEnd;
 
             if (adjustedTime >= sectionAdvanceTime) {
               currLineIndex = nextLineIndex;
