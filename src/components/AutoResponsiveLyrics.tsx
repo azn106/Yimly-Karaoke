@@ -452,10 +452,14 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         }}
       >
         {Array.from({ length: sectionCount }, (_, sectionIndex) => {
-          // A section's first LRC line appears 1.5 seconds before its timestamp.
-          // eLRC keeps its existing pre-fill behavior.
-          const firstLineIsReady = lyricsFormat !== 'lrc'
-            || adjustedTime >= (lyrics[sectionIndex]?.time ?? Infinity) - 1.5;
+          // Do not reveal the first line in any section until its own lyric
+          // timestamp. For eLRC, use the first word's timestamp when available.
+          // Keep settings previews visible regardless of playback time.
+          const firstSectionLine = lyrics[sectionIndex];
+          const firstSectionLineTime = lyricsFormat === 'elrc' && firstSectionLine?.words?.length
+            ? firstSectionLine.words[0].start
+            : firstSectionLine?.time ?? Infinity;
+          const firstLineIsReady = isPreview || adjustedTime >= firstSectionLineTime;
           const scheduledLineIndex = safeFocusIndex >= sectionIndex
             ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
             : sectionIndex;
