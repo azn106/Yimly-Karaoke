@@ -310,9 +310,13 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const elrcReplacementTime = isElrcMode
       ? Math.max(lineSingingEndTime, elrcReplacementStart - elrcDisplayLeadInSec)
       : Infinity;
-    const elrcExitFadeStartTime = elrcReplacementTime - 0.75;
+    // Begin fading as soon as this line finishes singing, then spread
+    // the fade across the remaining wait so it still reaches zero exactly
+    // when its section slot is replaced.
+    const elrcExitFadeStartTime = lineSingingEndTime;
+    const elrcExitFadeDuration = Math.max(0.001, elrcReplacementTime - elrcExitFadeStartTime);
     const elrcExitFadeProgress = isElrcMode && Number.isFinite(elrcReplacementTime)
-      ? Math.max(0, Math.min(1, (adjustedTime - elrcExitFadeStartTime) / 0.75))
+      ? Math.max(0, Math.min(1, (adjustedTime - elrcExitFadeStartTime) / elrcExitFadeDuration))
       : 0;
     const elrcLineOpacity = highOpacity * (1 - elrcExitFadeProgress);
 
