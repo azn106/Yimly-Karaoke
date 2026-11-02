@@ -20,8 +20,11 @@ function parseLrcLyrics(content: string, format: 'lrc' | 'elrc'): TimedLyricLine
       if (Number(tag[2]) >= 60) continue;
       let words: LyricWord[] | undefined; let text = body;
       if (format === 'elrc' && wordTags.length) {
-        const chunks = body.split(wordTag);
-        words = wordTags.map((word, i) => ({ text: (chunks[i + 1] || '').replace(/<[^>]*>/g, '').trim(), start: toSeconds(word) })).filter(word => word.text);
+        words = wordTags.map((word, i) => {
+          const start = (word.index ?? 0) + word[0].length;
+          const end = i + 1 < wordTags.length ? (wordTags[i + 1].index ?? body.length) : body.length;
+          return { text: body.slice(start, end).replace(/<[^>]*>/g, '').trim(), start: toSeconds(word) };
+        }).filter(word => word.text);
         text = words.map(word => word.text).join(' '); if (!words.length) words = undefined;
       }
       if (text) parsed.push({ time: toSeconds(tag), text, id: lineIndex + '-' + tag.index, words });
