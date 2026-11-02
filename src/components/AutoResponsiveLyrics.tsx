@@ -296,7 +296,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
     const activeTextCase = lyricsSettings.highlighted.textCase || lyricsSettings.unhighlighted.textCase;
 
-    const wordNodes = line.words?.length ? line.words.map((word, wordIndex) => {
+    const wordNodes = isElrcMode && line.words?.length ? line.words.map((word, wordIndex) => {
       const fillPercent = wordProgressList[wordIndex] ?? 0;
       const isFullyHighlighted = fillPercent >= 100;
       const hasStarted = fillPercent > 0;
