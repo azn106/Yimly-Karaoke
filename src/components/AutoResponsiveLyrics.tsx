@@ -373,16 +373,24 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
                 clipPath: isElrcMode ? 'inset(0 0 0 100%)' : 'none',
                 // eLRC keeps its word-synchronised wipe/fade. LRC fades
                 // the complete outgoing line uniformly after the next line highlights.
-                opacity: highOpacity * (1 - Math.max(0, Math.min(1, latestIncomingProgress))),
+                opacity: isElrcMode ? 0 : highOpacity * (1 - Math.max(0, Math.min(1, latestIncomingProgress))),
                 transition: {
-                  opacity: { duration: 0 },
+                  // Fade the outgoing eLRC line all the way to zero over the
+                  // incoming line's remaining word-highlighting duration.
                   ...(isElrcMode ? {
+                    opacity: {
+                      duration: Math.max(0.001, nextSectionRemainingSec),
+                      ease: 'linear',
+                      delay: 0
+                    },
                     clipPath: {
                       duration: Math.max(transitionDuration, nextSectionRemainingSec),
                       ease: 'linear',
                       delay: inDelay
                     }
-                  } : {})
+                  } : {
+                    opacity: { duration: 0 }
+                  })
                 }
               })
             }}
