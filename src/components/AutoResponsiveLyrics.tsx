@@ -314,7 +314,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
       ? elrcReplacementLine.words[0].start
       : elrcReplacementLine?.time ?? Infinity;
     const elrcReplacementTime = isElrcMode
-      ? Math.max(lineSingingEndTime, elrcReplacementStart - elrcDisplayLeadInSec)
+      ? Math.max(lineSingingEndTime, elrcReplacementStart - displayLeadInSec)
       : Infinity;
     // Keep the outgoing line fully visible until the next line starts singing,
     // then fade it across the remaining time until its section slot is replaced.
