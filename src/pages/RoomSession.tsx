@@ -19,7 +19,7 @@ import {
   FileText, ArrowLeft, Plus, Check, AlertCircle, 
   User, Library as LibraryIcon, Search, X, RefreshCw,
   Maximize2, Minimize2, Info, LogOut, QrCode, Clock, Volume2, Disc3,
-  ChevronUp, ChevronDown
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { filterSongs, SearchableSong } from '../lib/search-utils';
 import { getAuthToken } from '../lib/auth';
