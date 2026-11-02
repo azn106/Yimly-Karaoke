@@ -70,11 +70,11 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
   const sectionCount = Math.max(1, Math.min(5, Math.round(sectionsCount || 2)));
   const safeFocusIndex = Math.max(0, Math.min(Math.max(0, lyrics.length - 1), focusIndex));
   const adjustedTime = currentTime + (lyricOffset / 1000);
-  // eLRC can preview a complete line before its first word. LRC must not
-  // appear until its actual line timestamp.
+  // Both formats preview the complete upcoming line before its start.
+  // eLRC uses its configurable lead-in; LRC uses a fixed 1500ms lead-in.
   const displayLeadInSec = lyricsFormat === 'elrc'
     ? Math.max(0, (lyricsSettings.elrcDisplayLeadInMs ?? 1500) / 1000)
-    : 0;
+    : 1.5;
   const entranceFadeSec = Math.max(0.1, displayLeadInSec - 0.5);
   const getLyricStartTime = (lyric?: LyricLine) => {
     if (!lyric) return Infinity;
