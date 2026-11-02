@@ -3,6 +3,7 @@ import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic
 import { usePlayback } from '../context/PlaybackContext';
 import EqualizerIndicator from './EqualizerIndicator';
 import { computeWordIntervals, calculateWordProgress } from '../utils/lyricsProgress';
+import { getLyricsSettings } from '../utils/lyricsSettings';
 
 type LyricWord = { text: string; start: number };
 type TimedLyricLine = { time: number; text: string; id: string; words?: LyricWord[] };
@@ -50,6 +51,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   const [lyricsFormat, setLyricsFormat] = useState<'lrc' | 'elrc'>('lrc');
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [lyricsUnavailable, setLyricsUnavailable] = useState(false);
+  const [elrcDisplayLeadInMs, setElrcDisplayLeadInMs] = useState<number>(() => getLyricsSettings().elrcDisplayLeadInMs ?? 1500);
   const activeLyricRef = useRef<HTMLDivElement>(null);
   const fullscreenActiveLyricRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number | null>(null);
@@ -182,6 +184,12 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   }, []);
 
   useEffect(() => {
+    const syncLyricsSettings = () => setElrcDisplayLeadInMs(getLyricsSettings().elrcDisplayLeadInMs ?? 1500);
+    window.addEventListener('yimly_lyrics_settings_changed', syncLyricsSettings);
+    return () => window.removeEventListener('yimly_lyrics_settings_changed', syncLyricsSettings);
+  }, []);
+
+  useEffect(() => {
     setShowLyrics(false);
     setIsLyricsFullscreen(false);
     setLyricsLines([]);
@@ -218,7 +226,8 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   }, -1);
 
   // Fullscreen lyrics use the room renderer's five independently rotating sections.
-  const lyricDisplayLeadInSec = 1.5;
+  const lyricDisplayLeadInSec = lyricsFormat === 'elrc' ? Math.max(0, elrcDisplayLeadInMs / 1000) : 1.5;
+  const lyricEntranceFadeSec = Math.max(0.1, lyricDisplayLeadInSec - 0.5);
   const displayFocusIndex = lyricsLines.reduce((latest, line, index) => (
     currentTime >= lyricStart(line) - lyricDisplayLeadInSec ? index : latest
   ), -1);
@@ -559,7 +568,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                       className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden"
                       style={{ opacity: lineOpacity, fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: active ? 700 : 500, color: active ? '#F09ACB' : '#C6B1C4' }}
                     >
-                      <p className="w-full text-balance break-words" style={{ animation: 'ykLyricsFocusIn 1000ms ease-out both', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: window.matchMedia('(orientation: portrait)').matches ? 2 : 1, overflow: 'hidden' }}>{lineText}</p>
+                      <p className="w-full text-balance break-words" style={{ animation: 'ykLyricsFocusIn ' + lyricEntranceFadeSec + 's ease-out both', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: window.matchMedia('(orientation: portrait)').matches ? 2 : 1, overflow: 'hidden' }}>{lineText}</p>
                     </div>;
                   })}
                 </div>
