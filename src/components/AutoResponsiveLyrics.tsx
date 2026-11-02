@@ -287,22 +287,34 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
       ? calculateWordProgress(line.words, wordIntervals, adjustedTime, isLineActive, isLinePast, isPreview)
       : [];
 
-    // Average fill of this line becomes the outgoing line's fade target when
-    // this line replaces it. AnimatePresence supplies the latest value while
-    // the previous keyed line is exiting.
+    // LRC uses the incoming line's progress to dim the previous line.
     const previousSectionLine = !isElrcMode && lineIndex >= sectionCount
       ? lyrics[lineIndex - sectionCount]
       : undefined;
     const lrcFadeStartTime = (previousSectionLine?.time ?? line.time) + 0.75;
     const lrcFadeDuration = Math.max(0.001, line.time - lrcFadeStartTime);
-    const incomingFadeProgress = isElrcMode && wordProgressList.length
-      ? wordProgressList.reduce((sum, progress) => sum + progress, 0) / (wordProgressList.length * 100)
-      : !isElrcMode
-        // Fade the outgoing LRC line 750ms after its highlight begins;
-        // reach zero when this incoming line starts highlighting.
-        ? Math.max(0, Math.min(1, (adjustedTime - lrcFadeStartTime) / lrcFadeDuration))
-        : 0;
-    const nextSectionRemainingSec = Math.max(0, lineSingingEndTime - adjustedTime);
+    const incomingFadeProgress = !isElrcMode
+      // Fade the outgoing LRC line 750ms after its highlight begins;
+      // reach zero when this incoming line starts highlighting.
+      ? Math.max(0, Math.min(1, (adjustedTime - lrcFadeStartTime) / lrcFadeDuration))
+      : 0;
+
+    // eLRC fades each line out during the 750ms immediately before the
+    // same section slot is replaced. The replacement is sectionCount lines
+    // ahead and appears at the same time used by the section-advance logic.
+    const elrcReplacementLine = isElrcMode ? lyrics[lineIndex + sectionCount] : undefined;
+    const elrcReplacementStart = elrcReplacementLine?.words?.length
+      && typeof elrcReplacementLine.words[0].start === 'number'
+      ? elrcReplacementLine.words[0].start
+      : elrcReplacementLine?.time ?? Infinity;
+    const elrcReplacementTime = isElrcMode
+      ? Math.max(lineSingingEndTime, elrcReplacementStart - elrcDisplayLeadInSec)
+      : Infinity;
+    const elrcExitFadeStartTime = elrcReplacementTime - 0.75;
+    const elrcExitFadeProgress = isElrcMode && Number.isFinite(elrcReplacementTime)
+      ? Math.max(0, Math.min(1, (adjustedTime - elrcExitFadeStartTime) / 0.75))
+      : 0;
+    const elrcLineOpacity = highOpacity * (1 - elrcExitFadeProgress);
 
     const activeTextCase = lyricsSettings.highlighted.textCase || lyricsSettings.unhighlighted.textCase;
 
@@ -373,9 +385,13 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             animate={{ 
               // Both formats reveal the full line; eLRC uses a uniform opacity fade.
               clipPath: 'none',
-              opacity: highOpacity,
+              opacity: isElrcMode ? elrcLineOpacity : highOpacity,
               transition: {
-                duration: transitionDuration,
+                // Preserve the uniform entrance fade; once the scheduled
+                // outgoing fade begins, follow playback time without lag.
+                duration: isElrcMode && adjustedTime >= elrcExitFadeStartTime
+                  ? 0
+                  : transitionDuration,
                 ease: 'linear',
                 delay: inDelay
               }
@@ -386,14 +402,11 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
                 clipPath: 'none',
                 opacity: isElrcMode ? 0 : highOpacity * (1 - Math.max(0, Math.min(1, latestIncomingProgress))),
                 transition: {
-                  // Fade the outgoing eLRC line completely to zero opacity
-                  // over the incoming line's remaining word-highlighting duration.
+                  // eLRC has already reached zero at its scheduled
+                  // replacement time; keep exit instantaneous to avoid a
+                  // second fade after the section slot changes.
                   ...(isElrcMode ? {
-                    opacity: {
-                      duration: Math.max(0.001, nextSectionRemainingSec),
-                      ease: 'linear',
-                      delay: 0
-                    }
+                    opacity: { duration: 0 }
                   } : {
                     opacity: { duration: 0 }
                   })
@@ -488,7 +501,8 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
             const previousLineEnd = previousLastInterval?.end
               ?? lyrics[previousLineIndex + 1]?.time
               ?? Infinity;
-            // A section never previews its next LRC line before its timestamp.
+            // The next line is scheduled for its full-line lead-in, but a
+            // section cannot rotate until its current line finishes singing.
             const nextLine = lyrics[nextLineIndex];
             const nextLineStart = nextLine?.words?.length && typeof nextLine.words[0].start === 'number'
               ? nextLine.words[0].start
