@@ -460,29 +460,18 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               ) : lyricsUnavailable ? (
                 <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
               ) : (
-                <div className="h-full min-h-0 w-full max-w-5xl mx-auto flex flex-col justify-center gap-1 sm:gap-3 py-2" data-lyrics-format={lyricsFormat}>
-                  {Array.from({ length: 5 }, (_, sectionIndex) => {
-                    let lineIndex = -1;
-                    for (let candidate = sectionIndex; candidate < lyricsLines.length; candidate += 5) {
-                      const candidateStart = lyricStart(lyricsLines[candidate]);
-                      if (candidate <= activeLyricIndex) lineIndex = candidate;
-                      if (candidate > activeLyricIndex) break;
-                      const previousIndex = candidate - 5;
-                      if (previousIndex >= 0) {
-                        const previous = lyricsLines[previousIndex];
-                        const previousEnd = previous.words?.length ? previous.words[previous.words.length - 1].start + 0.45 : (lyricsLines[previousIndex + 1]?.time ?? Infinity);
-                        if (currentTime >= Math.max(previousEnd, candidateStart - 1.5)) lineIndex = candidate;
-                      }
-                    }
-                    const line = lineIndex >= 0 ? lyricsLines[lineIndex] : undefined;
-                    if (!line) return <div key={'empty-' + sectionIndex} className="flex-1 min-h-0" />;
-                    const nextStart = lyricStart(lyricsLines[lineIndex + 1]);
-                    const replacementStart = lyricStart(lyricsLines[lineIndex + 5]);
+                <div key={'fullscreen-active-lyric-' + (lyricsLines[activeLyricIndex]?.id || 'before-start')} className="h-full min-h-0 w-full max-w-5xl mx-auto flex flex-col justify-center gap-1 sm:gap-3 py-2" data-lyrics-format={lyricsFormat}>
+                  {visibleLyrics.map((line) => {
+                    const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
+                    const lineStart = lyricStart(line);
+                    const nextStart = lyricStart(lyricsLines[index + 1]);
+                    const replacementStart = lyricStart(lyricsLines[index + 5]);
                     const singingEnd = line.words?.length ? line.words[line.words.length - 1].start + 0.45 : nextStart;
                     const fadeEnd = Math.max(singingEnd, replacementStart - 1.5);
-                    const fade = Number.isFinite(fadeEnd) && Number.isFinite(nextStart) ? Math.max(0, Math.min(1, (currentTime - nextStart) / Math.max(0.001, fadeEnd - nextStart))) : 0;
-                    const isActive = currentTime >= lyricStart(line) && currentTime < singingEnd;
-                    return <div key={'section-' + sectionIndex + '-' + line.id} ref={isActive ? fullscreenActiveLyricRef : null} className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden" style={{ opacity: 1 - fade, fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: isActive ? 700 : 500, color: isActive ? '#F09ACB' : '#C6B1C4' }}>
+                    const fadeOut = Number.isFinite(fadeEnd) && Number.isFinite(nextStart) ? Math.max(0, Math.min(1, (currentTime - nextStart) / Math.max(0.001, fadeEnd - nextStart))) : 0;
+                    const fadeIn = currentTime < lineStart ? Math.max(0, Math.min(1, (currentTime - (lineStart - 1.5)) / 1.5)) : 1;
+                    const active = index === activeLyricIndex;
+                    return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden" style={{ opacity: fadeIn * (1 - fadeOut), fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: active ? 700 : 500, color: active ? '#F09ACB' : '#C6B1C4' }}>
                       <p className="w-full text-balance break-words" style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: window.matchMedia('(orientation: portrait)').matches ? 2 : 1, overflow: 'hidden' }}>
                         {line.words?.length ? line.words.map((word, wordIndex) => {
                           const nextWord = line.words?.[wordIndex + 1]; const end = nextWord?.start ?? word.start + 0.45;
