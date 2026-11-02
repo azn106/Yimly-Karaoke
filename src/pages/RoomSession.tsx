@@ -2604,64 +2604,48 @@ export default function RoomSession() {
 
       {/* Top Room Navigation Bar */}
       <header id="room-session-header" className="px-4 md:px-6 py-2.5 border-b border-white/5 bg-[#0D0E17]/95 backdrop-blur-md flex items-center justify-between relative z-50 shrink-0 select-none">
-        {/* Left Side: Restart/Rejoin, Add Song (host only), and Horizontal Queue directly aligned */}
-        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden pr-4">
-          {/* ↻ Start New Session / Rejoin Button */}
-          {isHost ? (
-            <button 
-              data-tv-id="header-start-session-button"
-              onClick={handleStartNewSession}
-              disabled={isRestartingSession}
-              className="p-2 bg-white/5 hover:bg-[#F472B6]/20 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-all border border-white/10 flex items-center justify-center shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
-              title="Start New Session"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRestartingSession ? 'animate-spin text-[#F472B6]' : ''}`} />
-            </button>
-          ) : (
-            <button 
-              onClick={() => navigate(session?.roomCode ? `/join?session=${session.roomCode.replace(/\s+/g, '')}` : '/join')}
-              className="p-2 hover:bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors shrink-0"
-              title="Re-join / Change Name"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
+        {/* Left: Refresh, QR, Add Song, then the upcoming queue */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 overflow-hidden pr-3">
+          <button data-tv-id="header-start-session-button" onClick={handleStartNewSession} disabled={isRestartingSession}
+            className="p-2 bg-white/5 hover:bg-[#F472B6]/20 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-all border border-white/10 flex items-center justify-center shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]" title="Start New Session">
+            <RefreshCw className={`w-4 h-4 ${isRestartingSession ? 'animate-spin text-[#F472B6]' : ''}`} />
+          </button>
+
+          {isHost && qrCodeDataUrl && (
+            <div className="relative shrink-0">
+              <button data-tv-id="qr-toggle-button" onClick={() => setShowQrPopover(prev => !prev)}
+                className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]" title="Toggle QR Code">
+                <QrCode className="w-4 h-4 text-[#F472B6]" />
+              </button>
+              {showQrPopover && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowQrPopover(false)} />
+                  <div className="absolute left-0 top-full mt-2 z-50 bg-[#12131D] border border-white/10 rounded-2xl p-4 shadow-2xl flex flex-col items-center animate-fadeIn min-w-[200px]">
+                    <img src={qrCodeDataUrl} alt="Join Room QR Code" className="w-40 h-40 object-contain" />
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-2">JOIN ROOM</span>
+                    <span className="text-xs font-mono font-black text-white tracking-widest mt-1">{session?.roomCode}</span>
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
-          {/* Add Song Button (Host Only) */}
-          {isHost && (
-            <button
-              data-tv-id="header-add-song-button"
-              onClick={() => setShowLibrary(true)}
-              className="px-3 py-1.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 text-xs shadow-md shadow-[#F472B6]/20 shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Song</span>
-            </button>
-          )}
+          <button data-tv-id="header-add-song-button" onClick={() => setShowLibrary(true)}
+            className="px-3 py-1.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 text-xs shadow-md shadow-[#F472B6]/20 shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]">
+            <Plus className="w-3.5 h-3.5" /><span>Add Song</span>
+          </button>
 
-          {/* Horizontal Upcoming-Song Queue directly following Add Song */}
           <div className="hidden md:flex items-center gap-2 overflow-x-auto py-1 scrollbar-none flex-1 min-w-0">
             {(() => {
               const currentIndex = currentSong ? queue.findIndex(q => q.id === currentSong.id || q.songId === currentSong.songId) : -1;
               const upcomingQueue = currentIndex >= 0 ? queue.slice(currentIndex + 1) : queue;
-              if (upcomingQueue.length === 0) {
-                return (
-                  <span className="text-xs text-zinc-500 italic px-2">No upcoming songs in queue</span>
-                );
-              }
+              if (upcomingQueue.length === 0) return <span className="text-xs text-zinc-500 italic px-2">No upcoming songs in queue</span>;
               return upcomingQueue.map((item, index) => {
                 const singerName = item.userName || (item.userId ? `Singer ${item.userId}` : 'Guest');
                 return (
-                  <div 
-                    key={item.id || index}
-                    className="bg-[#12131D] border border-white/10 rounded-xl px-3 py-1 flex flex-col justify-center shrink-0 min-w-[150px] max-w-[200px]"
-                  >
-                    <div className="text-xs font-bold text-white truncate">
-                      {item.songTitle} - {item.artistName || item.artist || 'Unknown Artist'}
-                    </div>
-                    <div className="text-[10px] text-zinc-400 truncate">
-                      {singerName}
-                    </div>
+                  <div key={item.id || index} className="bg-[#12131D] border border-white/10 rounded-xl px-3 py-1 flex flex-col justify-center shrink-0 min-w-[150px] max-w-[200px]">
+                    <div className="text-xs font-bold text-white truncate">{item.songTitle} - {item.artistName || item.artist || 'Unknown Artist'}</div>
+                    <div className="text-[10px] text-zinc-400 truncate">{singerName}</div>
                   </div>
                 );
               });
@@ -2669,143 +2653,44 @@ export default function RoomSession() {
           </div>
         </div>
 
-        {/* Right Side: Header Controls, QR Toggle Popover, & Collapse/Expand Toggle */}
+        {/* Right: Instrumental, lyrics format, expanded sync/fullscreen, collapse */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button data-tv-id="inst-toggle-button" onClick={handleToggleInstrumental}
+            className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${variant === 'instrumental' ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25' : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'}`}
+            title="Switch between Original Vocal and Instrumental backing track">
+            <Music className="w-3.5 h-3.5" /><span className="hidden xs:inline">Inst:</span> {variant === 'instrumental' ? 'ON' : 'OFF'}
+          </button>
+
+          <button data-tv-id="lyrics-format-toggle" onClick={handleToggleLyricsFormat} disabled={!currentSongDetails?.hasElrc}
+            className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${
+              !currentSongDetails?.hasElrc ? 'opacity-50 cursor-not-allowed bg-white/5 text-zinc-500 border-white/5' :
+              lyricsFormat === 'elrc' ? 'bg-cyan-500 text-white border-cyan-500 shadow-lg shadow-cyan-500/25' :
+              'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'
+            }`}
+            title={!currentSongDetails?.hasElrc ? 'Enhanced LRC (eLRC) not available for this song (LRC mode active)' : `Switch lyric format (Current: ${lyricsFormat.toUpperCase()})`}>
+            <Clock className="w-3.5 h-3.5 text-cyan-400" /><span className="hidden xs:inline">Lyrics:</span> {lyricsFormat.toUpperCase()}
+          </button>
+
           {isHeaderExpanded && (
             <div className="flex items-center gap-2 sm:gap-3 animate-fadeIn">
-              {isHost && (
-                <>
-                  {/* Instrumental Toggle */}
-                  <button 
-                    data-tv-id="inst-toggle-button"
-                    onClick={handleToggleInstrumental}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${
-                      variant === 'instrumental' 
-                        ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25' 
-                        : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'
-                    }`}
-                    title="Switch between Original Vocal and Instrumental backing track"
-                  >
-                    <Music className="w-3.5 h-3.5" />
-                    <span className="hidden xs:inline">Inst:</span> {variant === 'instrumental' ? 'ON' : 'OFF'}
-                  </button>
-
-                  {/* Lyrics Format Toggle */}
-                  <button 
-                    data-tv-id="lyrics-format-toggle"
-                    onClick={handleToggleLyricsFormat}
-                    disabled={!currentSongDetails?.hasElrc}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${
-                      !currentSongDetails?.hasElrc 
-                        ? 'opacity-50 cursor-not-allowed bg-white/5 text-zinc-500 border-white/5'
-                        : lyricsFormat === 'elrc'
-                        ? 'bg-cyan-500 text-white border-cyan-500 shadow-lg shadow-cyan-500/25'
-                        : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'
-                    }`}
-                    title={
-                      !currentSongDetails?.hasElrc
-                        ? 'Enhanced LRC (eLRC) not available for this song (LRC mode active)'
-                        : `Switch lyric format (Current: ${lyricsFormat.toUpperCase()})`
-                    }
-                  >
-                    <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="hidden xs:inline">Lyrics:</span> {lyricsFormat.toUpperCase()}
-                  </button>
-
-                  {/* Offset Tuner */}
-                  <div className="hidden sm:flex items-center gap-1 bg-[#08090E] px-2 py-1 rounded-xl border border-white/10 text-xs">
-                    <span className="text-zinc-500 text-[11px] font-medium hidden md:inline pl-1">
-                      {lyricsFormat.toUpperCase()} Offset
-                    </span>
-                    <button 
-                      data-tv-id="offset-minus-button"
-                      onClick={() => handleOffsetChange(-250)}
-                      className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
-                      title="-250ms"
-                    >
-                      -250ms
-                    </button>
-                    <button
-                      data-tv-id="offset-sync-button"
-                      onClick={handleSyncReset}
-                      className="px-1.5 py-0.5 font-mono text-[#F472B6] hover:text-[#ff7ab8] font-bold text-[11px] rounded hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
-                      title={`Reset ${lyricsFormat.toUpperCase()} offset to 0ms`}
-                    >
-                      {activeOffset > 0 ? `+${activeOffset}` : activeOffset}ms
-                    </button>
-                    <button 
-                      data-tv-id="offset-plus-button"
-                      onClick={() => handleOffsetChange(250)}
-                      className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
-                      title="+250ms"
-                    >
-                      +250ms
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {/* Fullscreen Toggle */}
-              <button
-                data-tv-id="fullscreen-toggle-button"
-                onClick={toggleFullscreen}
+              <div className="hidden sm:flex items-center gap-1 bg-[#08090E] px-2 py-1 rounded-xl border border-white/10 text-xs">
+                <span className="text-zinc-500 text-[11px] font-medium hidden md:inline pl-1">{lyricsFormat.toUpperCase()} Offset</span>
+                <button data-tv-id="offset-minus-button" onClick={() => handleOffsetChange(-250)} className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]" title="-250ms">-250ms</button>
+                <button data-tv-id="offset-sync-button" onClick={handleSyncReset} className="px-1.5 py-0.5 font-mono text-[#F472B6] hover:text-[#ff7ab8] font-bold text-[11px] rounded hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]" title={`Reset ${lyricsFormat.toUpperCase()} offset to 0ms`}>{activeOffset > 0 ? `+${activeOffset}` : activeOffset}ms</button>
+                <button data-tv-id="offset-plus-button" onClick={() => handleOffsetChange(250)} className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]" title="+250ms">+250ms</button>
+              </div>
+              <button data-tv-id="fullscreen-toggle-button" onClick={toggleFullscreen}
                 className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-              >
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
-
-              {/* Session Info Button (Host Only) */}
-              {isHost && (
-                <button
-                  data-tv-id="session-info-button"
-                  onClick={() => setShowSessionInfoModal(true)}
-                  className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
-                  title="Session Info"
-                >
-                  <Info className="w-4 h-4" />
-                </button>
-              )}
-
-              {/* QR Code Toggle & Floating Popover Overlay */}
-              {isHost && qrCodeDataUrl && (
-                <div className="relative">
-                  <button
-                    data-tv-id="qr-toggle-button"
-                    onClick={() => setShowQrPopover(prev => !prev)}
-                    className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
-                    title="Toggle QR Code"
-                  >
-                    <QrCode className="w-4 h-4 text-[#F472B6]" />
-                  </button>
-
-                  {showQrPopover && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setShowQrPopover(false)} />
-                      <div className="absolute right-0 top-full mt-2 z-50 bg-[#12131D] border border-white/10 rounded-2xl p-4 shadow-2xl flex flex-col items-center animate-fadeIn min-w-[200px]">
-                        <img 
-                          src={qrCodeDataUrl} 
-                          alt="Join Room QR Code" 
-                          className="w-40 h-40 object-contain"
-                        />
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-2">JOIN ROOM</span>
-                        <span className="text-xs font-mono font-black text-white tracking-widest mt-1">{session?.roomCode}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
-          {/* Collapse/Expand Toggle (Replaces End Session button position) */}
-          <button
-            data-tv-id="header-collapse-toggle"
-            onClick={() => setIsHeaderExpanded(prev => !prev)}
+          <button data-tv-id="header-collapse-toggle" onClick={() => setIsHeaderExpanded(prev => !prev)}
             className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
-            title={isHeaderExpanded ? 'Collapse Header' : 'Expand Header'}
-          >
-            {isHeaderExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            title={isHeaderExpanded ? 'Collapse Header' : 'Expand Header'}>
+            {isHeaderExpanded ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
       </header>
