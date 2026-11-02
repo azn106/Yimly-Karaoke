@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic, Music, ArrowLeft, ChevronUp, ChevronDown, Volume2, VolumeX, Volume1, Captions, LoaderCircle } from 'lucide-react';
 import { usePlayback } from '../context/PlaybackContext';
 import EqualizerIndicator from './EqualizerIndicator';
-import { computeWordIntervals } from '../utils/lyricsProgress';
+import { computeWordIntervals, calculateWordProgress } from '../utils/lyricsProgress';
 
 type LyricWord = { text: string; start: number };
 type TimedLyricLine = { time: number; text: string; id: string; words?: LyricWord[] };
@@ -208,7 +208,43 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
 
   const lyricStart = (line?: TimedLyricLine) => line?.words?.length ? line.words[0].start : (line?.time ?? Infinity);
   const activeLyricIndex = lyricsLines.reduce((active, line, index) => lyricStart(line) <= currentTime ? index : active, -1);
-  const visibleLyrics = lyricsLines.slice(Math.max(0, activeLyricIndex - 2), Math.max(0, activeLyricIndex - 2) + 5);
+
+  // The cover-art focus view is the room renderer's one-section LRC presentation:
+  // show only one complete line, introduce the first line 1.5s early, then replace
+  // it on each following LRC line timestamp. eLRC word timings are not highlighted here.
+  const coverLyricIndex = lyricsLines.reduce((latest, line, index) => {
+    const revealAt = index === 0 ? line.time - 1.5 : line.time;
+    return currentTime >= revealAt ? index : latest;
+  }, -1);
+
+  // Fullscreen lyrics use the room renderer's five independently rotating sections.
+  const lyricDisplayLeadInSec = 1.5;
+  const displayFocusIndex = lyricsLines.reduce((latest, line, index) => (
+    currentTime >= lyricStart(line) - lyricDisplayLeadInSec ? index : latest
+  ), -1);
+  const fullscreenSectionLines = Array.from({ length: 5 }, (_, sectionIndex) => {
+    const firstLine = lyricsLines[sectionIndex];
+    const firstLineReady = Boolean(firstLine) && currentTime >= lyricStart(firstLine) - lyricDisplayLeadInSec;
+    const scheduledLineIndex = displayFocusIndex >= sectionIndex
+      ? displayFocusIndex - ((displayFocusIndex - sectionIndex) % 5)
+      : sectionIndex;
+    let lineIndex = firstLineReady ? sectionIndex : -1;
+
+    for (let nextLineIndex = sectionIndex + 5; nextLineIndex <= scheduledLineIndex; nextLineIndex += 5) {
+      const previousLineIndex = nextLineIndex - 5;
+      const previousLine = lyricsLines[previousLineIndex];
+      const previousIntervals = lyricsFormat === 'elrc' && previousLine?.words?.length
+        ? computeWordIntervals(previousLine.words)
+        : [];
+      const previousLastInterval = previousIntervals[previousIntervals.length - 1];
+      const previousLineEnd = previousLastInterval?.end ?? lyricsLines[previousLineIndex + 1]?.time ?? Infinity;
+      const nextLineStart = lyricStart(lyricsLines[nextLineIndex]);
+      const sectionAdvanceTime = Math.max(previousLineEnd, nextLineStart - lyricDisplayLeadInSec);
+      if (currentTime >= sectionAdvanceTime) lineIndex = nextLineIndex;
+      else break;
+    }
+    return { sectionIndex, lineIndex, line: lineIndex >= 0 ? lyricsLines[lineIndex] : undefined };
+  });
 
   useEffect(() => {
     if (mode === 'panel' || !isExpanded) return;
@@ -357,7 +393,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                 >
                   {showLyrics ? (
                     <>
-                      <style>{'@keyframes ykLyricsFadeIn { from { opacity: 0; } to { opacity: 1; } }'}</style>
+                      <style>{'@keyframes ykLyricsFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes ykLyricsFocusIn { from { opacity: 0; } to { opacity: 1; } }'}</style>
                       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden" style={{ animation: 'ykLyricsFadeIn 650ms ease-out both' }}>
                         {currentSong?.hasArtwork && <img key={currentSong.id + '-lyrics-bg'} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
                         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(190,24,93,0.42) 0%, rgba(157,23,77,0.52) 54%, rgba(35,12,29,0.66) 100%)' }} />
@@ -377,13 +413,28 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                       ) : lyricsUnavailable ? (
                         <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
                       ) : (
-                        <div key={'compact-active-lyric-' + (lyricsLines[activeLyricIndex]?.id || 'before-start')} className="min-h-full flex flex-col justify-start gap-4 pt-4" style={{ animation: 'ykLyricsFadeIn 280ms ease-out both' }}>
-                          {visibleLyrics.map((line) => {
-                            const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
-                            const active = index === activeLyricIndex;
-                            const nearby = Math.abs(index - activeLyricIndex) <= 2;
-                            return <div key={line.id} ref={active ? activeLyricRef : null} className={'transition-all duration-300 ease-out text-balance leading-relaxed tracking-[0.015em] ' + (active ? 'text-[#F09ACB] text-lg sm:text-xl font-bold tracking-wide scale-[1.02]' : nearby ? 'text-[#C6B1C4] text-sm sm:text-base font-medium' : 'text-[#9D8A9C] text-sm font-normal')} aria-current={active ? 'true' : undefined}>{line.text}</div>;
-                          })}
+                        <div className="w-full h-full min-h-0 flex items-center justify-center px-2 text-center" data-lyrics-section="0">
+                          {coverLyricIndex >= 0 && lyricsLines[coverLyricIndex] ? (() => {
+                            const line = lyricsLines[coverLyricIndex];
+                            const active = currentTime >= line.time;
+                            return <p
+                              key={'cover-focus-' + line.id}
+                              ref={active ? activeLyricRef : null}
+                              className="w-full text-balance break-words px-1"
+                              aria-current={active ? 'true' : undefined}
+                              style={{
+                                animation: 'ykLyricsFocusIn 1000ms ease-out both',
+                                fontSize: 'clamp(0.72rem, 4vw, 1.15rem)',
+                                lineHeight: 1.25,
+                                fontWeight: active ? 700 : 500,
+                                color: active ? '#F09ACB' : '#C6B1C4',
+                                display: '-webkit-box',
+                                WebkitBoxOrient: 'vertical',
+                                WebkitLineClamp: 3,
+                                overflow: 'hidden',
+                              }}
+                            >{line.text}</p>;
+                          })() : null}
                         </div>
                       )}
                       </div>
@@ -461,26 +512,54 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               ) : lyricsUnavailable ? (
                 <div className="h-full flex flex-col items-center justify-center gap-2 text-white/80"><Captions className="w-8 h-8 text-pink-200/80" /><p className="text-sm font-medium">No synced lyrics available</p><p className="text-xs text-white/55">Add an LRC file to this song’s music folder to display lyrics here.</p></div>
               ) : (
-                <div key={'fullscreen-active-lyric-' + (lyricsLines[activeLyricIndex]?.id || 'before-start')} className="h-full min-h-0 w-full max-w-5xl mx-auto flex flex-col justify-center gap-1 sm:gap-3 py-2" data-lyrics-format={lyricsFormat}>
-                  {visibleLyrics.map((line) => {
-                    const index = lyricsLines.findIndex(candidate => candidate.id === line.id);
-                    const lineStart = lyricStart(line);
-                    const nextStart = lyricStart(lyricsLines[index + 1]);
-                    const replacementStart = lyricStart(lyricsLines[index + 5]);
-                    const wordIntervals = line.words?.length ? computeWordIntervals(line.words) : [];
-                    const singingEnd = wordIntervals.length ? wordIntervals[wordIntervals.length - 1].end : nextStart;
-                    const fadeEnd = Math.max(singingEnd, replacementStart - 1.5);
-                    const fadeOut = Number.isFinite(fadeEnd) && Number.isFinite(nextStart) ? Math.max(0, Math.min(1, (currentTime - nextStart) / Math.max(0.001, fadeEnd - nextStart))) : 0;
-                    const fadeIn = currentTime < lineStart ? Math.max(0, Math.min(1, (currentTime - (lineStart - 1.5)) / 1.5)) : 1;
-                    const active = index === activeLyricIndex;
-                    return <div key={line.id} ref={active ? fullscreenActiveLyricRef : null} className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden" style={{ opacity: fadeIn * (1 - fadeOut), fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: active ? 700 : 500, color: active ? '#F09ACB' : '#C6B1C4' }}>
-                      <p className="w-full text-balance break-words" style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: window.matchMedia('(orientation: portrait)').matches ? 2 : 1, overflow: 'hidden' }}>
-                        {line.words?.length ? line.words.map((word, wordIndex) => {
-                          const interval = wordIntervals[wordIndex];
-                          const progress = !interval || currentTime <= interval.start ? 0 : currentTime >= interval.end ? 1 : (currentTime - interval.start) / Math.max(0.001, interval.end - interval.start);
-                          return <React.Fragment key={wordIndex}><span style={{ color: progress > 0 ? '#F09ACB' : '#C6B1C4', textShadow: progress > 0 ? '0 0 18px rgba(244,114,182,0.45)' : 'none' }}>{word.text}</span>{' '}</React.Fragment>;
-                        }) : line.text}
-                      </p>
+                <div key={'fullscreen-sections-' + (lyricsLines[0]?.id || 'empty')} className="h-full min-h-0 w-full max-w-5xl mx-auto flex flex-col justify-center gap-1 sm:gap-3 py-2" data-lyrics-format={lyricsFormat}>
+                  {fullscreenSectionLines.map(({ sectionIndex, lineIndex, line }) => {
+                    if (!line || lineIndex < 0) return <div key={'fullscreen-section-' + sectionIndex} data-lyrics-section={sectionIndex} className="flex-1 min-h-0 w-full" />;
+
+                    const wordIntervals = lyricsFormat === 'elrc' && line.words?.length ? computeWordIntervals(line.words) : [];
+                    const firstInterval = wordIntervals[0];
+                    const lastInterval = wordIntervals[wordIntervals.length - 1];
+                    const lineSingingStartTime = firstInterval?.start ?? line.time;
+                    const lineSingingEndTime = lastInterval?.end ?? line.time;
+                    const nextLrcLineTime = lyricsLines[lineIndex + 1]?.time ?? Infinity;
+                    const isLinePast = wordIntervals.length > 0
+                      ? currentTime >= lineSingingEndTime
+                      : currentTime >= nextLrcLineTime;
+                    const isLineActive = wordIntervals.length > 0
+                      ? currentTime >= lineSingingStartTime && currentTime < lineSingingEndTime
+                      : currentTime >= line.time && currentTime < nextLrcLineTime;
+                    const wordProgressList = wordIntervals.length
+                      ? calculateWordProgress(line.words || [], wordIntervals, currentTime, isLineActive, isLinePast, false)
+                      : [];
+                    const fadeStartTime = lyricStart(lyricsLines[lineIndex + 1]);
+                    const replacementStartTime = lyricStart(lyricsLines[lineIndex + 5]);
+                    const fadeEndTime = Math.max(lineSingingEndTime, replacementStartTime - lyricDisplayLeadInSec);
+                    const fadeProgress = Number.isFinite(fadeEndTime)
+                      ? Math.max(0, Math.min(1, (currentTime - fadeStartTime) / Math.max(0.001, fadeEndTime - fadeStartTime)))
+                      : 0;
+                    const lineOpacity = 1 - fadeProgress;
+                    const active = lineIndex === activeLyricIndex;
+                    const lineText = wordIntervals.length ? (
+                      <span className="inline-flex flex-wrap items-center justify-center gap-x-[0.3em] gap-y-1 w-full">
+                        {(line.words || []).map((word, wordIndex) => {
+                          const fillPercent = wordProgressList[wordIndex] ?? 0;
+                          const transformedText = word.text;
+                          return <span key={'word-' + wordIndex} className="relative inline-block whitespace-nowrap">
+                            <span style={{ color: '#C6B1C4', opacity: 0.9 }}>{transformedText}</span>
+                            {fillPercent > 0 && <span aria-hidden="true" className="absolute inset-0 overflow-hidden whitespace-nowrap pointer-events-none" style={{ color: '#F09ACB', textShadow: '0 0 18px rgba(244,114,182,0.45)', clipPath: fillPercent >= 100 ? 'none' : 'inset(0 ' + (100 - fillPercent).toFixed(2) + '% 0 0)' }}>{transformedText}</span>}
+                          </span>;
+                        })}
+                      </span>
+                    ) : line.text;
+
+                    return <div
+                      key={'fullscreen-section-' + sectionIndex + '-line-' + line.id}
+                      ref={active ? fullscreenActiveLyricRef : null}
+                      data-lyrics-section={sectionIndex}
+                      className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden"
+                      style={{ opacity: lineOpacity, animation: 'ykLyricsFocusIn 1000ms ease-out both', fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: active ? 700 : 500, color: active ? '#F09ACB' : '#C6B1C4' }}
+                    >
+                      <p className="w-full text-balance break-words" style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: window.matchMedia('(orientation: portrait)').matches ? 2 : 1, overflow: 'hidden' }}>{lineText}</p>
                     </div>;
                   })}
                 </div>
