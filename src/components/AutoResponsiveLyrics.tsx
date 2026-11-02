@@ -281,7 +281,10 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     const incomingFadeProgress = isElrcMode && wordProgressList.length
       ? wordProgressList.reduce((sum, progress) => sum + progress, 0) / (wordProgressList.length * 100)
       : !isElrcMode
-        ? Math.max(0, Math.min(1, (adjustedTime - (line.time - 1)) / 1))
+        // LRC's whole-line highlight completes at the line timestamp.
+        // Keep the outgoing line fully visible until then, and fade it
+        // over the following second.
+        ? Math.max(0, Math.min(1, (adjustedTime - line.time) / 1))
         : 0;
     const nextSectionRemainingSec = Math.max(0, lineSingingEndTime - adjustedTime);
 
