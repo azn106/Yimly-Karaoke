@@ -435,6 +435,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                                 animation: 'ykLyricsFocusIn 1000ms ease-out both',
                                 fontSize: 'clamp(0.72rem, 4vw, 1.15rem)',
                                 lineHeight: 1.25,
+                                opacity: 1,
                                 fontWeight: active ? 700 : 500,
                                 color: active ? '#F09ACB' : '#C6B1C4',
                                 display: '-webkit-box',
@@ -566,7 +567,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                       ref={active ? fullscreenActiveLyricRef : null}
                       data-lyrics-section={sectionIndex}
                       className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden"
-                      style={{ opacity: lineOpacity, fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: active ? 700 : 500, color: active ? '#F09ACB' : '#C6B1C4' }}
+                      style={{ opacity: active ? 1 : lineOpacity, fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: active ? 700 : 500, color: active ? '#F09ACB' : '#C6B1C4' }}
                     >
                       <p className="w-full text-balance break-words" style={{ animation: 'ykLyricsFocusIn ' + lyricEntranceFadeSec + 's ease-out both', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: window.matchMedia('(orientation: portrait)').matches ? 2 : 1, overflow: 'hidden' }}>{lineText}</p>
                     </div>;
