@@ -338,7 +338,12 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
     const isLineActiveOrPast = isLineActive || isLinePast;
     const standardLrcColor = isLineActiveOrPast ? highColor : lowColor;
-    const standardLrcOpacity = isLineActiveOrPast ? highOpacity : lowOpacity;
+    const lrcLineFadeProgress = Number.isFinite(nextLrcLineTime) && nextLrcLineTime > line.time
+      ? Math.max(0, Math.min(1, (adjustedTime - line.time) / (nextLrcLineTime - line.time)))
+      : 0;
+    const standardLrcOpacity = !isElrcMode && isLineActiveOrPast
+      ? highOpacity * (1 - lrcLineFadeProgress)
+      : isLineActiveOrPast ? highOpacity : lowOpacity;
     const standardLrcGlow = isLineActiveOrPast ? `0 0 25px ${highColor}80` : 'none';
     // LRC retains its existing previous-line dimming. eLRC opacity is
     // driven by the incoming line's word progress in the exit variant below.
