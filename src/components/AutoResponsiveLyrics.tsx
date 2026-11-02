@@ -262,13 +262,14 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
 
     // For eLRC lines, isLinePast is true only once playback time has actually passed the final word's singing end.
     // Display lead time in safeFocusIndex must not prematurely force the final word to 100% while still being sung.
+    const nextLrcLineTime = lyrics[lineIndex + 1]?.time ?? Infinity;
     const isLinePast = wordIntervals.length > 0
       ? adjustedTime >= lineSingingEndTime
-      : (lineIndex >= 0 && lineIndex < safeFocusIndex);
+      : adjustedTime >= nextLrcLineTime;
 
     const isLineActive = wordIntervals.length > 0
       ? (adjustedTime >= lineSingingStartTime && adjustedTime < lineSingingEndTime)
-      : (isHighlighted && lineIndex === safeFocusIndex);
+      : (adjustedTime >= line.time && adjustedTime < nextLrcLineTime);
 
     const wordProgressList = line.words?.length
       ? calculateWordProgress(line.words, wordIntervals, adjustedTime, isLineActive, isLinePast, isPreview)
@@ -279,7 +280,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     // the previous keyed line is exiting.
     const incomingFadeProgress = isElrcMode && wordProgressList.length
       ? wordProgressList.reduce((sum, progress) => sum + progress, 0) / (wordProgressList.length * 100)
-      : 0;
+      : !isElrcMode
+        ? Math.max(0, Math.min(1, (adjustedTime - (line.time - 1)) / 1))
+        : 0;
     const nextSectionRemainingSec = Math.max(0, lineSingingEndTime - adjustedTime);
 
     const activeTextCase = lyricsSettings.highlighted.textCase || lyricsSettings.unhighlighted.textCase;
@@ -356,9 +359,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
                 clipPath: 'inset(0 0 0 100%)',
                 // eLRC fades in lockstep with the incoming line's actual word
                 // fill. LRC keeps its existing fade-out transition.
-                opacity: isElrcMode ? highOpacity * (1 - Math.max(0, Math.min(1, latestIncomingProgress))) : 0,
+                opacity: highOpacity * (1 - Math.max(0, Math.min(1, latestIncomingProgress))),
                 transition: {
-                  opacity: isElrcMode ? { duration: 0 } : { duration: transitionDuration, ease: 'linear', delay: inDelay },
+                  opacity: { duration: 0 },
                   clipPath: {
                     duration: isElrcMode ? Math.max(transitionDuration, nextSectionRemainingSec) : transitionDuration,
                     ease: 'linear',
@@ -381,7 +384,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
           >
             {wordNodes
               ? <span className={`flex flex-wrap items-center ${rowJustify} gap-x-[0.3em] gap-y-1 w-full`} style={{ textAlign: textAlignment }}>{wordNodes}</span>
-              : <span style={{ opacity: standardLrcOpacity * (isElrcMode ? 1 : (isLinePast ? 0.25 : 1)), textShadow: standardLrcGlow }}>{applyTextCase(line.text || '♪ ♪ ♪', lyricsSettings.highlighted.textCase)}</span>}
+              : <span style={{ opacity: standardLrcOpacity, textShadow: standardLrcGlow }}>{applyTextCase(line.text || '♪ ♪ ♪', lyricsSettings.highlighted.textCase)}</span>}
           </motion.p>
         </AnimatePresence>
       </div>
