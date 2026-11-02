@@ -278,13 +278,17 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
     // Average fill of this line becomes the outgoing line's fade target when
     // this line replaces it. AnimatePresence supplies the latest value while
     // the previous keyed line is exiting.
+    const previousSectionLine = !isElrcMode && lineIndex >= sectionCount
+      ? lyrics[lineIndex - sectionCount]
+      : undefined;
+    const lrcFadeStartTime = previousSectionLine?.time ?? line.time;
+    const lrcFadeDuration = Math.max(0.001, line.time - lrcFadeStartTime);
     const incomingFadeProgress = isElrcMode && wordProgressList.length
       ? wordProgressList.reduce((sum, progress) => sum + progress, 0) / (wordProgressList.length * 100)
       : !isElrcMode
-        // LRC's whole-line highlight completes at the line timestamp.
-        // Keep the outgoing line fully visible until then, and fade it
-        // over the following second.
-        ? Math.max(0, Math.min(1, (adjustedTime - line.time) / 1))
+        // Fade the outgoing LRC line from its own highlight start until the
+        // incoming line reaches its highlight timestamp.
+        ? Math.max(0, Math.min(1, (adjustedTime - lrcFadeStartTime) / lrcFadeDuration))
         : 0;
     const nextSectionRemainingSec = Math.max(0, lineSingingEndTime - adjustedTime);
 
@@ -434,12 +438,14 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
         }}
       >
         {Array.from({ length: sectionCount }, (_, sectionIndex) => {
-          // Pre-fill each section with its first assigned line so the display
-          // never starts with empty sections while waiting for playback.
+          // A section's first LRC line must not appear until its 1-second
+          // display lead begins. eLRC keeps its existing pre-fill behavior.
+          const firstLineIsReady = lyricsFormat !== 'lrc'
+            || adjustedTime >= (lyrics[sectionIndex]?.time ?? Infinity) - 1;
           const scheduledLineIndex = safeFocusIndex >= sectionIndex
             ? safeFocusIndex - ((safeFocusIndex - sectionIndex) % sectionCount)
             : sectionIndex;
-          let currLineIndex = sectionIndex;
+          let currLineIndex = firstLineIsReady ? sectionIndex : -1;
 
           // Advance this section one line at a time, and only after the line
           // currently occupying it has completed its word highlighting.
