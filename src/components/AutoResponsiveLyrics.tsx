@@ -356,7 +356,7 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
                 clipPath: 'inset(0 0 0 100%)',
                 // eLRC fades in lockstep with the incoming line's actual word
                 // fill. LRC keeps its existing fade-out transition.
-                opacity: isElrcMode ? 1 - Math.max(0, Math.min(1, latestIncomingProgress)) : 0,
+                opacity: isElrcMode ? highOpacity * (1 - Math.max(0, Math.min(1, latestIncomingProgress))) : 0,
                 transition: {
                   opacity: isElrcMode ? { duration: 0 } : { duration: transitionDuration, ease: 'linear', delay: inDelay },
                   clipPath: {
