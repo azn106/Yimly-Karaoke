@@ -482,6 +482,10 @@ export default function RoomSession() {
           return;
         }
         if (showLibrary) {
+          const activeEl = document.activeElement as HTMLElement;
+          if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+            return; // Allow Backspace to handle text deletion
+          }
           e.preventDefault();
           setShowLibrary(false);
           safeFocus(lastFocusedElementRef.current);
@@ -2618,24 +2622,16 @@ export default function RoomSession() {
                   className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]" title="Toggle QR Code">
                   <QrCode className="w-4 h-4 text-[#F472B6]" />
                 </button>
-                {showQrPopover && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowQrPopover(false)} />
-                    <div className="absolute left-0 top-full mt-2 z-50 bg-[#12131D] border border-white/10 rounded-2xl p-4 shadow-2xl flex flex-col items-center animate-fadeIn min-w-[200px]">
-                      <img src={qrCodeDataUrl} alt="Join Room QR Code" className="w-40 h-40 object-contain" />
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-2">JOIN ROOM</span>
-                      <span className="text-xs font-mono font-black text-white tracking-widest mt-1">{session?.roomCode}</span>
-                    </div>
-                  </>
-                )}
               </div>
-              {/* Expanded QR Area to push lyrics down */}
               {showQrPopover && (
-                <div className="absolute top-full left-0 w-full bg-[#12131D] border-b border-white/10 p-6 flex flex-col items-center z-40 animate-fadeIn">
-                  <img src={qrCodeDataUrl} alt="Join Room QR Code" className="w-48 h-48 object-contain" />
-                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest mt-3">JOIN ROOM</span>
-                  <span className="text-lg font-mono font-black text-white tracking-widest mt-1">{session?.roomCode}</span>
-                </div>
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowQrPopover(false)} />
+                  <div className="fixed left-4 top-24 z-50 flex flex-col items-start animate-fadeIn">
+                    <img src={qrCodeDataUrl} alt="Join Room QR Code" className="w-32 h-32 object-contain" />
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-2">JOIN ROOM</span>
+                    <span className="text-lg font-mono font-black text-white tracking-widest mt-1">{session?.roomCode}</span>
+                  </div>
+                </>
               )}
             </>
           )}
