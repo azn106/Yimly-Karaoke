@@ -2626,9 +2626,9 @@ export default function RoomSession() {
               {showQrPopover && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowQrPopover(false)} />
-                  <div className="fixed left-4 top-24 z-50 flex flex-col items-start animate-fadeIn">
+                  <div className="fixed left-6 top-20 z-50 flex flex-col items-center animate-fadeIn text-center">
                     <img src={qrCodeDataUrl} alt="Join Room QR Code" className="w-32 h-32 object-contain" />
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-2">JOIN ROOM</span>
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-3">QUEUE A SONG</span>
                     <span className="text-lg font-mono font-black text-white tracking-widest mt-1">{session?.roomCode}</span>
                   </div>
                 </>
