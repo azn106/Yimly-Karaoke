@@ -219,6 +219,9 @@ export default function RoomSession() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const displayAudioRef = audioRef;
   const artworkImageRef = useRef<HTMLImageElement>(null);
+  const artworkGradientRef = useRef<HTMLDivElement>(null);
+  const artworkGlowTopRef = useRef<HTMLDivElement>(null);
+  const artworkGlowBottomRef = useRef<HTMLDivElement>(null);
   const artworkAnalyserRef = useRef<AnalyserNode | null>(null);
   const artworkAudioContextRef = useRef<AudioContext | null>(null);
   const artworkAudioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -2105,16 +2108,26 @@ export default function RoomSession() {
   useEffect(() => {
     const audio = audioRef.current;
     const artwork = artworkImageRef.current;
+    const gradient = artworkGradientRef.current;
+    const glowTop = artworkGlowTopRef.current;
+    const glowBottom = artworkGlowBottomRef.current;
+    let rafId = 0;
+    let smoothedEnergy = 0;
+    const startedAt = performance.now();
+
     if (!karaokeAudioActuallyPlaying || !audio || !artwork) {
       if (artwork) {
         artwork.style.transform = 'scale(1.25)';
-        artwork.style.filter = 'brightness(1) saturate(1)';
+        artwork.style.filter = 'brightness(1) saturate(1) blur(4px)';
       }
+      if (gradient) {
+        gradient.style.backgroundPosition = '50% 50%';
+        gradient.style.opacity = '1';
+      }
+      if (glowTop) glowTop.style.transform = 'translate3d(0,0,0) scale(1)';
+      if (glowBottom) glowBottom.style.transform = 'translate3d(0,0,0) scale(1)';
       return;
     }
-
-    let rafId = 0;
-    let smoothedEnergy = 0;
     try {
       let context = artworkAudioContextRef.current;
       if (!context) {
@@ -2148,8 +2161,26 @@ export default function RoomSession() {
           const scale = 1.25 + smoothedEnergy * 0.065;
           const brightness = 1 + smoothedEnergy * 0.16;
           const saturation = 1 + smoothedEnergy * 0.22;
+          const motion = (now: number) => (now - startedAt) / 1000;
+          const elapsed = motion(performance.now());
+          const driftX = 50 + Math.sin(elapsed * 0.22) * 22 + smoothedEnergy * 10;
+          const driftY = 50 + Math.cos(elapsed * 0.17) * 20 - smoothedEnergy * 8;
           artworkImageRef.current.style.transform = `scale(${scale.toFixed(3)})`;
           artworkImageRef.current.style.filter = `brightness(${brightness.toFixed(3)}) saturate(${saturation.toFixed(3)}) blur(4px)`;
+          if (gradient) {
+            gradient.style.backgroundPosition = `${driftX.toFixed(1)}% ${driftY.toFixed(1)}%`;
+            gradient.style.opacity = (0.92 + smoothedEnergy * 0.12).toFixed(3);
+          }
+          if (glowTop) {
+            const topPulse = 1 + smoothedEnergy * 0.28 + Math.sin(elapsed * 0.7) * 0.055;
+            glowTop.style.transform = `translate3d(${(Math.sin(elapsed * 0.24) * 18).toFixed(1)}px,${(Math.cos(elapsed * 0.2) * 12).toFixed(1)}px,0) scale(${topPulse.toFixed(3)})`;
+            glowTop.style.opacity = (0.65 + smoothedEnergy * 0.3).toFixed(3);
+          }
+          if (glowBottom) {
+            const bottomPulse = 1 + smoothedEnergy * 0.2 + Math.cos(elapsed * 0.58) * 0.06;
+            glowBottom.style.transform = `translate3d(${(Math.cos(elapsed * 0.19) * 16).toFixed(1)}px,${(Math.sin(elapsed * 0.23) * 14).toFixed(1)}px,0) scale(${bottomPulse.toFixed(3)})`;
+            glowBottom.style.opacity = (0.5 + smoothedEnergy * 0.28).toFixed(3);
+          }
           rafId = requestAnimationFrame(animateArtwork);
         } else if (artworkImageRef.current) {
           artworkImageRef.current.style.transform = 'scale(1.25)';
@@ -2815,13 +2846,18 @@ export default function RoomSession() {
             </div>
           ) : null}
 
-          {/* Dark Translucent Overlay & Atmospheric Gradient for Readability */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#3B1648]/45 via-[#8E285E]/35 to-[#211238]/50 backdrop-blur-[1px] z-0 pointer-events-none" />
+          {/* Living purple-pink gradient that drifts and swells with the music */}
+          <div
+            ref={artworkGradientRef}
+            className="absolute inset-0 bg-gradient-to-br from-[#3B1648]/45 via-[#8E285E]/35 to-[#211238]/50 backdrop-blur-[1px] z-0 pointer-events-none"
+            style={{ backgroundSize: '190% 190%', backgroundPosition: '50% 50%', transition: 'opacity 220ms ease-out' }}
+          />
+          {/* Keep the lower readability shade steady while the colour layer moves */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#1A0D20]/55 via-transparent to-[#1A0D20]/20 z-0 pointer-events-none" />
 
-          {/* Ambient Glow matching Homepage & Sidebar Feature Cards */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#F472B6]/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16 z-0" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#F472B6]/5 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16 z-0" />
+          {/* Ambient pink light pools drift and pulse with the beat */}
+          <div ref={artworkGlowTopRef} className="absolute top-0 right-0 w-80 h-80 bg-[#F472B6]/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16 z-0" style={{ transition: 'opacity 220ms ease-out' }} />
+          <div ref={artworkGlowBottomRef} className="absolute bottom-0 left-0 w-80 h-80 bg-[#F472B6]/5 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16 z-0" style={{ transition: 'opacity 220ms ease-out' }} />
 
           {/* Card Top Header */}
           <div className="relative z-10 flex items-center justify-between p-3.5 sm:p-4 lg:p-5 pb-0 shrink-0">
