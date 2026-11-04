@@ -1407,10 +1407,30 @@ export default function RoomSession() {
     if (!isHost || isRestartingSession) return;
     setIsRestartingSession(true);
     try {
+      if (sessionId) {
+        const token = getAuthToken();
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const endRes = await fetch(`/api/karaoke/sessions/${sessionId}/end`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!endRes.ok) {
+          throw new Error('Failed to end previous session');
+        }
+      }
+
       if (ws) {
         try {
           ws.close();
         } catch (e) {}
+        setWs(null);
       }
       if (audioRef.current) {
         try {
