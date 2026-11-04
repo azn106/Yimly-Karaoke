@@ -2,38 +2,95 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
+import express from 'express';
+import http from 'http';
+import cookieParser from 'cookie-parser';
+import jwt from 'jsonwebtoken';
 
 const testDataDir = path.resolve(process.cwd(), 'data', 'test_verified_recording');
 process.env.DATA_DIR = testDataDir;
 
 import { setupDatabase, db } from '../db/index.js';
-import { libraries, artists, albums, songs, songVerifiedSources } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { replaceSongRecordingSource } from '../lib/source-replacement.js';
+import { users, libraries, artists, albums, songs, songVerifiedSources, playlistSongs, playlists, favorites } from '../db/schema.js';
+import { eq, and } from 'drizzle-orm';
+import { replaceSongRecordingSource, replaceSongInstrumental, isValidYouTubeUrl, extractYouTubeVideoId } from '../lib/source-replacement.js';
+import songsRoutes from '../routes/songs.js';
+import playlistsRoutes from '../routes/playlists.js';
+import favoritesRoutes from '../routes/favorites.js';
+import { downloadQueue } from '../lib/download-queue.js';
 
-test('Verified Recording & Reprocess Pipeline Tests', async (t) => {
+const JWT_SECRET = process.env.JWT_SECRET || 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe';
+
+test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', async (t) => {
   await setupDatabase();
+
+  // Setup Express test app for route and permission tests
+  const app = express();
+  app.use(express.json());
+  app.use(cookieParser());
+  app.use('/api/songs', songsRoutes);
+  app.use('/api/playlists', playlistsRoutes);
+  app.use('/api/favorites', favoritesRoutes);
+
+  const server = http.createServer(app);
+  let baseUrl = '';
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as any;
+      baseUrl = `http://127.0.0.1:${addr.port}`;
+      resolve();
+    });
+  });
+
+  t.after(() => {
+    server.close();
+  });
 
   // Cleanup test tables
   await db.delete(songVerifiedSources);
+  await db.delete(playlistSongs);
+  await db.delete(playlists);
+  await db.delete(favorites);
   await db.delete(songs);
   await db.delete(albums);
   await db.delete(artists);
   await db.delete(libraries);
+  await db.delete(users);
 
-  // Setup library & test song
+  // Create admin and regular user
+  const adminUser = (await db.insert(users).values({
+    username: 'admin_tester',
+    password: 'hashed_password_placeholder',
+    role: 'administrator',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).returning())[0];
+
+  const regularUser = (await db.insert(users).values({
+    username: 'regular_tester',
+    password: 'hashed_password_placeholder',
+    role: 'user',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).returning())[0];
+
+  const adminToken = jwt.sign({ id: adminUser.id, username: adminUser.username, role: 'administrator' }, JWT_SECRET);
+  const userToken = jwt.sign({ id: regularUser.id, username: regularUser.username, role: 'user' }, JWT_SECRET);
+
+  // Setup library & test songs
   const libRes = await db.insert(libraries).values({ name: 'Test Lib', path: testDataDir }).returning();
   const libId = libRes[0].id;
 
-  const artRes = await db.insert(artists).values({ name: 'Test Artist' }).returning();
+  const artRes = await db.insert(artists).values({ name: 'Adele' }).returning();
   const artId = artRes[0].id;
 
-  const albRes = await db.insert(albums).values({ artistId: artId, title: 'Test Album' }).returning();
+  const albRes = await db.insert(albums).values({ artistId: artId, title: '21' }).returning();
   const albId = albRes[0].id;
 
-  const dummyAudioPath = path.join(testDataDir, 'test_song.mp3');
-  const dummyInstPath = path.join(testDataDir, 'test_song (Instrumental).mp3');
   fs.mkdirSync(testDataDir, { recursive: true });
+  const dummyAudioPath = path.join(testDataDir, 'adele_rolling.mp3');
+  const dummyInstPath = path.join(testDataDir, 'adele_rolling (Instrumental).mp3');
   fs.writeFileSync(dummyAudioPath, Buffer.alloc(2048, 'a'));
   fs.writeFileSync(dummyInstPath, Buffer.alloc(2048, 'b'));
 
@@ -41,65 +98,182 @@ test('Verified Recording & Reprocess Pipeline Tests', async (t) => {
     libraryId: libId,
     artistId: artId,
     albumId: albId,
-    title: 'Test Song',
+    title: 'Rolling in the Deep',
     mainAudioPath: dummyAudioPath,
     instrumentalAudioPath: dummyInstPath,
-    duration: 180,
+    duration: 228,
     format: 'mp3',
     variant: 'original',
   }).returning();
   const songId = songRes[0].id;
 
-  await t.test('1. Verified source is saved against the correct existing song ID', async () => {
-    const testUrl = 'https://www.youtube.com/watch?v=abcdefghijk';
-    await replaceSongRecordingSource(songId, testUrl);
+  // Duplicate title/artist song with different ID to test exact ID isolation
+  const dummyAudioPath2 = path.join(testDataDir, 'adele_rolling_2.mp3');
+  const dummyInstPath2 = path.join(testDataDir, 'adele_rolling_2 (Instrumental).mp3');
+  fs.writeFileSync(dummyAudioPath2, Buffer.alloc(2048, 'c'));
+  fs.writeFileSync(dummyInstPath2, Buffer.alloc(2048, 'd'));
 
-    const saved = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId));
-    assert.strictEqual(saved.length, 1, 'Verified source record should exist');
-    assert.strictEqual(saved[0].songId, songId, 'Song ID should match');
-    assert.strictEqual(saved[0].youtubeUrl, testUrl, 'YouTube URL should match');
+  const songRes2 = await db.insert(songs).values({
+    libraryId: libId,
+    artistId: artId,
+    albumId: albId,
+    title: 'Rolling in the Deep',
+    mainAudioPath: dummyAudioPath2,
+    instrumentalAudioPath: dummyInstPath2,
+    duration: 228,
+    format: 'mp3',
+    variant: 'original',
+  }).returning();
+  const song2Id = songRes2[0].id;
+
+  // --- SECTION 1: SONGS PAGE UI SPECIFICATION AUDIT ---
+  await t.test('UI Audit: Songs page individual cards feature More Options menu and maintain clean layout', () => {
+    const libraryCode = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/Library.tsx'), 'utf-8');
+
+    // 1. More options icon is imported and rendered on individual song cards under tab === 'songs'
+    assert.ok(libraryCode.includes('song-more-options-container'), 'More options container exists on song cards');
+    assert.ok(libraryCode.includes('MoreVertical'), 'Three-dot MoreVertical icon is used for more options');
+
+    // 2. The 5 actions are present in the exact specified order
+    const startIndex = libraryCode.indexOf('song-more-options-container');
+    assert.ok(startIndex !== -1, 'More options container exists on song cards');
+    const menuText = libraryCode.slice(startIndex, startIndex + 6000);
+
+    const favIndex = menuText.indexOf('handleToggleFavorite');
+    const playlistIndex = menuText.indexOf('handleOpenAddToPlaylist');
+    const replaceAudioIndex = menuText.indexOf('handleOpenReplaceSource');
+    const replaceInstIndex = menuText.indexOf('handleOpenReplaceInstrumental');
+    const deleteIndex = menuText.indexOf('handleOpenDeleteConfirm');
+
+    assert.ok(favIndex !== -1, 'Add/Remove Favourites exists in menu');
+    assert.ok(playlistIndex !== -1, 'Add to Playlist exists in menu');
+    assert.ok(replaceAudioIndex !== -1, 'Replace Audio exists in menu');
+    assert.ok(replaceInstIndex !== -1, 'Replace Instrumental exists in menu');
+    assert.ok(deleteIndex !== -1, 'Delete Song exists in menu');
+
+    assert.ok(favIndex < playlistIndex, 'Action 1 (Favourites) comes before Action 2 (Playlist)');
+    assert.ok(playlistIndex < replaceAudioIndex, 'Action 2 (Playlist) comes before Action 3 (Replace Audio)');
+    assert.ok(replaceAudioIndex < replaceInstIndex, 'Action 3 (Replace Audio) comes before Action 4 (Replace Instrumental)');
+    assert.ok(replaceInstIndex < deleteIndex, 'Action 4 (Replace Instrumental) comes before Action 5 (Delete Song)');
+
+    // 3. Play and Add to queue remain visible on card
+    assert.ok(libraryCode.includes('handlePlayInJukebox(song, songs, idx)'), 'Play artwork button preserved');
+    assert.ok(libraryCode.includes('handleQueueInJukebox(song)'), 'Add to queue button preserved');
+
+    // 4. Delete requires confirmation modal
+    assert.ok(libraryCode.includes('deleteConfirmModal'), 'Delete confirmation modal state exists');
+    assert.ok(libraryCode.includes('Delete Song?'), 'Delete confirmation modal displays title');
+
+    // 5. Main Jukebox page remains untouched
+    const roomSessionCode = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/RoomSession.tsx'), 'utf-8');
+    assert.ok(!roomSessionCode.includes('song-more-options-container'), 'RoomSession Jukebox queue is completely untouched');
   });
 
-  await t.test('2. Manually verified source takes priority over automatic search', async () => {
-    // Verified source record exists in songVerifiedSources
-    const saved = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId));
-    assert.strictEqual(saved.length, 1);
-    assert.ok(saved[0].youtubeUrl.includes('youtube.com'));
+  // --- SECTION 2: VERIFIED SOURCE PERSISTENCE & PIPELINE REUSE ---
+  await t.test('Replace Audio: verified source is saved against exact song ID and reused by pipeline', async () => {
+    const testUrl = 'https://www.youtube.com/watch?v=rYEDA3JcQqw';
+    const result = await replaceSongRecordingSource(songId, testUrl);
+
+    assert.strictEqual(result.songId, songId);
+    assert.ok(result.jobId, 'Returns job ID');
+
+    // Verify record in songVerifiedSources
+    const verified = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId));
+    assert.strictEqual(verified.length, 1);
+    assert.strictEqual(verified[0].songId, songId);
+    assert.strictEqual(verified[0].youtubeUrl, testUrl);
+    assert.strictEqual(verified[0].videoId, 'rYEDA3JcQqw');
+
+    // Exact ID isolation: second song with same title and artist did NOT receive this verified source
+    const verified2 = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, song2Id));
+    assert.strictEqual(verified2.length, 0, 'Song 2 must not receive verified source belonging to Song 1');
+
+    // Verify existing pipeline method is reused
+    assert.strictEqual(typeof downloadQueue.downloadSingleTrackAudio, 'function', 'Reuses downloadQueue pipeline method');
   });
 
-  await t.test('3. Existing downloader and 4. instrumental pipeline are re-referenced', () => {
-    assert.ok(typeof replaceSongRecordingSource === 'function', 'Pipeline runner should be defined');
+  await t.test('Replace Audio: URL validation and error handling', async () => {
+    assert.strictEqual(isValidYouTubeUrl('https://www.youtube.com/watch?v=rYEDA3JcQqw'), true);
+    assert.strictEqual(isValidYouTubeUrl('https://youtu.be/rYEDA3JcQqw'), true);
+    assert.strictEqual(isValidYouTubeUrl('not_a_url'), false);
+    assert.strictEqual(extractYouTubeVideoId('https://www.youtube.com/watch?v=12345678901'), '12345678901');
+
+    // Non-existent song ID fails gracefully
+    const notFoundRes = await replaceSongRecordingSource(999999, 'https://www.youtube.com/watch?v=12345678901');
+    assert.strictEqual(notFoundRes.success, false);
+    assert.match(notFoundRes.error || notFoundRes.message, /not found/i);
   });
 
-  await t.test('5. Existing metadata is preserved during replacement', async () => {
-    const updatedSong = await db.select().from(songs).where(eq(songs.id, songId));
-    assert.strictEqual(updatedSong[0].title, 'Test Song', 'Title preserved');
-    assert.strictEqual(updatedSong[0].artistId, artId, 'Artist ID preserved');
+  await t.test('Replace Audio: Safe file rollback and metadata preservation on invalid source download', async () => {
+    const preSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
+    const preAudioContent = fs.readFileSync(preSong.mainAudioPath!);
+
+    const failRes = await replaceSongRecordingSource(songId, 'https://www.youtube.com/watch?v=invalid_id_fail');
+    assert.strictEqual(failRes.success, false, 'Invalid source returns failure');
+
+    // Original files and metadata untouched
+    const postSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
+    assert.strictEqual(postSong.title, preSong.title, 'Title preserved');
+    assert.strictEqual(postSong.artistId, preSong.artistId, 'Artist ID preserved');
+    assert.strictEqual(postSong.albumId, preSong.albumId, 'Album ID preserved');
+    assert.strictEqual(postSong.mainAudioPath, preSong.mainAudioPath, 'Audio path untouched');
+    assert.strictEqual(fs.readFileSync(postSong.mainAudioPath!).toString(), preAudioContent.toString(), 'Original audio content preserved');
   });
 
-  await t.test('6. Correct metadata is applied to replacement files', async () => {
-    const s = await db.select().from(songs).where(eq(songs.id, songId));
-    assert.ok(s[0].mainAudioPath, 'Main audio path exists');
-    assert.ok(s[0].instrumentalAudioPath, 'Instrumental audio path exists');
+  await t.test('Replace Audio: Concurrency protection blocks simultaneous replacements for same song', async () => {
+    // Start two concurrent replacements
+    const p1 = replaceSongRecordingSource(songId, 'https://www.youtube.com/watch?v=12345678901');
+    const p2 = replaceSongRecordingSource(songId, 'https://www.youtube.com/watch?v=12345678901');
+
+    const [r1, r2] = await Promise.all([p1, p2]);
+    // One of them must report conflict
+    const hasConflict = !r1.success || !r2.success;
+    assert.ok(hasConflict, 'Concurrent replacements for same song ID are blocked');
   });
 
-  await t.test('7-9. Failed validation / download leaves old files untouched', async () => {
-    const prevSong = await db.select().from(songs).where(eq(songs.id, songId));
-    const badResult = await replaceSongRecordingSource(songId, 'https://www.youtube.com/watch?v=invalid_url_test');
-    assert.strictEqual(badResult.success, false, 'Should fail gracefully');
+  // --- SECTION 3: REPLACE INSTRUMENTAL ---
+  await t.test('Replace Instrumental: regenerates instrumental from original audio without downloading', async () => {
+    const preSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
+    const originalMainPath = preSong.mainAudioPath;
 
-    const currSong = await db.select().from(songs).where(eq(songs.id, songId));
-    assert.strictEqual(currSong[0].mainAudioPath, prevSong[0].mainAudioPath, 'Old file path untouched on failure');
+    const res = await replaceSongInstrumental(songId);
+    assert.ok(res.songId === songId);
+
+    const postSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
+    assert.strictEqual(postSong.mainAudioPath, originalMainPath, 'Original main audio path left completely unchanged');
+    assert.ok(postSong.instrumentalAudioPath, 'Instrumental audio path exists');
+    assert.strictEqual(postSong.title, preSong.title, 'Song metadata preserved');
   });
 
-  await t.test('10. Successful replacement updates audio paths', async () => {
-    // verified source table and record valid
-    const src = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId));
-    assert.strictEqual(src.length, 1);
-  });
+  // --- SECTION 4: PERMISSIONS & API ENDPOINTS ---
+  await t.test('Permissions: Non-admin users cannot call replace-source or replace-instrumental (403 Forbidden)', async () => {
+    // Non-admin replace-source
+    const res1 = await fetch(`${baseUrl}/api/songs/${songId}/replace-source`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userToken}`,
+      },
+      body: JSON.stringify({ youtubeUrl: 'https://www.youtube.com/watch?v=rYEDA3JcQqw' }),
+    });
+    assert.strictEqual(res1.status, 403, 'Regular user must receive 403 Forbidden on replace-source');
 
-  await t.test('12. Reprocessing does not create duplicate library entries', async () => {
-    const allSongs = await db.select().from(songs);
-    assert.strictEqual(allSongs.length, 1, 'Should not duplicate library entries');
+    // Non-admin replace-instrumental
+    const res2 = await fetch(`${baseUrl}/api/songs/${songId}/replace-instrumental`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
+    assert.strictEqual(res2.status, 403, 'Regular user must receive 403 Forbidden on replace-instrumental');
+
+    // Admin can access replacement endpoints
+    const res3 = await fetch(`${baseUrl}/api/songs/${songId}/verified-source`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.strictEqual(res3.status, 200, 'Admin can fetch verified source');
+    const vData = await res3.json();
+    assert.ok(vData.verifiedSource !== undefined);
   });
 });

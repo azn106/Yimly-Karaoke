@@ -244,6 +244,82 @@ export class DownloadQueueManager {
     return this.maxConcurrency;
   }
 
+  /**
+   * Reusable download pipeline method that executes an audio download using the established
+   * yt-dlp pipeline, retry loop, error sanitization, and output format detection.
+   */
+  public async downloadSingleTrackAudio(
+    targetUrl: string,
+    outputDir: string,
+    format: string = 'mp3',
+    quality: string = '320k',
+    maxAttempts: number = 3
+  ): Promise<string> {
+    const ytDlpPath = await getYtDlpPath();
+    const tempFileBase = path.join(outputDir, `audio_${Date.now()}`);
+    let downloadedAudioPath = '';
+    const possibleExtensions = ['mp3', 'm4a', 'flac', 'wav', 'opus', 'webm', 'ogg'];
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        if (!fs.existsSync(outputDir)) {
+          fs.mkdirSync(outputDir, { recursive: true });
+        }
+
+        if (isPreviewMode) {
+          const simPath = `${tempFileBase}.${format}`;
+          simulateDownload(simPath);
+          downloadedAudioPath = simPath;
+          break;
+        } else {
+          const dlArgs = [
+            '-x',
+            '--audio-format', format === 'opus' ? 'opus' : format,
+            '--audio-quality', quality === '128k' ? '5' : quality === '192k' ? '2' : '0',
+            '--no-playlist',
+            '--max-filesize', '100M',
+            '--js-runtimes', 'node',
+            '-o', `${tempFileBase}.%(ext)s`,
+            targetUrl.trim(),
+          ];
+
+          await new Promise<void>((resolve, reject) => {
+            execFile(ytDlpPath, dlArgs, { timeout: 300000 }, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+
+          for (const ext of possibleExtensions) {
+            const candidate = `${tempFileBase}.${ext}`;
+            if (fs.existsSync(candidate) && fs.statSync(candidate).size > 1024) {
+              downloadedAudioPath = candidate;
+              break;
+            }
+          }
+
+          if (downloadedAudioPath && fs.existsSync(downloadedAudioPath)) {
+            break;
+          }
+          throw new Error(`yt-dlp completed but audio file was not found for URL: ${targetUrl}`);
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Downloader Queue] Download attempt ${attempt + 1}/${maxAttempts} failed:`, err?.message || err);
+        if (attempt < maxAttempts - 1) {
+          await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+        }
+      }
+    }
+
+    if (!downloadedAudioPath || !fs.existsSync(downloadedAudioPath) || fs.statSync(downloadedAudioPath).size <= 1024) {
+      throw new Error(sanitizeErrorMessage(lastError?.message || 'Download failed after retries'));
+    }
+
+    return downloadedAudioPath;
+  }
+
   public async init() {
     if (this.initialized) return;
     this.initialized = true;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { Search, Play, Pause, Music, Disc, Mic, RefreshCw, Calendar, FileText, ChevronRight, ChevronLeft, ArrowLeft, AlertCircle, ListMusic, Trash2, Plus, Heart } from 'lucide-react';
+import { Search, Play, Pause, Music, Disc, Mic, RefreshCw, Calendar, FileText, ChevronRight, ChevronLeft, ArrowLeft, AlertCircle, ListMusic, Trash2, Plus, Heart, MoreVertical, Check, Loader2, X } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../types';
 import CreatePlaylistModal from '../components/playlist/CreatePlaylistModal';
 import EditPlaylistModal from '../components/playlist/EditPlaylistModal';
@@ -91,10 +91,13 @@ export default function Library() {
   const [isSharePlaylistOpen, setIsSharePlaylistOpen] = useState(false);
   const [isAddSongsOpen, setIsAddSongsOpen] = useState(false);
   const [activeModalPlaylist, setActiveModalPlaylist] = useState<Playlist | null>(null);
+  const [openMenuSongId, setOpenMenuSongId] = useState<number | null>(null);
+
   const [replaceSourceModal, setReplaceSourceModal] = useState<{
     isOpen: boolean;
     songId: number | null;
     songTitle: string;
+    songArtist: string;
     youtubeUrl: string;
     loading: boolean;
     error: string | null;
@@ -103,10 +106,53 @@ export default function Library() {
     isOpen: false,
     songId: null,
     songTitle: '',
+    songArtist: '',
     youtubeUrl: '',
     loading: false,
     error: null,
     successMsg: null,
+  });
+
+  const [replaceInstrumentalModal, setReplaceInstrumentalModal] = useState<{
+    isOpen: boolean;
+    songId: number | null;
+    songTitle: string;
+    songArtist: string;
+    loading: boolean;
+    error: string | null;
+    successMsg: string | null;
+  }>({
+    isOpen: false,
+    songId: null,
+    songTitle: '',
+    songArtist: '',
+    loading: false,
+    error: null,
+    successMsg: null,
+  });
+
+  const [addToPlaylistModal, setAddToPlaylistModal] = useState<{
+    isOpen: boolean;
+    song: any | null;
+    addingToId: number | null;
+    successPlaylistId: number | null;
+    error: string | null;
+  }>({
+    isOpen: false,
+    song: null,
+    addingToId: null,
+    successPlaylistId: null,
+    error: null,
+  });
+
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    isOpen: boolean;
+    song: any | null;
+    deleting: boolean;
+  }>({
+    isOpen: false,
+    song: null,
+    deleting: false,
   });
 
   const [scanning, setScanning] = useState(false);
@@ -244,6 +290,7 @@ export default function Library() {
       isOpen: true,
       songId: song.id,
       songTitle: song.title,
+      songArtist: song.artist || 'Unknown Artist',
       youtubeUrl: existingUrl,
       loading: false,
       error: null,
@@ -278,6 +325,130 @@ export default function Library() {
         loading: false,
         error: err.message || 'Failed to replace recording source',
       }));
+    }
+  };
+
+  const handleOpenReplaceInstrumental = (song: any) => {
+    setReplaceInstrumentalModal({
+      isOpen: true,
+      songId: song.id,
+      songTitle: song.title,
+      songArtist: song.artist || 'Unknown Artist',
+      loading: false,
+      error: null,
+      successMsg: null,
+    });
+  };
+
+  const handleExecuteReplaceInstrumental = async () => {
+    if (!replaceInstrumentalModal.songId) return;
+    setReplaceInstrumentalModal(prev => ({ ...prev, loading: true, error: null, successMsg: null }));
+
+    try {
+      const res = await fetch(`/api/songs/${replaceInstrumentalModal.songId}/replace-instrumental`, {
+        method: 'POST',
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || data.details || 'Failed to regenerate instrumental');
+      }
+
+      setReplaceInstrumentalModal(prev => ({
+        ...prev,
+        loading: false,
+        successMsg: 'Instrumental regenerated and replaced successfully!',
+      }));
+    } catch (err: any) {
+      setReplaceInstrumentalModal(prev => ({
+        ...prev,
+        loading: false,
+        error: err.message || 'Failed to regenerate instrumental',
+      }));
+    }
+  };
+
+  const handleOpenAddToPlaylist = (song: any) => {
+    setAddToPlaylistModal({
+      isOpen: true,
+      song,
+      addingToId: null,
+      successPlaylistId: null,
+      error: null,
+    });
+  };
+
+  const handleAddSongToSpecificPlaylist = async (playlistId: number) => {
+    if (!addToPlaylistModal.song || addToPlaylistModal.addingToId) return;
+    setAddToPlaylistModal(prev => ({ ...prev, addingToId: playlistId, error: null }));
+
+    try {
+      const res = await fetch(`/api/playlists/${playlistId}/songs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ songId: addToPlaylistModal.song.id }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Failed to add song' }));
+        throw new Error(data.error || 'Failed to add song to playlist');
+      }
+
+      setPlaylists(prev => prev.map(p => p.id === playlistId ? { ...p, songCount: (p.songCount || 0) + 1 } : p));
+      setAddToPlaylistModal(prev => ({
+        ...prev,
+        addingToId: null,
+        successPlaylistId: playlistId,
+      }));
+
+      setTimeout(() => {
+        setAddToPlaylistModal({ isOpen: false, song: null, addingToId: null, successPlaylistId: null, error: null });
+      }, 1200);
+    } catch (e: any) {
+      setAddToPlaylistModal(prev => ({
+        ...prev,
+        addingToId: null,
+        error: e.message || 'Failed to add song to playlist',
+      }));
+    }
+  };
+
+  const handleOpenDeleteConfirm = (song: any) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      song,
+      deleting: false,
+    });
+  };
+
+  const handleConfirmDeleteSong = async () => {
+    const song = deleteConfirmModal.song;
+    if (!song || deleteConfirmModal.deleting) return;
+
+    setDeleteConfirmModal(prev => ({ ...prev, deleting: true }));
+
+    try {
+      const res = await fetch(`/api/songs/${song.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          throw new Error('You do not have permission to delete this song.');
+        }
+        throw new Error(data.error || 'Failed to delete song');
+      }
+
+      setSongs(prev => prev.filter(s => s.id !== song.id));
+      setSearchResults(prev => prev.filter(item => !(item.type === 'song' && item.id === song.id)));
+      setSelectedArtist(prev => prev?.songs ? { ...prev, songs: prev.songs.filter((s: any) => s.id !== song.id) } : prev);
+      setSelectedAlbum(prev => prev?.songs ? { ...prev, songs: prev.songs.filter((s: any) => s.id !== song.id) } : prev);
+      setStats(prev => ({ ...prev, songs: Math.max(0, prev.songs - 1) }));
+      setQueuedSongId(prev => (prev === song.id ? null : prev));
+      setDeleteConfirmModal({ isOpen: false, song: null, deleting: false });
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete song');
+      setDeleteConfirmModal(prev => ({ ...prev, deleting: false }));
     }
   };
 
@@ -2304,15 +2475,99 @@ export default function Library() {
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteSong(song)}
-                      className="shrink-0 rounded-full p-2 text-zinc-500 transition-colors hover:text-red-400 focus-visible:text-red-400"
-                      title="Delete song from library"
-                      aria-label={`Delete ${song.title} from library`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {/* More Options Menu */}
+                    <div className="relative shrink-0 song-more-options-container">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuSongId(prev => prev === song.id ? null : song.id);
+                        }}
+                        className={`shrink-0 rounded-full p-2 transition-colors ${
+                          openMenuSongId === song.id
+                            ? 'bg-white/15 text-[#F472B6]'
+                            : 'text-zinc-400 hover:bg-white/10 hover:text-white focus-visible:text-white'
+                        }`}
+                        title="More options"
+                        aria-label={`More options for ${song.title}`}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+
+                      {openMenuSongId === song.id && (
+                        <div
+                          className="absolute right-0 top-full mt-1.5 z-50 w-52 rounded-xl border border-white/10 bg-[#171926] p-1.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* 1. Add to Favourites / Remove from Favourites */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleToggleFavorite(song.id);
+                              setOpenMenuSongId(null);
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"
+                          >
+                            <Heart className={`h-4 w-4 ${favoriteIds.has(song.id) ? 'fill-[#F472B6] text-[#F472B6]' : 'text-zinc-400'}`} />
+                            <span>{favoriteIds.has(song.id) ? 'Remove from Favourites' : 'Add to Favourites'}</span>
+                          </button>
+
+                          {/* 2. Add to Playlist */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleOpenAddToPlaylist(song);
+                              setOpenMenuSongId(null);
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"
+                          >
+                            <ListMusic className="h-4 w-4 text-zinc-400" />
+                            <span>Add to Playlist</span>
+                          </button>
+
+                          {/* 3. Replace Audio */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleOpenReplaceSource(song);
+                              setOpenMenuSongId(null);
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"
+                          >
+                            <RefreshCw className="h-4 w-4 text-zinc-400" />
+                            <span>Replace Audio</span>
+                          </button>
+
+                          {/* 4. Replace Instrumental */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleOpenReplaceInstrumental(song);
+                              setOpenMenuSongId(null);
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"
+                          >
+                            <Mic className="h-4 w-4 text-zinc-400" />
+                            <span>Replace Instrumental</span>
+                          </button>
+
+                          <div className="my-1 border-t border-white/5" />
+
+                          {/* 5. Delete Song */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleOpenDeleteConfirm(song);
+                              setOpenMenuSongId(null);
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-400" />
+                            <span>Delete Song</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -2402,6 +2657,295 @@ export default function Library() {
         onClose={() => setEditorState(prev => ({ ...prev, isOpen: false }))}
         onSave={handleLyricsUpdated}
       />
+
+      {/* Replace Audio Modal */}
+      {replaceSourceModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div 
+            className="w-full max-w-lg bg-[#141622] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-white tracking-tight">Replace Audio</h2>
+                <p className="text-xs text-zinc-400 mt-0.5 truncate max-w-sm">
+                  {replaceSourceModal.songTitle} {replaceSourceModal.songArtist ? `• ${replaceSourceModal.songArtist}` : ''}
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setReplaceSourceModal(prev => ({ ...prev, isOpen: false, error: null, successMsg: null }))}
+                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Provide the YouTube URL of the official recording. Yimly will download the replacement, regenerate the instrumental track, and update files safely while preserving all existing song metadata, playlist links, and favourites.
+              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                  YouTube Recording URL
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={replaceSourceModal.youtubeUrl}
+                  onChange={(e) => setReplaceSourceModal(prev => ({ ...prev, youtubeUrl: e.target.value, error: null }))}
+                  className="w-full px-3.5 py-2.5 bg-[#0D0E15] border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all"
+                  disabled={replaceSourceModal.loading}
+                  autoFocus
+                />
+              </div>
+
+              {replaceSourceModal.error && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-xs text-red-400">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{replaceSourceModal.error}</span>
+                </div>
+              )}
+
+              {replaceSourceModal.successMsg && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start gap-2 text-xs text-emerald-400">
+                  <Check className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{replaceSourceModal.successMsg}</span>
+                </div>
+              )}
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReplaceSourceModal(prev => ({ ...prev, isOpen: false, error: null, successMsg: null }))}
+                  disabled={replaceSourceModal.loading}
+                  className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteReplaceSource}
+                  disabled={replaceSourceModal.loading || !replaceSourceModal.youtubeUrl.trim()}
+                  className="px-4 py-2 bg-[#F472B6] hover:bg-[#DB2777] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-[#F472B6]/25 cursor-pointer"
+                >
+                  {replaceSourceModal.loading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Replacing Audio…</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Replace Audio</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Replace Instrumental Modal */}
+      {replaceInstrumentalModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div 
+            className="w-full max-w-lg bg-[#141622] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-white tracking-tight">Replace Instrumental</h2>
+                <p className="text-xs text-zinc-400 mt-0.5 truncate max-w-sm">
+                  {replaceInstrumentalModal.songTitle} {replaceInstrumentalModal.songArtist ? `• ${replaceInstrumentalModal.songArtist}` : ''}
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setReplaceInstrumentalModal(prev => ({ ...prev, isOpen: false, error: null, successMsg: null }))}
+                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                This will regenerate the instrumental track from the existing original audio file using vocal separation. The original audio, song metadata, lyrics, and playlists will remain completely unchanged.
+              </p>
+
+              {replaceInstrumentalModal.error && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-xs text-red-400">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{replaceInstrumentalModal.error}</span>
+                </div>
+              )}
+
+              {replaceInstrumentalModal.successMsg && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start gap-2 text-xs text-emerald-400">
+                  <Check className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{replaceInstrumentalModal.successMsg}</span>
+                </div>
+              )}
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReplaceInstrumentalModal(prev => ({ ...prev, isOpen: false, error: null, successMsg: null }))}
+                  disabled={replaceInstrumentalModal.loading}
+                  className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteReplaceInstrumental}
+                  disabled={replaceInstrumentalModal.loading}
+                  className="px-4 py-2 bg-[#F472B6] hover:bg-[#DB2777] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-[#F472B6]/25 cursor-pointer"
+                >
+                  {replaceInstrumentalModal.loading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Regenerating…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-3.5 h-3.5" />
+                      <span>Regenerate Instrumental</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add To Playlist Modal */}
+      {addToPlaylistModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div 
+            className="w-full max-w-md bg-[#141622] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-white tracking-tight">Add to Playlist</h2>
+                <p className="text-xs text-zinc-400 mt-0.5 truncate max-w-xs">
+                  {addToPlaylistModal.song?.title}
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setAddToPlaylistModal({ isOpen: false, song: null, addingToId: null, successPlaylistId: null, error: null })}
+                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto divide-y divide-white/5 space-y-1">
+              {addToPlaylistModal.error && (
+                <div className="p-3 mb-2 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-xs text-red-400">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{addToPlaylistModal.error}</span>
+                </div>
+              )}
+
+              {playlists.length === 0 ? (
+                <div className="py-8 text-center text-xs text-zinc-400">
+                  No playlists found. Create a playlist first in the Playlists tab.
+                </div>
+              ) : (
+                playlists.map((pl) => {
+                  const isAdding = addToPlaylistModal.addingToId === pl.id;
+                  const isDone = addToPlaylistModal.successPlaylistId === pl.id;
+
+                  return (
+                    <button
+                      key={pl.id}
+                      type="button"
+                      onClick={() => handleAddSongToSpecificPlaylist(pl.id)}
+                      disabled={isAdding || isDone}
+                      className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors text-left cursor-pointer group"
+                    >
+                      <div className="min-w-0 pr-3">
+                        <p className="text-xs font-semibold text-white truncate group-hover:text-[#F472B6] transition-colors">{pl.name}</p>
+                        <p className="text-[10px] text-zinc-400">{pl.songCount || 0} songs</p>
+                      </div>
+                      <div className="shrink-0">
+                        {isDone ? (
+                          <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+                            <Check className="w-3.5 h-3.5" /> Added
+                          </span>
+                        ) : isAdding ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-[#F472B6]" />
+                        ) : (
+                          <Plus className="w-4 h-4 text-zinc-400 group-hover:text-white" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Song Confirmation Modal */}
+      {deleteConfirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div 
+            className="w-full max-w-sm bg-[#141622] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto border border-red-500/20">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h2 className="text-base font-bold text-white tracking-tight">Delete Song?</h2>
+              <p className="text-xs text-zinc-300">
+                Are you sure you want to delete <span className="font-semibold text-white">"{deleteConfirmModal.song?.title}"</span>?
+              </p>
+              <p className="text-[11px] text-zinc-400">
+                This will permanently remove the song audio, instrumental files, lyrics, and any playlist links. This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-white/[0.02] border-t border-white/5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmModal({ isOpen: false, song: null, deleting: false })}
+                disabled={deleteConfirmModal.deleting}
+                className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteSong}
+                disabled={deleteConfirmModal.deleting}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-red-600/20 cursor-pointer"
+              >
+                {deleteConfirmModal.deleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting…</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

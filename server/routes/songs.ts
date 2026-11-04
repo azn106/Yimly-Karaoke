@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { songs, artists, albums, lyrics, songArtists, playlistSongs, favorites, queueItems, sessions, songVerifiedSources } from '../db/schema.js';
 import { eq, like, or, inArray, asc, desc, and, sql } from 'drizzle-orm';
 import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
-import { replaceSongRecordingSource } from '../lib/source-replacement.js';
+import { replaceSongRecordingSource, replaceSongInstrumental, getReplacementJob, getActiveSongReplacement } from '../lib/source-replacement.js';
 import { formatArtistDisplay, cleanupOrphanedRecords } from '../lib/artist-utils.js';
 import { broadcastSongOffsetToRooms } from '../ws/index.js';
 import { isLrcContentValid } from '../lib/lyrics.js';
@@ -1070,7 +1070,7 @@ router.delete('/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-router.post('/:id/replace-source', requireAuth, async (req, res) => {
+router.post('/:id/replace-source', requireAdmin, async (req, res) => {
   try {
     const songId = parseInt(req.params.id, 10);
     if (isNaN(songId)) return res.status(400).json({ error: 'Invalid song ID' });
@@ -1093,6 +1093,23 @@ router.post('/:id/replace-source', requireAuth, async (req, res) => {
   }
 });
 
+router.post('/:id/replace-instrumental', requireAdmin, async (req, res) => {
+  try {
+    const songId = parseInt(req.params.id, 10);
+    if (isNaN(songId)) return res.status(400).json({ error: 'Invalid song ID' });
+
+    const result = await replaceSongInstrumental(songId);
+    if (!result.success) {
+      return res.status(400).json({ error: result.message, details: result.error });
+    }
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Replace instrumental error:', err);
+    res.status(500).json({ error: err.message || 'Failed to replace instrumental' });
+  }
+});
+
 router.get('/:id/verified-source', requireAuth, async (req, res) => {
   try {
     const songId = parseInt(req.params.id, 10);
@@ -1106,6 +1123,33 @@ router.get('/:id/verified-source', requireAuth, async (req, res) => {
     res.json({ verifiedSource: source[0] });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to fetch verified source' });
+  }
+});
+
+router.get('/:id/replace-status', requireAuth, async (req, res) => {
+  try {
+    const songId = parseInt(req.params.id, 10);
+    if (isNaN(songId)) return res.status(400).json({ error: 'Invalid song ID' });
+
+    const activeJob = getActiveSongReplacement(songId);
+    res.json({
+      active: !!activeJob,
+      job: activeJob || null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch replacement status' });
+  }
+});
+
+router.get('/replace-jobs/:jobId', requireAuth, async (req, res) => {
+  try {
+    const job = getReplacementJob(req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ error: 'Replacement job not found' });
+    }
+    res.json(job);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch job' });
   }
 });
 
