@@ -2740,7 +2740,7 @@ export default function RoomSession() {
               <img
                 src={`/api/songs/${currentSong.songId}/artwork`}
                 alt=""
-                className="w-full h-full object-cover scale-125 blur-[8px] opacity-100 transition-all duration-700 select-none motion-safe:animate-fade-in"
+                className="w-full h-full object-cover scale-125 blur-[4px] opacity-100 transition-all duration-700 select-none motion-safe:animate-fade-in"
                 onError={() => setArtworkFailed(true)}
               />
             </div>
