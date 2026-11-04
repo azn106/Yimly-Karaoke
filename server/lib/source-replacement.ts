@@ -47,6 +47,27 @@ export function getActiveSongReplacement(songId: number): ReplacementProgress | 
   return undefined;
 }
 
+/**
+ * Return the newest replacement for a song, optionally limited to jobs
+ * started at or after the caller's request timestamp. This lets clients
+ * recover a completed job after a reverse-proxy timeout without mistaking
+ * an older completed job for the replacement they just requested.
+ */
+export function getLatestSongReplacement(
+  songId: number,
+  since?: number
+): ReplacementProgress | undefined {
+  let latest: ReplacementProgress | undefined;
+  for (const job of replacementJobs.values()) {
+    if (job.songId !== songId) continue;
+    if (since !== undefined && job.startedAt.getTime() < since) continue;
+    if (!latest || job.startedAt.getTime() > latest.startedAt.getTime()) {
+      latest = job;
+    }
+  }
+  return latest;
+}
+
 export function extractYouTubeVideoId(url: string): string | null {
   if (!url || typeof url !== 'string') return null;
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
