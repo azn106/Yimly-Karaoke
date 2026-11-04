@@ -1140,9 +1140,13 @@ router.get('/:id/replace-status', requireAuth, async (req, res) => {
       ? requestedSince - 5000
       : undefined;
     const activeJob = getActiveSongReplacement(songId);
-    const latestJob = activeJob || getLatestSongReplacement(songId, since);
+    const matchingActiveJob = activeJob &&
+      (since === undefined || activeJob.startedAt.getTime() >= since)
+      ? activeJob
+      : undefined;
+    const latestJob = matchingActiveJob || getLatestSongReplacement(songId, since);
     res.json({
-      active: !!activeJob,
+      active: !!matchingActiveJob,
       job: latestJob || null,
     });
   } catch (err: any) {
