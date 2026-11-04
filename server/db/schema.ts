@@ -203,3 +203,16 @@ export const downloadTrackJobs = sqliteTable('download_track_jobs', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
+export const songVerifiedSources = sqliteTable('song_verified_sources', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  songId: integer('song_id').references(() => songs.id, { onDelete: 'cascade' }).notNull().unique(),
+  youtubeUrl: text('youtube_url').notNull(),
+  videoId: text('video_id'),
+  sourceTitle: text('source_title'),
+  sourceArtist: text('source_artist'),
+  verified: integer('verified').notNull().default(1),
+  verifiedAt: integer('verified_at', { mode: 'timestamp' }).notNull(),
+  processedAt: integer('processed_at', { mode: 'timestamp' }),
+});
+
+

@@ -506,6 +506,27 @@ export async function setupDatabase(migrationsFolderOverride?: string) {
     console.error('Failed to create download jobs tables:', e);
   }
 
+  // Ensure song_verified_sources table exists
+  try {
+    await sqlite.execute(`
+      CREATE TABLE IF NOT EXISTS song_verified_sources (
+        id integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+        song_id integer NOT NULL UNIQUE,
+        youtube_url text NOT NULL,
+        video_id text,
+        source_title text,
+        source_artist text,
+        verified integer DEFAULT 1 NOT NULL,
+        verified_at integer NOT NULL,
+        processed_at integer,
+        FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE
+      );
+    `);
+    await sqlite.execute('CREATE INDEX IF NOT EXISTS song_verified_sources_song_id_idx ON song_verified_sources (song_id);');
+  } catch (e) {
+    console.error('Failed to create song_verified_sources table:', e);
+  }
+
   // Ensure cover_path, source_type, source_id columns exist in playlists table and playlist_id in download_jobs
   try {
     await sqlite.execute('ALTER TABLE playlists ADD COLUMN cover_path text;');

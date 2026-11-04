@@ -1,8 +1,9 @@
 import express, { Router } from 'express';
 import { db } from '../db/index.js';
-import { songs, artists, albums, lyrics, songArtists, playlistSongs, favorites, queueItems, sessions } from '../db/schema.js';
+import { songs, artists, albums, lyrics, songArtists, playlistSongs, favorites, queueItems, sessions, songVerifiedSources } from '../db/schema.js';
 import { eq, like, or, inArray, asc, desc, and, sql } from 'drizzle-orm';
 import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
+import { replaceSongRecordingSource } from '../lib/source-replacement.js';
 import { formatArtistDisplay, cleanupOrphanedRecords } from '../lib/artist-utils.js';
 import { broadcastSongOffsetToRooms } from '../ws/index.js';
 import { isLrcContentValid } from '../lib/lyrics.js';
@@ -1066,6 +1067,45 @@ router.delete('/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
   } catch (error) {
     console.error('Failed to delete song completely:', error);
     res.status(500).json({ error: 'Failed to delete song' });
+  }
+});
+
+router.post('/:id/replace-source', requireAuth, async (req, res) => {
+  try {
+    const songId = parseInt(req.params.id, 10);
+    if (isNaN(songId)) return res.status(400).json({ error: 'Invalid song ID' });
+
+    const { youtubeUrl, sourceUrl } = req.body;
+    const urlToUse = youtubeUrl || sourceUrl;
+    if (!urlToUse || typeof urlToUse !== 'string') {
+      return res.status(400).json({ error: 'YouTube URL is required' });
+    }
+
+    const result = await replaceSongRecordingSource(songId, urlToUse);
+    if (!result.success) {
+      return res.status(400).json({ error: result.message, details: result.error });
+    }
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Replace source error:', err);
+    res.status(500).json({ error: err.message || 'Failed to replace recording source' });
+  }
+});
+
+router.get('/:id/verified-source', requireAuth, async (req, res) => {
+  try {
+    const songId = parseInt(req.params.id, 10);
+    if (isNaN(songId)) return res.status(400).json({ error: 'Invalid song ID' });
+
+    const source = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId)).limit(1);
+    if (source.length === 0) {
+      return res.json({ verifiedSource: null });
+    }
+
+    res.json({ verifiedSource: source[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch verified source' });
   }
 });
 

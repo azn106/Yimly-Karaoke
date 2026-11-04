@@ -91,6 +91,23 @@ export default function Library() {
   const [isSharePlaylistOpen, setIsSharePlaylistOpen] = useState(false);
   const [isAddSongsOpen, setIsAddSongsOpen] = useState(false);
   const [activeModalPlaylist, setActiveModalPlaylist] = useState<Playlist | null>(null);
+  const [replaceSourceModal, setReplaceSourceModal] = useState<{
+    isOpen: boolean;
+    songId: number | null;
+    songTitle: string;
+    youtubeUrl: string;
+    loading: boolean;
+    error: string | null;
+    successMsg: string | null;
+  }>({
+    isOpen: false,
+    songId: null,
+    songTitle: '',
+    youtubeUrl: '',
+    loading: false,
+    error: null,
+    successMsg: null,
+  });
 
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -209,6 +226,59 @@ export default function Library() {
       artworkPath: song.artworkPath,
       variant: song.variant,
     });
+  };
+
+  const handleOpenReplaceSource = async (song: any) => {
+    let existingUrl = '';
+    try {
+      const res = await fetch(`/api/songs/${song.id}/verified-source`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.verifiedSource?.youtubeUrl) {
+          existingUrl = data.verifiedSource.youtubeUrl;
+        }
+      }
+    } catch {}
+
+    setReplaceSourceModal({
+      isOpen: true,
+      songId: song.id,
+      songTitle: song.title,
+      youtubeUrl: existingUrl,
+      loading: false,
+      error: null,
+      successMsg: null,
+    });
+  };
+
+  const handleExecuteReplaceSource = async () => {
+    if (!replaceSourceModal.songId || !replaceSourceModal.youtubeUrl.trim()) return;
+    setReplaceSourceModal(prev => ({ ...prev, loading: true, error: null, successMsg: null }));
+
+    try {
+      const res = await fetch(`/api/songs/${replaceSourceModal.songId}/replace-source`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ youtubeUrl: replaceSourceModal.youtubeUrl.trim() }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || data.details || 'Failed to replace recording source');
+      }
+
+      setReplaceSourceModal(prev => ({
+        ...prev,
+        loading: false,
+        successMsg: 'Recording replaced and audio reprocessed successfully!',
+      }));
+    } catch (err: any) {
+      setReplaceSourceModal(prev => ({
+        ...prev,
+        loading: false,
+        error: err.message || 'Failed to replace recording source',
+      }));
+    }
   };
 
   const handlePlayPlaylistInJukebox = async (playlist: Playlist) => {

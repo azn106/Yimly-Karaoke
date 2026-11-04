@@ -4,7 +4,7 @@ import { promisify } from 'util';
 import { execFile, exec, ChildProcess } from 'child_process';
 import NodeID3 from 'node-id3';
 import { db } from '../db/index.js';
-import { downloadJobs, downloadTrackJobs, libraries, queueItems, playlists, playlistSongs, songs } from '../db/schema.js';
+import { downloadJobs, downloadTrackJobs, libraries, queueItems, playlists, playlistSongs, songs, songVerifiedSources, artists } from '../db/schema.js';
 import { eq, and, asc, inArray, sql, ne } from 'drizzle-orm';
 import { scanLibrary } from './scanner.js';
 import { fetchLyrics, saveLrcSidecar, stripLrcTimestamps } from './lyrics.js';
@@ -812,25 +812,46 @@ export class DownloadQueueManager {
 
         if (!isAlreadyYouTube) {
           try {
-            const ytMatch = await matchSpotifyTrackToYouTube({
-              title: track.title,
-              artist: track.artist,
-              album: track.album,
-              duration: track.duration || undefined,
-              releaseYear: track.releaseYear,
-            });
+            const verifiedMatch = await db.select({
+              youtubeUrl: songVerifiedSources.youtubeUrl
+            })
+            .from(songVerifiedSources)
+            .innerJoin(songs, eq(songVerifiedSources.songId, songs.id))
+            .innerJoin(artists, eq(songs.artistId, artists.id))
+            .where(and(
+              eq(songs.title, track.title),
+              eq(artists.name, track.artist)
+            ))
+            .limit(1);
 
-            if (ytMatch && ytMatch.candidate?.url && ytMatch.score >= 40) {
-              targetDownloadUrl = ytMatch.candidate.url;
+            if (verifiedMatch.length > 0 && verifiedMatch[0].youtubeUrl) {
+              targetDownloadUrl = verifiedMatch[0].youtubeUrl;
               track.sourceUrl = targetDownloadUrl;
-              // Persist resolved YouTube URL to database
               await db.update(downloadTrackJobs)
                 .set({ sourceUrl: targetDownloadUrl, updatedAt: new Date() })
                 .where(eq(downloadTrackJobs.id, track.id));
-
-              console.log(`[Downloader Queue] Matched "${track.title}" -> ${targetDownloadUrl} (Spotify: ${track.duration || '?'}s, YT: ${ytMatch.candidate.duration}s, Diff: ${ytMatch.durationDiff}s, Score: ${ytMatch.score})`);
+              console.log(`[Downloader Queue] Using manually verified source for "${track.title}" by "${track.artist}" -> ${targetDownloadUrl}`);
             } else {
-              console.warn(`[Downloader Queue] No credible YouTube Music match found for "${track.title}" by "${track.artist}" (score too low or rejected)`);
+              const ytMatch = await matchSpotifyTrackToYouTube({
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+                duration: track.duration || undefined,
+                releaseYear: track.releaseYear,
+              });
+
+              if (ytMatch && ytMatch.candidate?.url && ytMatch.score >= 40) {
+                targetDownloadUrl = ytMatch.candidate.url;
+                track.sourceUrl = targetDownloadUrl;
+                // Persist resolved YouTube URL to database
+                await db.update(downloadTrackJobs)
+                  .set({ sourceUrl: targetDownloadUrl, updatedAt: new Date() })
+                  .where(eq(downloadTrackJobs.id, track.id));
+
+                console.log(`[Downloader Queue] Matched "${track.title}" -> ${targetDownloadUrl} (Spotify: ${track.duration || '?'}s, YT: ${ytMatch.candidate.duration}s, Diff: ${ytMatch.durationDiff}s, Score: ${ytMatch.score})`);
+              } else {
+                console.warn(`[Downloader Queue] No credible YouTube Music match found for "${track.title}" by "${track.artist}" (score too low or rejected)`);
+              }
             }
           } catch (matchErr: any) {
             console.warn(`[Downloader Queue] Matching error for "${track.title}":`, matchErr?.message || matchErr);
