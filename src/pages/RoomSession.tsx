@@ -2880,7 +2880,7 @@ export default function RoomSession() {
           {/* Living purple-pink gradient that drifts and swells with the music */}
           <div
             ref={artworkGradientRef}
-            className="absolute inset-0 bg-gradient-to-br from-[#3B1648]/65 via-[#8E285E]/55 to-[#211238]/70 backdrop-blur-[1px] z-0 pointer-events-none"
+            className="absolute inset-0 bg-gradient-to-br from-[#351044]/85 via-[#761B4F]/80 to-[#160B2B]/90 backdrop-blur-[1px] z-0 pointer-events-none"
             style={{ backgroundSize: '190% 190%', backgroundPosition: '50% 50%', transition: 'opacity 220ms ease-out' }}
           />
           {/* Keep the lower readability shade steady while the colour layer moves */}
