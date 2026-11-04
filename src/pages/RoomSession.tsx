@@ -218,6 +218,10 @@ export default function RoomSession() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const displayAudioRef = audioRef;
+  const artworkImageRef = useRef<HTMLImageElement>(null);
+  const artworkAnalyserRef = useRef<AnalyserNode | null>(null);
+  const artworkAudioContextRef = useRef<AudioContext | null>(null);
+  const artworkAudioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const restorePositionRef = useRef<{ time: number, playing: boolean } | null>(null);
 
   // Background Music State & Controller (Host Only)
@@ -2097,6 +2101,69 @@ export default function RoomSession() {
     if (activeBgm && isHost && !isKaraokeActive && bgmSettings.enabled) safePlayBgm(activeBgm);
   };
 
+  // Let the cover artwork breathe in response to the actual music energy.
+  useEffect(() => {
+    const audio = audioRef.current;
+    const artwork = artworkImageRef.current;
+    if (!karaokeAudioActuallyPlaying || !audio || !artwork) {
+      if (artwork) {
+        artwork.style.transform = 'scale(1.25)';
+        artwork.style.filter = 'brightness(1) saturate(1)';
+      }
+      return;
+    }
+
+    let rafId = 0;
+    let smoothedEnergy = 0;
+    try {
+      let context = artworkAudioContextRef.current;
+      if (!context) {
+        const AudioContextConstructor = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContextConstructor) return;
+        context = new AudioContextConstructor();
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.78;
+        const source = context.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(context.destination);
+        artworkAudioContextRef.current = context;
+        artworkAnalyserRef.current = analyser;
+        artworkAudioSourceRef.current = source;
+      }
+
+      if (context.state === 'suspended') void context.resume();
+      const analyser = artworkAnalyserRef.current;
+      if (!analyser) return;
+      const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+      const animateArtwork = () => {
+        if (!audio.paused && artworkImageRef.current) {
+          analyser.getByteFrequencyData(frequencyData);
+          let total = 0;
+          // Weight the low and mid frequencies so the artwork follows the beat and body of the song.
+          const binsToRead = Math.min(36, frequencyData.length);
+          for (let i = 0; i < binsToRead; i++) total += frequencyData[i];
+          const energy = Math.min(1, (total / binsToRead / 255) * 2.2);
+          smoothedEnergy += (energy - smoothedEnergy) * (energy > smoothedEnergy ? 0.22 : 0.08);
+          const scale = 1.25 + smoothedEnergy * 0.065;
+          const brightness = 1 + smoothedEnergy * 0.16;
+          const saturation = 1 + smoothedEnergy * 0.22;
+          artworkImageRef.current.style.transform = `scale(${scale.toFixed(3)})`;
+          artworkImageRef.current.style.filter = `brightness(${brightness.toFixed(3)}) saturate(${saturation.toFixed(3)}) blur(4px)`;
+          rafId = requestAnimationFrame(animateArtwork);
+        } else if (artworkImageRef.current) {
+          artworkImageRef.current.style.transform = 'scale(1.25)';
+          artworkImageRef.current.style.filter = 'brightness(1) saturate(1) blur(4px)';
+        }
+      };
+      rafId = requestAnimationFrame(animateArtwork);
+    } catch (error) {
+      console.warn('[Artwork] Audio-reactive background unavailable:', error);
+    }
+
+    return () => cancelAnimationFrame(rafId);
+  }, [karaokeAudioActuallyPlaying, currentSong?.songId]);
+
   // High-frequency smooth animation loop for lyric sweep and position
   useEffect(() => {
     if (!playing) return;
@@ -2738,9 +2805,11 @@ export default function RoomSession() {
           {currentSong?.songId && !artworkFailed ? (
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
               <img
+                ref={artworkImageRef}
                 src={`/api/songs/${currentSong.songId}/artwork`}
                 alt=""
-                className="w-full h-full object-cover scale-125 blur-[4px] opacity-100 transition-all duration-700 select-none motion-safe:animate-fade-in"
+                className="w-full h-full object-cover scale-125 blur-[4px] opacity-100 select-none motion-safe:animate-fade-in"
+                style={{ transition: 'transform 120ms ease-out, filter 180ms ease-out' }}
                 onError={() => setArtworkFailed(true)}
               />
             </div>
