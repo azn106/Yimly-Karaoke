@@ -2120,10 +2120,10 @@ export default function RoomSession() {
     if (!karaokeAudioActuallyPlaying || !audio || !artwork) {
       if (artwork) {
         artwork.style.transform = 'scale(1)';
-        artwork.style.filter = 'brightness(1) saturate(1) blur(5px)';
+        artwork.style.filter = 'brightness(0.42) saturate(0.72) blur(12px)';
       }
       if (artworkTiles) {
-        artworkTiles.style.filter = 'brightness(0.82) saturate(1.05) blur(20px)';
+        artworkTiles.style.filter = 'brightness(0.38) saturate(0.7) blur(30px)';
         artworkTiles.style.opacity = '0.72';
       }
       if (gradient) {
@@ -2172,9 +2172,9 @@ export default function RoomSession() {
           const driftX = 50 + Math.sin(elapsed * 0.22) * 22 + smoothedEnergy * 10;
           const driftY = 50 + Math.cos(elapsed * 0.17) * 20 - smoothedEnergy * 8;
           artworkImageRef.current.style.transform = `scale(${scale.toFixed(3)})`;
-          artworkImageRef.current.style.filter = `brightness(${brightness.toFixed(3)}) saturate(${saturation.toFixed(3)}) blur(5px)`;
+          artworkImageRef.current.style.filter = `brightness(${(0.42 + smoothedEnergy * 0.08).toFixed(3)}) saturate(${(0.72 + smoothedEnergy * 0.08).toFixed(3)}) blur(12px)`;
           if (artworkTiles) {
-            artworkTiles.style.filter = `brightness(${(0.82 + smoothedEnergy * 0.12).toFixed(3)}) saturate(${(1.05 + smoothedEnergy * 0.16).toFixed(3)}) blur(20px)`;
+            artworkTiles.style.filter = `brightness(${(0.38 + smoothedEnergy * 0.06).toFixed(3)}) saturate(${(0.7 + smoothedEnergy * 0.08).toFixed(3)}) blur(30px)`;
             artworkTiles.style.opacity = (0.72 + smoothedEnergy * 0.12).toFixed(3);
           }
           if (gradient) {
@@ -2194,9 +2194,9 @@ export default function RoomSession() {
           rafId = requestAnimationFrame(animateArtwork);
         } else if (artworkImageRef.current) {
           artworkImageRef.current.style.transform = 'scale(1)';
-          artworkImageRef.current.style.filter = 'brightness(1) saturate(1) blur(5px)';
+          artworkImageRef.current.style.filter = 'brightness(0.42) saturate(0.72) blur(12px)';
           if (artworkTileRef.current) {
-            artworkTileRef.current.style.filter = 'brightness(0.82) saturate(1.05) blur(20px)';
+            artworkTileRef.current.style.filter = 'brightness(0.38) saturate(0.7) blur(30px)';
             artworkTileRef.current.style.opacity = '0.72';
           }
         }
@@ -2859,7 +2859,7 @@ export default function RoomSession() {
                   backgroundSize: '220px 220px',
                   backgroundPosition: 'center center',
                   transform: 'scale(1.12)',
-                  filter: 'brightness(0.82) saturate(1.05) blur(20px)',
+                  filter: 'brightness(0.38) saturate(0.7) blur(30px)',
                   opacity: 0.72,
                   transition: 'filter 180ms ease-out, opacity 180ms ease-out'
                 }}
@@ -2869,7 +2869,7 @@ export default function RoomSession() {
                   ref={artworkImageRef}
                   src={`/api/songs/${currentSong.songId}/artwork`}
                   alt=""
-                  className="h-full max-h-full w-auto max-w-none object-contain blur-[5px] opacity-100 select-none motion-safe:animate-fade-in"
+                  className="h-full max-h-full w-auto max-w-none object-contain blur-[12px] opacity-100 select-none motion-safe:animate-fade-in"
                   style={{ transition: 'transform 120ms ease-out, filter 180ms ease-out' }}
                   onError={() => setArtworkFailed(true)}
                 />
@@ -2880,7 +2880,7 @@ export default function RoomSession() {
           {/* Living purple-pink gradient that drifts and swells with the music */}
           <div
             ref={artworkGradientRef}
-            className="absolute inset-0 bg-gradient-to-br from-[#351044]/85 via-[#761B4F]/80 to-[#160B2B]/90 backdrop-blur-[1px] z-0 pointer-events-none"
+            className="absolute inset-0 bg-gradient-to-br from-[#100D18]/85 via-[#241324]/82 to-[#090B13]/90 backdrop-blur-[8px] z-0 pointer-events-none"
             style={{ backgroundSize: '190% 190%', backgroundPosition: '50% 50%', transition: 'opacity 220ms ease-out' }}
           />
           {/* Keep the lower readability shade steady while the colour layer moves */}
