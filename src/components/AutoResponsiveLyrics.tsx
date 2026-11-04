@@ -380,6 +380,9 @@ export const AutoResponsiveLyrics: React.FC<AutoResponsiveLyricsProps> = ({
               letterSpacing: `${displayStyle.letterSpacing}px`,
               lineHeight: displayStyle.lineSpacing,
               textAlign: textAlignment,
+              // A restrained black stroke keeps both pink highlighted and muted lyrics readable over bright artwork.
+              WebkitTextStroke: '1.35px rgba(0, 0, 0, 0.92)',
+              paintOrder: 'stroke fill',
             }}
             className={`w-full whitespace-normal break-words leading-tight ${getAlignmentClass(textAlignment)}`}
           >
