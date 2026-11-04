@@ -199,6 +199,7 @@ export default function RoomSession() {
   const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
   const [showQrPopover, setShowQrPopover] = useState(false);
   const [isRestartingSession, setIsRestartingSession] = useState(false);
+  const [artworkFailed, setArtworkFailed] = useState(false);
 
   // Overflow menu and modals state (Host Only)
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
@@ -1139,6 +1140,7 @@ export default function RoomSession() {
     // Reset lyrics and clear previous audio error upon song switch
     setLyrics([]);
     setAudioError(null);
+    setArtworkFailed(false);
 
     if (currentSong?.songId) {
       const songId = currentSong.songId;
@@ -2627,11 +2629,11 @@ export default function RoomSession() {
       )}
 
       {/* Top Room Navigation Bar */}
-      <header id="room-session-header" className="px-4 md:px-6 py-2.5 border-b border-white/5 bg-[#0D0E17]/95 backdrop-blur-md flex items-center justify-between relative z-50 shrink-0 select-none">
+      <header id="room-session-header" className="px-4 md:px-6 py-2.5 border-b border-white/10 bg-[#0D0E17]/80 backdrop-blur-xl flex items-center justify-between relative z-50 shrink-0 select-none shadow-lg shadow-black/20">
         {/* Left: Refresh, QR, Add Song, then the upcoming queue */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 overflow-hidden pr-3">
           <button data-tv-id="header-start-session-button" onClick={handleStartNewSession} disabled={isRestartingSession}
-            className="p-2 bg-white/5 hover:bg-[#F472B6]/20 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-all border border-white/10 flex items-center justify-center shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]" title="Start New Session">
+            className="p-2 bg-white/5 hover:bg-[#F472B6]/20 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-all border border-white/10 hover:border-white/25 backdrop-blur-md flex items-center justify-center shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]" title="Start New Session">
             <RefreshCw className={`w-4 h-4 ${isRestartingSession ? 'animate-spin text-[#F472B6]' : ''}`} />
           </button>
 
@@ -2639,7 +2641,7 @@ export default function RoomSession() {
             <>
               <div className="relative shrink-0">
                 <button data-tv-id="qr-toggle-button" onClick={(e) => { e.stopPropagation(); setShowQrPopover(prev => !prev); }}
-                  className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]" title="Toggle QR Code">
+                  className="p-2 bg-white/5 hover:bg-white/15 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-colors border border-white/10 hover:border-white/25 backdrop-blur-md focus:outline-none focus:ring-4 focus:ring-[#F472B6]" title="Toggle QR Code">
                   <QrCode className="w-4 h-4 text-[#F472B6]" />
                 </button>
               </div>
@@ -2658,7 +2660,7 @@ export default function RoomSession() {
 
 
           <button data-tv-id="header-add-song-button" onClick={() => setShowLibrary(true)}
-            className="px-3 py-1.5 bg-[#F472B6] hover:bg-[#DB2777] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 text-xs shadow-md shadow-[#F472B6]/20 shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]">
+            className="px-3.5 py-1.5 bg-[#F472B6]/90 hover:bg-[#DB2777] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 text-xs shadow-md shadow-[#F472B6]/25 border border-white/20 backdrop-blur-md shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]">
             <Plus className="w-3.5 h-3.5" /><span>Add Song</span>
           </button>
 
@@ -2670,7 +2672,7 @@ export default function RoomSession() {
               return upcomingQueue.map((item, index) => {
                 const singerName = item.userName || (item.userId ? `Singer ${item.userId}` : 'Guest');
                 return (
-                  <div key={item.id || index} className="bg-[#12131D] border border-white/10 rounded-xl px-3 py-1 flex flex-col justify-center shrink-0 min-w-[150px] max-w-[200px]">
+                  <div key={item.id || index} className="bg-[#12131D]/70 backdrop-blur-md border border-white/10 hover:border-white/20 rounded-xl px-3 py-1 flex flex-col justify-center shrink-0 min-w-[150px] max-w-[200px] transition-colors">
                     <div className="text-xs font-bold text-white truncate">{item.songTitle} - {item.artistName || item.artist || 'Unknown Artist'}</div>
                     <div className="text-[10px] text-zinc-400 truncate">{singerName}</div>
                   </div>
@@ -2683,16 +2685,16 @@ export default function RoomSession() {
         {/* Right: Instrumental, lyrics format, expanded sync/fullscreen, collapse */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button data-tv-id="inst-toggle-button" onClick={handleToggleInstrumental}
-            className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${variant === 'instrumental' ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25' : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'}`}
+            className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border backdrop-blur-md focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${variant === 'instrumental' ? 'bg-[#F472B6] text-white border-[#F472B6] shadow-lg shadow-[#F472B6]/25' : 'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/15 hover:border-white/25'}`}
             title="Switch between Original Vocal and Instrumental backing track">
             <Music className="w-3.5 h-3.5" /><span className="hidden xs:inline">Inst:</span> {variant === 'instrumental' ? 'ON' : 'OFF'}
           </button>
 
           <button data-tv-id="lyrics-format-toggle" onClick={handleToggleLyricsFormat} disabled={!currentSongDetails?.hasElrc}
-            className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${
+            className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border backdrop-blur-md focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${
               !currentSongDetails?.hasElrc ? 'opacity-50 cursor-not-allowed bg-white/5 text-zinc-500 border-white/5' :
               lyricsFormat === 'elrc' ? 'bg-cyan-500 text-white border-cyan-500 shadow-lg shadow-cyan-500/25' :
-              'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10'
+              'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/15 hover:border-white/25'
             }`}
             title={!currentSongDetails?.hasElrc ? 'Enhanced LRC (eLRC) not available for this song (LRC mode active)' : `Switch lyric format (Current: ${lyricsFormat.toUpperCase()})`}>
             <Clock className="w-3.5 h-3.5 text-cyan-400" /><span className="hidden xs:inline">Lyrics:</span> {lyricsFormat.toUpperCase()}
@@ -2700,14 +2702,14 @@ export default function RoomSession() {
 
           {isHeaderExpanded && (
             <div className="flex items-center gap-2 sm:gap-3 animate-fadeIn">
-              <div className="hidden sm:flex items-center gap-1 bg-[#08090E] px-2 py-1 rounded-xl border border-white/10 text-xs">
+              <div className="hidden sm:flex items-center gap-1 bg-[#08090E]/80 backdrop-blur-md px-2 py-1 rounded-xl border border-white/10 text-xs">
                 <span className="text-zinc-500 text-[11px] font-medium hidden md:inline pl-1">{lyricsFormat.toUpperCase()} Offset</span>
                 <button data-tv-id="offset-minus-button" onClick={() => handleOffsetChange(-250)} className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]" title="-250ms">-250ms</button>
                 <button data-tv-id="offset-sync-button" onClick={handleSyncReset} className="px-1.5 py-0.5 font-mono text-[#F472B6] hover:text-[#ff7ab8] font-bold text-[11px] rounded hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]" title={`Reset ${lyricsFormat.toUpperCase()} offset to 0ms`}>{activeOffset > 0 ? `+${activeOffset}` : activeOffset}ms</button>
                 <button data-tv-id="offset-plus-button" onClick={() => handleOffsetChange(250)} className="px-1.5 py-0.5 bg-[#181926] hover:bg-[#222436] text-zinc-300 hover:text-white rounded text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#F472B6]" title="+250ms">+250ms</button>
               </div>
               <button data-tv-id="fullscreen-toggle-button" onClick={toggleFullscreen}
-                className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+                className="p-2 bg-white/5 hover:bg-white/15 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-colors border border-white/10 hover:border-white/25 backdrop-blur-md focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
                 title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
@@ -2715,7 +2717,7 @@ export default function RoomSession() {
           )}
 
           <button data-tv-id="header-collapse-toggle" onClick={() => setIsHeaderExpanded(prev => !prev)}
-            className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl transition-colors border border-white/10 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+            className="p-2 bg-white/5 hover:bg-white/15 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-colors border border-white/10 hover:border-white/25 backdrop-blur-md focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
             title={isHeaderExpanded ? 'Collapse Header' : 'Expand Header'}>
             {isHeaderExpanded ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
@@ -2732,9 +2734,25 @@ export default function RoomSession() {
           id="room-session-main"
           className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 shadow-xl flex-1 flex flex-col justify-between h-full min-h-0 min-w-0 transition-all select-none"
         >
+          {/* Dynamic Blurred Artwork Background */}
+          {currentSong?.songId && !artworkFailed ? (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+              <img
+                src={`/api/songs/${currentSong.songId}/artwork`}
+                alt=""
+                className="w-full h-full object-cover scale-125 blur-[36px] opacity-45 transition-all duration-700 select-none motion-safe:animate-fade-in"
+                onError={() => setArtworkFailed(true)}
+              />
+            </div>
+          ) : null}
+
+          {/* Dark Translucent Overlay & Atmospheric Gradient for Readability */}
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px] z-0 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0D0E17]/95 via-transparent to-[#0D0E17]/50 z-0 pointer-events-none" />
+
           {/* Ambient Glow matching Homepage & Sidebar Feature Cards */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#F472B6]/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#F472B6]/5 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16" />
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[#F472B6]/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16 z-0" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#F472B6]/5 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16 z-0" />
 
           {/* Card Top Header */}
           <div className="relative z-10 flex items-center justify-between p-3.5 sm:p-4 lg:p-5 pb-0 shrink-0">
