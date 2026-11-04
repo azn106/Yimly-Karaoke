@@ -2165,12 +2165,10 @@ export default function RoomSession() {
           const energy = Math.min(1, (total / binsToRead / 255) * 2.2);
           smoothedEnergy += (energy - smoothedEnergy) * (energy > smoothedEnergy ? 0.22 : 0.08);
           const scale = 1 + smoothedEnergy * 0.035;
-          const brightness = 1 + smoothedEnergy * 0.16;
-          const saturation = 1 + smoothedEnergy * 0.22;
-          const motion = (now: number) => (now - startedAt) / 1000;
+                    const motion = (now: number) => (now - startedAt) / 1000;
           const elapsed = motion(performance.now());
-          const driftX = 50 + Math.sin(elapsed * 0.22) * 22 + smoothedEnergy * 10;
-          const driftY = 50 + Math.cos(elapsed * 0.17) * 20 - smoothedEnergy * 8;
+          const driftX = 50 + Math.sin(elapsed * 0.16) * 28 + smoothedEnergy * 12;
+          const driftY = 50 + Math.cos(elapsed * 0.13) * 26 - smoothedEnergy * 10;
           artworkImageRef.current.style.transform = `scale(${scale.toFixed(3)})`;
           artworkImageRef.current.style.filter = `brightness(${(0.42 + smoothedEnergy * 0.08).toFixed(3)}) saturate(${(0.72 + smoothedEnergy * 0.08).toFixed(3)}) blur(12px)`;
           if (artworkTiles) {
@@ -2179,7 +2177,8 @@ export default function RoomSession() {
           }
           if (gradient) {
             gradient.style.backgroundPosition = `${driftX.toFixed(1)}% ${driftY.toFixed(1)}%`;
-            gradient.style.opacity = (0.92 + smoothedEnergy * 0.12).toFixed(3);
+            gradient.style.opacity = (0.94 + smoothedEnergy * 0.06).toFixed(3);
+            gradient.style.filter = `saturate(${(1 + smoothedEnergy * 0.22).toFixed(3)})`;
           }
           if (glowTop) {
             const topPulse = 1 + smoothedEnergy * 0.28 + Math.sin(elapsed * 0.7) * 0.055;
@@ -2844,7 +2843,7 @@ export default function RoomSession() {
         {/* Main Stage: Lyrics Card Container */}
         <main 
           id="room-session-main"
-          className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 shadow-xl flex-1 flex flex-col justify-between h-full min-h-0 min-w-0 transition-all select-none"
+          className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-[#090811] border border-white/[0.08] shadow-[0_28px_90px_rgba(0,0,0,0.48)] flex-1 flex flex-col justify-between h-full min-h-0 min-w-0 transition-all select-none"
         >
           {/* Repeating blurred artwork tiles behind the full-height centre cover */}
           {currentSong?.songId && !artworkFailed ? (
@@ -2880,8 +2879,8 @@ export default function RoomSession() {
           {/* Living purple-pink gradient that drifts and swells with the music */}
           <div
             ref={artworkGradientRef}
-            className="absolute inset-0 bg-gradient-to-br from-[#100D18]/85 via-[#241324]/82 to-[#090B13]/90 backdrop-blur-[8px] z-0 pointer-events-none"
-            style={{ backgroundSize: '190% 190%', backgroundPosition: '50% 50%', transition: 'opacity 220ms ease-out' }}
+            className="absolute inset-0 z-0 pointer-events-none"
+            style={{ backgroundImage: 'radial-gradient(ellipse at 18% 18%, rgba(244,114,182,0.30), transparent 48%), radial-gradient(ellipse at 82% 76%, rgba(139,92,246,0.28), transparent 52%), radial-gradient(ellipse at 70% 12%, rgba(255,79,163,0.14), transparent 42%), linear-gradient(135deg, rgba(13,10,20,0.76), rgba(28,13,31,0.72) 48%, rgba(8,10,18,0.84))', backgroundSize: '210% 210%', backgroundPosition: '50% 50%', backdropFilter: 'blur(2px)', transition: 'opacity 260ms ease-out' }}
           />
           {/* Keep the lower readability shade steady while the colour layer moves */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#1A0D20]/55 via-transparent to-[#1A0D20]/20 z-0 pointer-events-none" />
@@ -3008,7 +3007,7 @@ export default function RoomSession() {
                       step="0.1"
                       value={currentTime}
                       onChange={handleSeek}
-                      className="flex-1 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F472B6] focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
+                      className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-[#F472B6] focus:outline-none focus:ring-2 focus:ring-[#F472B6]"
                     />
                     <span className="text-[11px] font-mono text-zinc-500 w-10">
                       {formatTime(duration)}
@@ -3022,7 +3021,7 @@ export default function RoomSession() {
                     data-tv-id="restart-button"
                     onClick={handleRestart}
                     disabled={!currentSong}
-                    className="p-3 bg-[#181926] hover:bg-[#222436] text-white rounded-full transition-all disabled:opacity-30 border border-white/10 hover:scale-105 active:scale-95 shadow-md focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
+                    className="p-3 bg-white/[0.055] hover:bg-white/[0.11] text-white/85 rounded-full transition-all disabled:opacity-30 border border-white/[0.09] hover:border-white/20 hover:scale-105 active:scale-95 shadow-[0_8px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6]/70 focus:ring-offset-2 focus:ring-offset-[#08090E]"
                     title="Restart Track"
                   >
                     <RotateCcw className="w-5 h-5" />
@@ -3033,17 +3032,17 @@ export default function RoomSession() {
                     data-tv-id="play-button"
                     onClick={togglePlay}
                     disabled={!currentSong}
-                    className="w-14 h-14 bg-white hover:bg-zinc-200 text-black rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-xl disabled:opacity-30 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E] focus:scale-110 focus:shadow-[0_0_35px_rgba(255,79,163,0.9)]"
+                    className="w-14 h-14 bg-gradient-to-br from-[#FF83BD] via-[#F472B6] to-[#DB2777] hover:brightness-110 text-white rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-[0_8px_34px_rgba(244,114,182,0.34)] ring-1 ring-white/25 disabled:opacity-30 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E] focus:scale-110 focus:shadow-[0_0_35px_rgba(255,79,163,0.55)]"
                     title={playing ? 'Pause' : 'Play'}
                   >
-                    {playing ? <Pause className="w-6 h-6 fill-black" /> : <Play className="w-6 h-6 fill-black ml-0.5" />}
+                    {playing ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
                   </button>
 
                   <button 
                     data-tv-id="skip-button"
                     onClick={handleSkip}
                     disabled={!currentSong}
-                    className="p-3 bg-[#181926] hover:bg-[#222436] text-white rounded-full transition-all disabled:opacity-30 border border-white/10 hover:scale-105 active:scale-95 shadow-md focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E]"
+                    className="p-3 bg-white/[0.055] hover:bg-white/[0.11] text-white/85 rounded-full transition-all disabled:opacity-30 border border-white/[0.09] hover:border-white/20 hover:scale-105 active:scale-95 shadow-[0_8px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6]/70 focus:ring-offset-2 focus:ring-offset-[#08090E]"
                     title="Skip Track"
                   >
                     <SkipForward className="w-5 h-5" />
