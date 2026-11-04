@@ -2740,14 +2740,14 @@ export default function RoomSession() {
               <img
                 src={`/api/songs/${currentSong.songId}/artwork`}
                 alt=""
-                className="w-full h-full object-cover scale-125 blur-[14px] opacity-100 transition-all duration-700 select-none motion-safe:animate-fade-in"
+                className="w-full h-full object-cover scale-125 blur-[8px] opacity-100 transition-all duration-700 select-none motion-safe:animate-fade-in"
                 onError={() => setArtworkFailed(true)}
               />
             </div>
           ) : null}
 
           {/* Dark Translucent Overlay & Atmospheric Gradient for Readability */}
-          <div className="absolute inset-0 bg-[#2B1428]/35 backdrop-blur-[1px] z-0 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#3B1648]/45 via-[#8E285E]/35 to-[#211238]/50 backdrop-blur-[1px] z-0 pointer-events-none" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#1A0D20]/55 via-transparent to-[#1A0D20]/20 z-0 pointer-events-none" />
 
           {/* Ambient Glow matching Homepage & Sidebar Feature Cards */}
