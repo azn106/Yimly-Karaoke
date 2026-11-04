@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { songs, artists, albums, lyrics, songArtists, playlistSongs, favorites, queueItems, sessions, songVerifiedSources } from '../db/schema.js';
 import { eq, like, or, inArray, asc, desc, and, sql } from 'drizzle-orm';
 import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
-import { replaceSongRecordingSource, replaceSongInstrumental, getReplacementJob, getActiveSongReplacement } from '../lib/source-replacement.js';
+import { replaceSongRecordingSource, replaceSongInstrumental, getReplacementJob, getActiveSongReplacement, getLatestSongReplacement } from '../lib/source-replacement.js';
 import { formatArtistDisplay, cleanupOrphanedRecords } from '../lib/artist-utils.js';
 import { broadcastSongOffsetToRooms } from '../ws/index.js';
 import { isLrcContentValid } from '../lib/lyrics.js';
@@ -1131,10 +1131,19 @@ router.get('/:id/replace-status', requireAuth, async (req, res) => {
     const songId = parseInt(req.params.id, 10);
     if (isNaN(songId)) return res.status(400).json({ error: 'Invalid song ID' });
 
+    // The client supplies the time it initiated the replacement. Prefer an
+    // active job, otherwise return the newest matching completed/failed job.
+    // A small clock-skew allowance avoids missing jobs when client/server clocks
+    // differ slightly, while preventing an older run from being reported as new.
+    const requestedSince = Number(req.query.since);
+    const since = Number.isFinite(requestedSince) && requestedSince > 0
+      ? requestedSince - 5000
+      : undefined;
     const activeJob = getActiveSongReplacement(songId);
+    const latestJob = activeJob || getLatestSongReplacement(songId, since);
     res.json({
       active: !!activeJob,
-      job: activeJob || null,
+      job: latestJob || null,
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to fetch replacement status' });
