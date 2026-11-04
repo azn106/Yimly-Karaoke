@@ -2193,8 +2193,12 @@ export default function RoomSession() {
           }
           rafId = requestAnimationFrame(animateArtwork);
         } else if (artworkImageRef.current) {
-          artworkImageRef.current.style.transform = 'scale(1.25)';
-          artworkImageRef.current.style.filter = 'brightness(1) saturate(1) blur(4px)';
+          artworkImageRef.current.style.transform = 'scale(1)';
+          artworkImageRef.current.style.filter = 'brightness(1) saturate(1) blur(5px)';
+          if (artworkTileRef.current) {
+            artworkTileRef.current.style.filter = 'brightness(0.82) saturate(1.05) blur(20px)';
+            artworkTileRef.current.style.opacity = '0.72';
+          }
         }
       };
       rafId = requestAnimationFrame(animateArtwork);
