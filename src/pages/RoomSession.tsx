@@ -2869,7 +2869,7 @@ export default function RoomSession() {
                   ref={artworkImageRef}
                   src={`/api/songs/${currentSong.songId}/artwork`}
                   alt=""
-                  className="h-full w-auto max-w-full object-contain blur-[5px] opacity-100 select-none motion-safe:animate-fade-in"
+                  className="h-full max-h-full w-auto max-w-none object-contain blur-[5px] opacity-100 select-none motion-safe:animate-fade-in"
                   style={{ transition: 'transform 120ms ease-out, filter 180ms ease-out' }}
                   onError={() => setArtworkFailed(true)}
                 />
