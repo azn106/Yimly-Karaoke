@@ -219,6 +219,7 @@ export default function RoomSession() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const displayAudioRef = audioRef;
   const artworkImageRef = useRef<HTMLImageElement>(null);
+  const artworkTileRef = useRef<HTMLDivElement>(null);
   const artworkGradientRef = useRef<HTMLDivElement>(null);
   const artworkGlowTopRef = useRef<HTMLDivElement>(null);
   const artworkGlowBottomRef = useRef<HTMLDivElement>(null);
@@ -2108,6 +2109,7 @@ export default function RoomSession() {
   useEffect(() => {
     const audio = audioRef.current;
     const artwork = artworkImageRef.current;
+    const artworkTiles = artworkTileRef.current;
     const gradient = artworkGradientRef.current;
     const glowTop = artworkGlowTopRef.current;
     const glowBottom = artworkGlowBottomRef.current;
@@ -2117,8 +2119,12 @@ export default function RoomSession() {
 
     if (!karaokeAudioActuallyPlaying || !audio || !artwork) {
       if (artwork) {
-        artwork.style.transform = 'scale(1.25)';
-        artwork.style.filter = 'brightness(1) saturate(1) blur(4px)';
+        artwork.style.transform = 'scale(1)';
+        artwork.style.filter = 'brightness(1) saturate(1) blur(5px)';
+      }
+      if (artworkTiles) {
+        artworkTiles.style.filter = 'brightness(0.82) saturate(1.05) blur(20px)';
+        artworkTiles.style.opacity = '0.72';
       }
       if (gradient) {
         gradient.style.backgroundPosition = '50% 50%';
@@ -2158,7 +2164,7 @@ export default function RoomSession() {
           for (let i = 0; i < binsToRead; i++) total += frequencyData[i];
           const energy = Math.min(1, (total / binsToRead / 255) * 2.2);
           smoothedEnergy += (energy - smoothedEnergy) * (energy > smoothedEnergy ? 0.22 : 0.08);
-          const scale = 1.25 + smoothedEnergy * 0.065;
+          const scale = 1 + smoothedEnergy * 0.035;
           const brightness = 1 + smoothedEnergy * 0.16;
           const saturation = 1 + smoothedEnergy * 0.22;
           const motion = (now: number) => (now - startedAt) / 1000;
@@ -2166,7 +2172,11 @@ export default function RoomSession() {
           const driftX = 50 + Math.sin(elapsed * 0.22) * 22 + smoothedEnergy * 10;
           const driftY = 50 + Math.cos(elapsed * 0.17) * 20 - smoothedEnergy * 8;
           artworkImageRef.current.style.transform = `scale(${scale.toFixed(3)})`;
-          artworkImageRef.current.style.filter = `brightness(${brightness.toFixed(3)}) saturate(${saturation.toFixed(3)}) blur(4px)`;
+          artworkImageRef.current.style.filter = `brightness(${brightness.toFixed(3)}) saturate(${saturation.toFixed(3)}) blur(5px)`;
+          if (artworkTiles) {
+            artworkTiles.style.filter = `brightness(${(0.82 + smoothedEnergy * 0.12).toFixed(3)}) saturate(${(1.05 + smoothedEnergy * 0.16).toFixed(3)}) blur(20px)`;
+            artworkTiles.style.opacity = (0.72 + smoothedEnergy * 0.12).toFixed(3);
+          }
           if (gradient) {
             gradient.style.backgroundPosition = `${driftX.toFixed(1)}% ${driftY.toFixed(1)}%`;
             gradient.style.opacity = (0.92 + smoothedEnergy * 0.12).toFixed(3);
@@ -2832,18 +2842,35 @@ export default function RoomSession() {
           id="room-session-main"
           className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-[#171827] via-[#1b172a] to-[#141522] border border-white/10 shadow-xl flex-1 flex flex-col justify-between h-full min-h-0 min-w-0 transition-all select-none"
         >
-          {/* Dynamic Blurred Artwork Background */}
+          {/* Repeating blurred artwork tiles behind the full-height centre cover */}
           {currentSong?.songId && !artworkFailed ? (
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-              <img
-                ref={artworkImageRef}
-                src={`/api/songs/${currentSong.songId}/artwork`}
-                alt=""
-                className="w-full h-full object-cover scale-125 blur-[4px] opacity-100 select-none motion-safe:animate-fade-in"
-                style={{ transition: 'transform 120ms ease-out, filter 180ms ease-out' }}
-                onError={() => setArtworkFailed(true)}
+            <>
+              <div
+                ref={artworkTileRef}
+                aria-hidden="true"
+                className="absolute inset-0 pointer-events-none z-0"
+                style={{
+                  backgroundImage: `url("/api/songs/${currentSong.songId}/artwork")`,
+                  backgroundRepeat: 'repeat',
+                  backgroundSize: '220px 220px',
+                  backgroundPosition: 'center center',
+                  transform: 'scale(1.12)',
+                  filter: 'brightness(0.82) saturate(1.05) blur(20px)',
+                  opacity: 0.72,
+                  transition: 'filter 180ms ease-out, opacity 180ms ease-out'
+                }}
               />
-            </div>
+              <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none z-0">
+                <img
+                  ref={artworkImageRef}
+                  src={`/api/songs/${currentSong.songId}/artwork`}
+                  alt=""
+                  className="h-full w-auto max-w-full object-contain blur-[5px] opacity-100 select-none motion-safe:animate-fade-in"
+                  style={{ transition: 'transform 120ms ease-out, filter 180ms ease-out' }}
+                  onError={() => setArtworkFailed(true)}
+                />
+              </div>
+            </>
           ) : null}
 
           {/* Living purple-pink gradient that drifts and swells with the music */}
