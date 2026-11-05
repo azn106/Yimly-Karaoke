@@ -1704,7 +1704,7 @@ export default function Library() {
                         isPlaying={isThisPlaying}
                         onPlay={() => handlePlayInJukebox(song, selectedAlbum.songs, idx)}
                         onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
-                        showAlbum={false}
+                        
                         leading={<span className="w-6 shrink-0 text-center font-mono text-xs text-zinc-500">{song.trackNumber || idx + 1}</span>}
                       />
                     </td>
