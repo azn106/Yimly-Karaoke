@@ -1704,67 +1704,20 @@ export default function Library() {
                 const isCurrent = jukeboxCurrentSong?.id === song.id;
                 const isThisPlaying = isCurrent && jukeboxIsPlaying;
                 return (
-                  <tr key={song.id} className={`transition-colors group ${isCurrent ? 'bg-[#F472B6]/10' : 'hover:bg-[#1A1C2C]/60'}`}>
-                    <td className="px-5 py-3.5 text-zinc-500 font-mono text-xs">
-                      <button
-                        type="button"
-                        onClick={() => handlePlayInJukebox(song, selectedAlbum.songs, idx)}
-                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
-                        title={isThisPlaying ? 'Pause' : 'Play'}
+                  <tr key={song.id} className="group">
+                    <td colSpan={4} className="px-3">
+                      <JukeboxSongCard
+                        song={{ ...song, artist: song.artist || selectedAlbum.artist, album: selectedAlbum.title }}
+                        isCurrent={isCurrent}
+                        isPlaying={isThisPlaying}
+                        onPlay={() => handlePlayInJukebox(song, selectedAlbum.songs, idx)}
+                        onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
+                        showAlbum={false}
+                        leading={<span className="w-6 shrink-0 text-center font-mono text-xs text-zinc-500">{song.trackNumber || idx + 1}</span>}
                       >
-                        {isThisPlaying ? (
-                          <Pause className="w-3.5 h-3.5 text-[#F472B6] fill-current" />
-                        ) : (
-                          <span className="group-hover:hidden">{song.trackNumber || idx + 1}</span>
-                        )}
-                        {!isThisPlaying && (
-                          <Play className="w-3.5 h-3.5 fill-current hidden group-hover:block ml-0.5" />
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-5 py-3.5 font-medium text-white flex items-center gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`truncate ${isCurrent ? 'text-[#F472B6] font-semibold' : ''}`} title={song.title}>{song.title}</span>
-                        {isCurrent && <EqualizerIndicator isPlaying={isThisPlaying} />}
-                        <LyricBadges
-                          hasLrc={song.hasLrc}
-                          hasElrc={song.hasElrc}
-                          onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 text-zinc-400 font-mono text-xs">{formatDuration(song.duration)}</td>
-                    <td className="px-5 py-3.5 text-right">
-                      <div className="inline-flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handlePlayInJukebox(song, selectedAlbum.songs, idx)}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
-                            isThisPlaying 
-                              ? 'bg-[#F472B6] text-white shadow-sm' 
-                              : 'bg-white/5 hover:bg-white/15 text-zinc-200 hover:text-white border border-white/5'
-                          }`}
-                          title={isThisPlaying ? 'Pause track' : 'Play track in Jukebox'}
-                        >
-                          {isThisPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                          <span>{isThisPlaying ? 'Pause' : 'Play'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleQueueInJukebox(song)}
-                          className="p-1.5 rounded-lg text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-colors"
-                          title="Add to Jukebox queue"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSong(song)}
-                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-transparent text-zinc-500 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
-                          title="Delete song from library"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                        <button type="button" onClick={() => handleQueueInJukebox(song)} className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white" title="Add to Jukebox queue" aria-label="Add to Jukebox queue"><Plus className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => handleDeleteSong(song)} className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400" title="Delete song from library"><Trash2 className="h-3.5 w-3.5" /></button>
+                      </JukeboxSongCard>
                     </td>
                   </tr>
                 );
