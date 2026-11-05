@@ -424,7 +424,7 @@ export default function Library() {
     onAddToPlaylist: () => handleOpenAddToPlaylist(song),
     onReplaceAudio: () => handleOpenReplaceSource(song),
     onReplaceInstrumental: () => handleOpenReplaceInstrumental(song),
-    onDeleteSong: () => handleDeleteSong(song),
+    onDeleteSong: () => handleOpenDeleteConfirm(song),
   });
 
   const handleOpenDeleteConfirm = (song: any) => {
@@ -1612,8 +1612,6 @@ export default function Library() {
                           showAlbum={false}
                         >
                           <span className="hidden text-[10px] capitalize text-zinc-500 sm:inline">{song.variant}</span>
-                          <button type="button" onClick={() => handleQueueInJukebox(song)} className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white" title="Add to Jukebox queue" aria-label="Add to Jukebox queue"><Plus className="h-3.5 w-3.5" /></button>
-                          <button type="button" onClick={() => handleDeleteSong(song)} className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400" title="Delete song from library"><Trash2 className="h-3.5 w-3.5" /></button>
                         </JukeboxSongCard>
                       </td>
                     </tr>
@@ -1822,8 +1820,6 @@ export default function Library() {
                           showDuration={false}
                           artistContent={renderArtistLinks(item)}
                         >
-                          <button type="button" onClick={() => handleQueueInJukebox(item)} className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white" title="Add to Jukebox queue"><Plus className="h-3.5 w-3.5" /></button>
-                          <button type="button" onClick={() => handleDeleteSong(item)} className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400" title="Delete song from library"><Trash2 className="h-3.5 w-3.5" /></button>
                         </JukeboxSongCard>
                       </td>
                     </tr>
@@ -2073,7 +2069,6 @@ export default function Library() {
                       {songs.slice(0, 10).map((song, index) => {
                         const isCurrent = jukeboxCurrentSong?.id === song.id;
                         const isThisPlaying = isCurrent && jukeboxIsPlaying;
-                        const isFav = favoriteIds.has(song.id);
 
                         return (
                           <JukeboxSongCard
