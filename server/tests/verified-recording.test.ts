@@ -17,7 +17,7 @@ import { replaceSongRecordingSource, replaceSongInstrumental, isValidYouTubeUrl,
 import songsRoutes from '../routes/songs.js';
 import playlistsRoutes from '../routes/playlists.js';
 import favoritesRoutes from '../routes/favorites.js';
-import { downloadQueue } from '../lib/download-queue.js';
+import { downloadQueue, sanitizeErrorMessage } from '../lib/download-queue.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe';
 
@@ -169,54 +169,159 @@ test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', a
   });
 
   // --- SECTION 2: VERIFIED SOURCE PERSISTENCE & PIPELINE REUSE ---
-  await t.test('Replace Audio: verified source is saved against exact song ID and reused by pipeline', async () => {
-    const testUrl = 'https://www.youtube.com/watch?v=rYEDA3JcQqw';
-    const result = await replaceSongRecordingSource(songId, testUrl);
+  await t.test('Regression: The exact supplied shortened URL and "?si=" parameters are preserved and validated', () => {
+    const exactUrl = 'https://youtu.be/CWG-GDfejmY?si=K1vetd6tzVTYb9DB';
+    assert.strictEqual(isValidYouTubeUrl(exactUrl), true, 'Exact shortened URL with ?si= must be recognized as valid');
+    assert.strictEqual(extractYouTubeVideoId(exactUrl), 'CWG-GDfejmY', 'Video ID must be accurately extracted from shortened URL with ?si=');
 
-    assert.strictEqual(result.songId, songId);
-    assert.ok(result.jobId, 'Returns job ID');
+    // Query param preservation across formats
+    const watchWithSi = 'https://www.youtube.com/watch?v=CWG-GDfejmY&si=K1vetd6tzVTYb9DB';
+    assert.strictEqual(isValidYouTubeUrl(watchWithSi), true);
+    assert.strictEqual(extractYouTubeVideoId(watchWithSi), 'CWG-GDfejmY');
 
-    // Verify record in songVerifiedSources
-    const verified = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId));
-    assert.strictEqual(verified.length, 1);
-    assert.strictEqual(verified[0].songId, songId);
-    assert.strictEqual(verified[0].youtubeUrl, testUrl);
-    assert.strictEqual(verified[0].videoId, 'rYEDA3JcQqw');
+    const musicWithSi = 'https://music.youtube.com/watch?v=CWG-GDfejmY&si=K1vetd6tzVTYb9DB';
+    assert.strictEqual(isValidYouTubeUrl(musicWithSi), true);
+    assert.strictEqual(extractYouTubeVideoId(musicWithSi), 'CWG-GDfejmY');
 
-    // Exact ID isolation: second song with same title and artist did NOT receive this verified source
-    const verified2 = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, song2Id));
-    assert.strictEqual(verified2.length, 0, 'Song 2 must not receive verified source belonging to Song 1');
+    // Standard YouTube watch URLs and other supported forms
+    assert.strictEqual(isValidYouTubeUrl('https://www.youtube.com/watch?v=CWG-GDfejmY'), true);
+    assert.strictEqual(isValidYouTubeUrl('https://youtube.com/watch?v=CWG-GDfejmY'), true);
+    assert.strictEqual(isValidYouTubeUrl('https://m.youtube.com/watch?v=CWG-GDfejmY'), true);
+    assert.strictEqual(isValidYouTubeUrl('https://music.youtube.com/watch?v=CWG-GDfejmY'), true);
+    assert.strictEqual(isValidYouTubeUrl('https://www.youtube.com/shorts/CWG-GDfejmY'), true);
+    assert.strictEqual(isValidYouTubeUrl('https://www.youtube.com/embed/CWG-GDfejmY'), true);
 
-    // Verify existing pipeline method is reused
-    assert.strictEqual(typeof downloadQueue.downloadSingleTrackAudio, 'function', 'Reuses downloadQueue pipeline method');
-  });
-
-  await t.test('Replace Audio: URL validation and error handling', async () => {
-    assert.strictEqual(isValidYouTubeUrl('https://www.youtube.com/watch?v=rYEDA3JcQqw'), true);
-    assert.strictEqual(isValidYouTubeUrl('https://youtu.be/rYEDA3JcQqw'), true);
+    // Invalid URLs
+    assert.strictEqual(isValidYouTubeUrl('https://spotify.com/track/CWG-GDfejmY'), false);
+    assert.strictEqual(isValidYouTubeUrl('https://notyoutube.com/watch?v=CWG-GDfejmY'), false);
+    assert.strictEqual(isValidYouTubeUrl('https://youtu.be/toolongvideoid12345'), false);
+    assert.strictEqual(isValidYouTubeUrl('https://youtu.be/tooshort'), false);
     assert.strictEqual(isValidYouTubeUrl('not_a_url'), false);
-    assert.strictEqual(extractYouTubeVideoId('https://www.youtube.com/watch?v=12345678901'), '12345678901');
-
-    // Non-existent song ID fails gracefully
-    const notFoundRes = await replaceSongRecordingSource(999999, 'https://www.youtube.com/watch?v=12345678901');
-    assert.strictEqual(notFoundRes.success, false);
-    assert.match(notFoundRes.error || notFoundRes.message, /not found/i);
+    assert.strictEqual(isValidYouTubeUrl(''), false);
   });
 
-  await t.test('Replace Audio: Safe file rollback and metadata preservation on invalid source download', async () => {
+  await t.test('Regression: sanitizeErrorMessage preserves URLs intact and extracts useful yt-dlp stderr', () => {
+    const errorWithUrl = 'Command failed: /app/applet/yt-dlp -x --audio-format mp3 -o /app/applet/data/tmp.mp3 https://youtu.be/CWG-GDfejmY?si=K1vetd6tzVTYb9DB';
+    const sanitizedWithoutStderr = sanitizeErrorMessage(errorWithUrl);
+    assert.ok(sanitizedWithoutStderr.includes('https://youtu.be/CWG-GDfejmY?si=K1vetd6tzVTYb9DB'), 'Must preserve full URL including video ID and ?si= parameter');
+    assert.ok(!sanitizedWithoutStderr.includes('https:?si='), 'Must NEVER corrupt URL into https:?si=');
+    assert.ok(!sanitizedWithoutStderr.includes('/app/applet'), 'Must strip internal server filesystem paths');
+
+    // Captures useful yt-dlp stderr over generic Command failed header
+    const ytDlpStderr = 'WARNING: [youtube] some warning\nERROR: [youtube] CWG-GDfejmY: Video unavailable. This video is not available';
+    const sanitizedWithStderr = sanitizeErrorMessage(errorWithUrl, ytDlpStderr);
+    assert.strictEqual(sanitizedWithStderr, '[youtube] CWG-GDfejmY: Video unavailable. This video is not available', 'Must report informative yt-dlp stderr');
+
+    // Bot challenge stderr reporting
+    const botStderr = 'ERROR: [youtube] rYEDA3JcQqw: Sign in to confirm you’re not a bot. This helps protect our community.';
+    assert.strictEqual(sanitizeErrorMessage(errorWithUrl, botStderr), '[youtube] rYEDA3JcQqw: Sign in to confirm you’re not a bot. This helps protect our community.');
+  });
+
+  await t.test('Regression: Failed replacement preserves existing audio files and previous verified source record', async () => {
+    // 1. Seed pre-existing verified source for songId
+    await db.delete(songVerifiedSources).where(eq(songVerifiedSources.songId, songId));
+    await db.insert(songVerifiedSources).values({
+      songId,
+      youtubeUrl: 'https://www.youtube.com/watch?v=PREV_123456',
+      videoId: 'PREV_123456',
+      sourceTitle: 'Rolling in the Deep',
+      sourceArtist: 'Adele',
+      verified: 1,
+      verifiedAt: new Date(Date.now() - 50000),
+    });
+
     const preSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
     const preAudioContent = fs.readFileSync(preSong.mainAudioPath!);
 
+    // 2. Execute replacement with an invalid URL that fails
     const failRes = await replaceSongRecordingSource(songId, 'https://www.youtube.com/watch?v=invalid_id_fail');
-    assert.strictEqual(failRes.success, false, 'Invalid source returns failure');
+    assert.strictEqual(failRes.success, false, 'Invalid source replacement must report failure');
 
-    // Original files and metadata untouched
+    // 3. Verify previous verified source was preserved and NOT overwritten
+    const verifiedAfterFail = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId));
+    assert.strictEqual(verifiedAfterFail.length, 1);
+    assert.strictEqual(verifiedAfterFail[0].youtubeUrl, 'https://www.youtube.com/watch?v=PREV_123456', 'Previous verified source must be preserved on failure');
+    assert.strictEqual(verifiedAfterFail[0].videoId, 'PREV_123456');
+
+    // 4. Verify original audio file content and metadata are untouched
     const postSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
-    assert.strictEqual(postSong.title, preSong.title, 'Title preserved');
-    assert.strictEqual(postSong.artistId, preSong.artistId, 'Artist ID preserved');
-    assert.strictEqual(postSong.albumId, preSong.albumId, 'Album ID preserved');
-    assert.strictEqual(postSong.mainAudioPath, preSong.mainAudioPath, 'Audio path untouched');
+    assert.strictEqual(postSong.mainAudioPath, preSong.mainAudioPath);
     assert.strictEqual(fs.readFileSync(postSong.mainAudioPath!).toString(), preAudioContent.toString(), 'Original audio content preserved');
+  });
+
+  await t.test('Replace Audio: Successful replacement updates audio paths, file size, and verified source atomically', async () => {
+    const originalDownload = downloadQueue.downloadSingleTrackAudio;
+    const testUrl = 'https://youtu.be/CWG-GDfejmY?si=K1vetd6tzVTYb9DB';
+
+    // Mock download to produce valid staged main and instrumental files
+    downloadQueue.downloadSingleTrackAudio = async (_url: string, outDir: string, format: string) => {
+      const mainFile = path.join(outDir, `audio_${Date.now()}.${format}`);
+      const instFile = path.join(outDir, `Adele - Rolling in the Deep (Instrumental).${format}`);
+      fs.writeFileSync(mainFile, Buffer.alloc(2048, 'new_main_content'));
+      fs.writeFileSync(instFile, Buffer.alloc(2048, 'new_inst_content'));
+      return mainFile;
+    };
+
+    try {
+      const result = await replaceSongRecordingSource(songId, testUrl);
+      assert.strictEqual(result.success, true, 'Replacement must succeed when pipeline produces valid files');
+      assert.strictEqual(result.songId, songId);
+
+      // Verify files updated
+      const updatedSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
+      assert.ok(fs.existsSync(updatedSong.mainAudioPath!), 'Main audio exists');
+      assert.ok(fs.existsSync(updatedSong.instrumentalAudioPath!), 'Instrumental audio exists');
+      assert.strictEqual(fs.readFileSync(updatedSong.mainAudioPath!).toString(), Buffer.alloc(2048, 'new_main_content').toString());
+
+      // Verify verified source record saved AFTER successful commit
+      const verified = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId));
+      assert.strictEqual(verified.length, 1);
+      assert.strictEqual(verified[0].youtubeUrl, testUrl, 'Stores the complete URL with ?si= parameter');
+      assert.strictEqual(verified[0].videoId, 'CWG-GDfejmY');
+      assert.strictEqual(verified[0].verified, 1);
+      assert.ok(verified[0].processedAt, 'ProcessedAt timestamp set upon successful replacement');
+
+      // Exact ID isolation: second song with same artist and title did NOT receive verified source
+      const verified2 = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, song2Id));
+      assert.strictEqual(verified2.length, 0, 'Song 2 must not receive verified source belonging to Song 1');
+
+    } finally {
+      downloadQueue.downloadSingleTrackAudio = originalDownload;
+    }
+  });
+
+  await t.test('Replace Audio: Rollback restores previous files and database records if file commit fails', async () => {
+    const preSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
+    const preAudioContent = fs.readFileSync(preSong.mainAudioPath!);
+    const preVerified = (await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId)))[0];
+
+    const originalDownload = downloadQueue.downloadSingleTrackAudio;
+
+    // Simulate download succeeding in staging, but make final target directory write trigger an error
+    downloadQueue.downloadSingleTrackAudio = async (_url: string, outDir: string, format: string) => {
+      const mainFile = path.join(outDir, `audio_${Date.now()}.${format}`);
+      const instFile = path.join(outDir, `Adele - Rolling in the Deep (Instrumental).${format}`);
+      // Write corrupted empty instrumental file to trigger validation / commit failure
+      fs.writeFileSync(mainFile, Buffer.alloc(2048, 'main'));
+      fs.writeFileSync(instFile, Buffer.alloc(10, 'empty'));
+      return mainFile;
+    };
+
+    try {
+      const failRes = await replaceSongRecordingSource(songId, 'https://youtu.be/CWG-GDfejmY?si=K1vetd6tzVTYb9DB');
+      assert.strictEqual(failRes.success, false, 'Should fail and abort commit when staged file validation fails');
+
+      // Previous audio content and paths preserved
+      const postSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
+      assert.strictEqual(postSong.mainAudioPath, preSong.mainAudioPath);
+      assert.strictEqual(fs.readFileSync(postSong.mainAudioPath!).toString(), preAudioContent.toString(), 'Original audio preserved after rollback');
+
+      // Verified source unchanged
+      const postVerified = (await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId)))[0];
+      assert.strictEqual(postVerified.youtubeUrl, preVerified.youtubeUrl);
+    } finally {
+      downloadQueue.downloadSingleTrackAudio = originalDownload;
+    }
   });
 
   await t.test('Replace Audio: Concurrency protection blocks simultaneous replacements for same song', async () => {

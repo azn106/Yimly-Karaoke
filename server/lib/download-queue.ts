@@ -156,15 +156,50 @@ export function normalizeTopicTrackMetadata(track: Pick<ActiveTrackJob, 'artist'
   track.title = songTitle;
 }
 
-function sanitizeErrorMessage(msg?: string): string {
-  if (!msg) return 'Unknown error occurred';
-  // Remove absolute paths and long stack lines for clean UI display
-  const cleaned = msg
-    .replace(/\/[\w./-]+/g, '')
-    .replace(/ERROR:\s*/gi, '')
-    .split('\n')[0]
+/**
+ * Sanitizes command and process error messages for user-facing display.
+ * Strips sensitive absolute filesystem paths while strictly preserving all
+ * URL components (hostname, path, video ID, query params such as ?si=).
+ * Prioritizes actual yt-dlp / tool stderr output over generic Command failed lines.
+ */
+export function sanitizeErrorMessage(msg?: string, stderr?: string): string {
+  if (!msg && !stderr) return 'Unknown error occurred';
+
+  const rawStderr = (stderr || '').trim();
+  const rawMsg = (msg || '').trim();
+
+  // Combine stderr and message to locate the most informative error line
+  const combined = [rawStderr, rawMsg].filter(Boolean).join('\n');
+  const lines = combined.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Look for yt-dlp / extractor ERROR: lines first
+  const errorLine = lines.find(l => /^ERROR:\s*/i.test(l));
+  let chosen = '';
+  if (errorLine) {
+    chosen = errorLine.replace(/^ERROR:\s*/i, '').trim();
+  } else {
+    // Pick the first line that is not a generic "Command failed:" wrapper
+    const nonCommandFailed = lines.find(l => !/^Error:\s*Command failed:/i.test(l) && !/^Command failed:/i.test(l));
+    chosen = nonCommandFailed || lines[0] || 'Download failed';
+  }
+
+  // Protect all URLs (http:// and https://) by replacing with unique placeholders
+  const urls: string[] = [];
+  const withPlaceholders = chosen.replace(/https?:\/\/[^\s"'<>]+/gi, (url) => {
+    urls.push(url);
+    return `__URL_TOKEN_${urls.length - 1}__`;
+  });
+
+  // Strip absolute filesystem paths (starting with / followed by path segments)
+  const cleanedPaths = withPlaceholders
+    .replace(/(^|[\s"'`(=])\/(?:[a-zA-Z0-9_.-]+\/)+[a-zA-Z0-9_.-]*/g, '$1')
+    .replace(/\s{2,}/g, ' ')
     .trim();
-  return cleaned.length > 180 ? cleaned.slice(0, 180) + '...' : cleaned;
+
+  // Restore the original URLs completely intact
+  const restored = cleanedPaths.replace(/__URL_TOKEN_(\d+)__/g, (_, idx) => urls[Number(idx)] || '');
+
+  return restored.length > 240 ? restored.slice(0, 240) + '...' : restored || 'Download failed';
 }
 
 let cachedYtDlpPath: string | null = null;
@@ -285,9 +320,13 @@ export class DownloadQueueManager {
           ];
 
           await new Promise<void>((resolve, reject) => {
-            execFile(ytDlpPath, dlArgs, { timeout: 300000 }, (err) => {
-              if (err) reject(err);
-              else resolve();
+            execFile(ytDlpPath, dlArgs, { timeout: 300000 }, (err, stdout, stderr) => {
+              if (err) {
+                const errWithStderr = Object.assign(err, { stderr: stderr ? String(stderr) : '' });
+                reject(errWithStderr);
+              } else {
+                resolve();
+              }
             });
           });
 
@@ -314,7 +353,8 @@ export class DownloadQueueManager {
     }
 
     if (!downloadedAudioPath || !fs.existsSync(downloadedAudioPath) || fs.statSync(downloadedAudioPath).size <= 1024) {
-      throw new Error(sanitizeErrorMessage(lastError?.message || 'Download failed after retries'));
+      const capturedStderr = lastError?.stderr ? String(lastError.stderr) : '';
+      throw new Error(sanitizeErrorMessage(lastError?.message || 'Download failed after retries', capturedStderr));
     }
 
     return downloadedAudioPath;
@@ -979,10 +1019,14 @@ export class DownloadQueueManager {
             ];
 
             await new Promise<void>((resolve, reject) => {
-              const child = execFile(ytDlpPath, dlArgs, { timeout: 300000 }, (err) => {
+              const child = execFile(ytDlpPath, dlArgs, { timeout: 300000 }, (err, stdout, stderr) => {
                 this.activeChildProcesses.delete(track.id);
-                if (err) reject(err);
-                else resolve();
+                if (err) {
+                  const errWithStderr = Object.assign(err, { stderr: stderr ? String(stderr) : '' });
+                  reject(errWithStderr);
+                } else {
+                  resolve();
+                }
               });
               this.activeChildProcesses.set(track.id, child);
             });
@@ -1155,7 +1199,8 @@ export class DownloadQueueManager {
     // All attempts failed: Mark track failed (does NOT abort the overall job)
     track.status = 'failed';
     track.progress = 0;
-    track.error = sanitizeErrorMessage(lastError?.message || 'Download failed after retries');
+    const trackStderr = lastError?.stderr ? String(lastError.stderr) : '';
+    track.error = sanitizeErrorMessage(lastError?.message || 'Download failed after retries', trackStderr);
     job.failedCount = job.tracks.filter(t => t.status === 'failed').length;
     await this.persistTrackUpdate(track);
   }

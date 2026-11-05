@@ -70,18 +70,34 @@ export function getLatestSongReplacement(
 
 export function extractYouTubeVideoId(url: string): string | null {
   if (!url || typeof url !== 'string') return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  return (match && match[2].length === 11) ? match[2] : null;
+  const trimmed = url.trim();
+  const regExp = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?.*?[&?]v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:[?&#].*)?$/;
+  const match = trimmed.match(regExp);
+  if (match && match[1]) {
+    return match[1];
+  }
+  try {
+    const parsed = new URL(trimmed.startsWith('http://') || trimmed.startsWith('https://') ? trimmed : `https://${trimmed}`);
+    const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+    if (host === 'youtu.be') {
+      const id = parsed.pathname.slice(1).split('/')[0];
+      if (/^[a-zA-Z0-9_-]{11}$/.test(id)) return id;
+    }
+    if (host === 'youtube.com' || host === 'music.youtube.com' || host === 'm.youtube.com') {
+      const v = parsed.searchParams.get('v');
+      if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      if ((parts[0] === 'embed' || parts[0] === 'v' || parts[0] === 'shorts') && parts[1] && /^[a-zA-Z0-9_-]{11}$/.test(parts[1])) {
+        return parts[1];
+      }
+    }
+  } catch {}
+  return null;
 }
 
 export function isValidYouTubeUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
-  const trimmed = url.trim();
-  return (
-    (trimmed.includes('youtube.com/watch') || trimmed.includes('youtu.be/') || trimmed.includes('music.youtube.com/watch')) &&
-    extractYouTubeVideoId(trimmed) !== null
-  );
+  return extractYouTubeVideoId(url.trim()) !== null;
 }
 
 /**
@@ -159,36 +175,8 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
     }
 
     const song = songRec[0];
-    const now = new Date();
 
-    // 2. Verified source persistence (MANDATORY: Must fail if saving fails)
-    try {
-      await db.insert(songVerifiedSources).values({
-        songId,
-        youtubeUrl: trimmedUrl,
-        videoId,
-        sourceTitle: song.title,
-        sourceArtist: song.artist || 'Unknown Artist',
-        verified: 1,
-        verifiedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: songVerifiedSources.songId,
-        set: {
-          youtubeUrl: trimmedUrl,
-          videoId,
-          sourceTitle: song.title,
-          sourceArtist: song.artist || 'Unknown Artist',
-          verified: 1,
-          verifiedAt: now,
-        }
-      });
-    } catch (dbErr: any) {
-      console.error('[SourceReplacement] Fatal: Failed to persist verified source record:', dbErr);
-      throw new Error(`Failed to save verified recording source: ${dbErr?.message || dbErr}`);
-    }
-
-    // 3. Staging directory creation
+    // 2. Staging directory creation
     if (!fs.existsSync(stagingDir)) {
       fs.mkdirSync(stagingDir, { recursive: true });
     }
@@ -234,11 +222,14 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
     console.log(`[SourceReplacement] Executing instrumental separation for song #${songId}...`);
     const stagedInstrumental = path.join(stagingDir, `${baseFilename} (Instrumental).${actualExt}`);
 
-    const sepResult = await separateAndCreateInstrumental(
-      stagedMainAudio,
-      stagedInstrumental,
-      { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' }
-    );
+    let sepResult: { ok: boolean; error?: string } = { ok: true };
+    if (!fs.existsSync(stagedInstrumental) || fs.statSync(stagedInstrumental).size <= 1024) {
+      sepResult = await separateAndCreateInstrumental(
+        stagedMainAudio,
+        stagedInstrumental,
+        { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' }
+      );
+    }
 
     if (!sepResult.ok || !fs.existsSync(stagedInstrumental) || fs.statSync(stagedInstrumental).size <= 1024) {
       throw new Error(sepResult.error || 'Instrumental separation failed or produced invalid file.');
@@ -288,9 +279,30 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
         format: actualExt,
       }).where(eq(songs.id, songId));
 
-      await db.update(songVerifiedSources).set({
-        processedAt: new Date(),
-      }).where(eq(songVerifiedSources.songId, songId));
+      // Persist the new verified source ONLY after replacement download, instrumental separation, and file commit have succeeded
+      const commitTime = new Date();
+      await db.insert(songVerifiedSources).values({
+        songId,
+        youtubeUrl: trimmedUrl,
+        videoId,
+        sourceTitle: song.title,
+        sourceArtist: song.artist || 'Unknown Artist',
+        verified: 1,
+        verifiedAt: commitTime,
+        processedAt: commitTime,
+      })
+      .onConflictDoUpdate({
+        target: songVerifiedSources.songId,
+        set: {
+          youtubeUrl: trimmedUrl,
+          videoId,
+          sourceTitle: song.title,
+          sourceArtist: song.artist || 'Unknown Artist',
+          verified: 1,
+          verifiedAt: commitTime,
+          processedAt: commitTime,
+        }
+      });
 
       // Re-index metadata tags
       const canonicalMeta = {
@@ -339,6 +351,15 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
       if (backupInst && fs.existsSync(backupInst) && oldInstPath) {
         try { fs.copyFileSync(backupInst, oldInstPath); fs.unlinkSync(backupInst); } catch {}
       }
+      // Rollback songs database update if it occurred
+      try {
+        await db.update(songs).set({
+          mainAudioPath: oldMainPath,
+          instrumentalAudioPath: oldInstPath,
+          fileSize: song.fileSize,
+          format: song.format,
+        }).where(eq(songs.id, songId));
+      } catch {}
       throw commitErr;
     }
 
