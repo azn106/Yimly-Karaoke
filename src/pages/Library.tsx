@@ -1811,105 +1811,30 @@ export default function Library() {
                           onPlay={() => handlePlayInJukebox(item)}
                           onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: item.id, title: item.title, format })}
                           artistContent={renderArtistLinks(item)}
-                        >
-                        </JukeboxSongCard>
+                        />
                       </td>
                     </tr>
-                  ) : (
-                  <tr key={idx} className="hover:bg-[#1A1C2C]/60 transition-colors">
-                    <td className="px-5 py-3.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">
-                        {item.type}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 font-medium text-white flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden">
-                        {item.hasArtwork ? (
-                          <img
-                            src={
-                              item.type === 'artist'
-                                ? `/api/artists/${item.id}/artwork`
-                                : item.type === 'album'
-                                ? `/api/albums/${item.id}/artwork`
-                                : `/api/songs/${item.id}/artwork`
-                            }
-                            alt={item.title || item.name}
-                            className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        ) : item.type === 'artist' ? (
-                          <Mic className="w-4 h-4 text-zinc-400" />
-                        ) : item.type === 'album' ? (
-                          <Disc className="w-4 h-4 text-zinc-400" />
-                        ) : (
-                          <Music className="w-4 h-4 text-zinc-400" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`truncate ${item.type === 'song' && jukeboxCurrentSong?.id === item.id ? 'text-[#F472B6] font-semibold' : ''}`}>{item.title || item.name}</span>
-                        {item.type === 'song' && jukeboxCurrentSong?.id === item.id && (
-                          <EqualizerIndicator isPlaying={jukeboxIsPlaying} />
-                        )}
-                        {item.type === 'song' && (
-                          <LyricBadges
-                            hasLrc={item.hasLrc}
-                            hasElrc={item.hasElrc}
-                            onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: item.id, title: item.title, format })}
-                          />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 text-zinc-400 text-xs">
-                      {item.type === 'song' ? renderArtistLinks(item) : (item.artist || item.album || '—')}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      {item.type === 'artist' && (
-                        <button onClick={() => openArtist(item.id)} className="px-3 py-1.5 bg-white/5 hover:bg-white/15 text-white rounded-lg text-xs font-medium">View</button>
-                      )}
-                      {item.type === 'album' && (
-                        <button onClick={() => openAlbum(item.id)} className="px-3 py-1.5 bg-white/5 hover:bg-white/15 text-white rounded-lg text-xs font-medium">View</button>
-                      )}
-                      {item.type === 'song' && (
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handlePlayInJukebox(item)}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
-                              jukeboxCurrentSong?.id === item.id && jukeboxIsPlaying
-                                ? 'bg-[#F472B6] text-white shadow-sm'
-                                : 'bg-white/5 hover:bg-white/15 text-zinc-200 hover:text-white border border-white/5'
-                            }`}
-                            title={jukeboxCurrentSong?.id === item.id && jukeboxIsPlaying ? 'Pause song' : 'Play song in Jukebox'}
-                          >
-                            {jukeboxCurrentSong?.id === item.id && jukeboxIsPlaying ? (
-                              <Pause className="w-3.5 h-3.5 fill-current" />
-                            ) : (
-                              <Play className="w-3.5 h-3.5 fill-current" />
-                            )}
-                            <span>{jukeboxCurrentSong?.id === item.id && jukeboxIsPlaying ? 'Pause' : 'Play'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleQueueInJukebox(item)}
-                            className="p-1.5 rounded-lg text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-colors"
-                            title="Add to Jukebox queue"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteSong(item)}
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all bg-transparent text-zinc-500 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
-                            title="Delete song from library"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                  )
+                  ) : item.type === 'artist' ? (
+                    <tr key={`artist-${item.id}`}>
+                      <td colSpan={4} className="px-3 py-1">
+                        <JukeboxArtistCard
+                          artist={item}
+                          onOpen={() => openArtist(item.id)}
+                          layout="list"
+                        />
+                      </td>
+                    </tr>
+                  ) : item.type === 'album' ? (
+                    <tr key={`album-${item.id}`}>
+                      <td colSpan={4} className="px-3 py-1">
+                        <JukeboxAlbumCard
+                          album={item}
+                          onOpen={() => openAlbum(item.id)}
+                          layout="list"
+                        />
+                      </td>
+                    </tr>
+                  ) : null
                 ))}
                 {searchResults.length === 0 && (
                   <tr>
