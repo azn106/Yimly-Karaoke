@@ -1590,8 +1590,8 @@ export default function Library() {
         {/* Songs by Artist */}
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-white tracking-tight">Songs</h2>
-          <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
-            <table className="w-full min-w-[640px] text-left text-sm">
+          <div className="min-w-0 w-full overflow-hidden rounded-xl border border-white/[0.06] bg-[#141416]">
+          <table className="w-full table-fixed text-left text-sm">
               <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
                 <tr><th colSpan={4} className="px-5 py-3.5 text-left">Songs</th></tr>
               </thead>
@@ -1685,8 +1685,8 @@ export default function Library() {
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
-          <table className="w-full min-w-[640px] text-left text-sm">
+        <div className="min-w-0 w-full overflow-hidden rounded-xl border border-white/[0.06] bg-[#141416]">
+          <table className="w-full table-fixed text-left text-sm">
             <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
               <tr><th colSpan={4} className="px-5 py-3.5 text-left">Tracks</th></tr>
             </thead>
@@ -1788,9 +1788,9 @@ export default function Library() {
       {search.trim() && !loading && (
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-white">Search Results for "{search}"</h2>
-          <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+          <div className="min-w-0 w-full overflow-hidden rounded-xl border border-white/[0.06] bg-[#141416]">
+          <table className="w-full table-fixed text-left text-sm">
+              <thead className="hidden border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500 sm:table-header-group">
                 <tr>
                   <th className="px-5 py-3.5">Type</th>
                   <th className="px-5 py-3.5">Name / Title</th>
