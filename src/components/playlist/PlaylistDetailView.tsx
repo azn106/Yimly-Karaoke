@@ -28,6 +28,7 @@ import {
 import { Playlist, PlaylistSongItem } from '../../types';
 import LyricBadges from '../LyricBadges';
 import EqualizerIndicator from '../EqualizerIndicator';
+import JukeboxSongCard from '../jukebox/JukeboxSongCard';
 import { usePlayback, PlaybackSong } from '../../context/PlaybackContext';
 
 interface PlaylistDetailViewProps {
@@ -496,193 +497,48 @@ export default function PlaylistDetailView({
                 const isQueued = queuedSongId === song.id;
 
                 return (
-                  <tr key={song.playlistSongId || song.id} className="hover:bg-[#1A1C2C]/60 transition-colors group">
-                    {/* Position & Reorder */}
-                    <td className="px-4 py-3.5 text-zinc-500 font-mono text-xs">
-                      {canEdit ? (
-                        <div className="flex items-center gap-1">
-                          <span>{idx + 1}</span>
-                          <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              disabled={idx === 0}
-                              onClick={() => onReorderSong(song.playlistSongId, 'up')}
-                              className="text-zinc-500 hover:text-white disabled:opacity-20 p-0.5"
-                              title="Move up"
-                            >
-                              <ArrowUp className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              disabled={idx === songs.length - 1}
-                              onClick={() => onReorderSong(song.playlistSongId, 'down')}
-                              className="text-zinc-500 hover:text-white disabled:opacity-20 p-0.5"
-                              title="Move down"
-                            >
-                              <ArrowDown className="w-3 h-3" />
-                            </button>
+                  <tr key={song.playlistSongId || song.id} className="group">
+                    <td colSpan={6} className="px-3">
+                      <JukeboxSongCard
+                        song={song}
+                        isCurrent={jukeboxCurrentSong?.id === song.id}
+                        isPlaying={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying}
+                        onPlay={song.isUnavailable ? undefined : () => handlePlaySongInJukebox(song, idx)}
+                        onOpenLyrics={song.isUnavailable ? undefined : (format) => onOpenLyrics?.(song.id, song.title, format)}
+                        unavailable={!!song.isUnavailable}
+                        showAlbum
+                        albumContent={song.albumId ? (
+                          <button type="button" onClick={() => onOpenAlbum(song.albumId!)} className="truncate text-left hover:text-white hover:underline">{song.album}</button>
+                        ) : song.album}
+                        artistContent={song.artists && Array.isArray(song.artists) && song.artists.length > 0 ? (
+                          song.artists.map((artist, artistIndex) => (
+                            <React.Fragment key={artist.id || artistIndex}>
+                              {artist.id ? <button type="button" onClick={() => onOpenArtist(artist.id!)} className="hover:text-[#F472B6] hover:underline">{artist.name}</button> : artist.name}
+                              {artistIndex < song.artists.length - 1 ? ', ' : ''}
+                            </React.Fragment>
+                          ))
+                        ) : song.artist}
+                        leading={
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className="w-5 text-center font-mono text-xs text-zinc-500">{idx + 1}</span>
+                            {canEdit && (
+                              <div className="flex flex-col">
+                                <button type="button" disabled={idx === 0} onClick={() => onReorderSong(song.playlistSongId, 'up')} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-20" title="Move up"><ArrowUp className="h-3 w-3" /></button>
+                                <button type="button" disabled={idx === songs.length - 1} onClick={() => onReorderSong(song.playlistSongId, 'down')} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-20" title="Move down"><ArrowDown className="h-3 w-3" /></button>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ) : (
-                        <span>{idx + 1}</span>
-                      )}
-                    </td>
-
-                    {/* Title */}
-                    <td className="px-4 py-3.5 font-medium text-white flex items-center gap-3">
-                      <button
-                        type="button"
-                        disabled={song.isUnavailable}
-                        onClick={() => handlePlaySongInJukebox(song, idx)}
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 overflow-hidden relative border transition-colors ${
-                          song.isUnavailable
-                            ? 'bg-white/5 border-white/5 opacity-50 cursor-not-allowed'
-                            : 'bg-white/5 border-white/5 hover:border-[#F472B6]/40 cursor-pointer group/play'
-                        }`}
-                        title={
-                          song.isUnavailable
-                            ? 'Track unavailable'
-                            : jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying
-                            ? 'Pause'
-                            : 'Play in Jukebox'
                         }
                       >
-                        {song.hasArtwork ? (
-                          <img
-                            src={`/api/songs/${song.id}/artwork`}
-                            alt={song.title}
-                            className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
-                        )}
-                        {!song.isUnavailable && (
-                          <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? 'opacity-100' : 'opacity-0 group-hover/play:opacity-100'}`}>
-                            {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? (
-                              <Pause className="w-4 h-4 text-[#F472B6] fill-current" />
-                            ) : (
-                              <Play className="w-4 h-4 text-white fill-current ml-0.5" />
-                            )}
-                          </div>
-                        )}
-                      </button>
-
-                      <div className="min-w-0 flex items-center gap-2">
-                        <span className={`truncate block ${song.isUnavailable ? 'text-zinc-500 italic' : jukeboxCurrentSong?.id === song.id ? 'text-[#F472B6] font-semibold' : ''}`} title={song.title}>{song.title}</span>
-                        {song.isUnavailable && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium shrink-0">
-                            Unavailable
-                          </span>
-                        )}
-                        {jukeboxCurrentSong?.id === song.id && <EqualizerIndicator isPlaying={jukeboxIsPlaying} />}
-                        {!song.isUnavailable && (
-                          <LyricBadges
-                            hasLrc={song.hasLrc}
-                            hasElrc={song.hasElrc}
-                            onOpenLyrics={(format) => onOpenLyrics?.(song.id, song.title, format)}
-                          />
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Artist */}
-                    <td className="px-4 py-3.5 text-zinc-300 text-xs truncate max-w-xs hidden sm:table-cell">
-                      {song.artists && Array.isArray(song.artists) && song.artists.length > 0 ? (
-                        song.artists.map((a, i) => (
-                          <span key={a.id || i}>
-                            {a.id ? (
-                              <button
-                                type="button"
-                                onClick={() => onOpenArtist(a.id!)}
-                                className="hover:text-[#F472B6] hover:underline"
-                              >
-                                {a.name}
-                              </button>
-                            ) : (
-                              <span>{a.name}</span>
-                            )}
-                            {i < (song.artists?.length ?? 0) - 1 && ', '}
-                          </span>
-                        ))
-                      ) : (
-                        <span>{song.artist}</span>
-                      )}
-                    </td>
-
-                    {/* Album */}
-                    <td className="px-4 py-3.5 text-zinc-400 text-xs truncate max-w-xs hidden md:table-cell">
-                      {song.albumId ? (
-                        <button
-                          type="button"
-                          onClick={() => onOpenAlbum(song.albumId!)}
-                          className="hover:text-white hover:underline text-left truncate max-w-full"
-                        >
-                          {song.album}
+                        <button type="button" disabled={song.isUnavailable} onClick={() => onAddToQueue(song.id)} className={`rounded-lg p-1.5 transition-colors ${song.isUnavailable ? 'cursor-not-allowed text-zinc-700' : isQueued ? 'bg-[#F472B6] text-white' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`} title={song.isUnavailable ? 'Track unavailable' : 'Add song to active karaoke room queue'}>
+                          {isQueued ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                         </button>
-                      ) : (
-                        song.album || '—'
-                      )}
-                    </td>
-
-                    {/* Duration */}
-                    <td className="px-4 py-3.5 text-zinc-400 text-xs font-mono">
-                      {formatDuration(song.duration)}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          disabled={song.isUnavailable}
-                          onClick={() => handlePlaySongInJukebox(song, idx)}
-                          className={`p-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all ${
-                            song.isUnavailable
-                              ? 'opacity-30 cursor-not-allowed bg-white/5 text-zinc-500 border border-transparent'
-                              : jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying
-                              ? 'bg-[#F472B6] text-white shadow-sm'
-                              : 'bg-white/5 hover:bg-white/15 text-zinc-300 hover:text-white border border-white/5'
-                          }`}
-                          title={song.isUnavailable ? 'Track unavailable' : 'Play in Jukebox'}
-                        >
-                          {jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying ? (
-                            <Pause className="w-3.5 h-3.5 fill-current" />
-                          ) : (
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                          )}
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={song.isUnavailable}
-                          onClick={() => onAddToQueue(song.id)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
-                            song.isUnavailable
-                              ? 'opacity-30 cursor-not-allowed bg-white/5 text-zinc-500 border border-transparent'
-                              : isQueued
-                              ? 'bg-[#F472B6] text-white'
-                              : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
-                          }`}
-                          title={song.isUnavailable ? 'Track unavailable' : 'Add song to active karaoke room queue'}
-                        >
-                          {isQueued ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                          <span className="hidden sm:inline">{isQueued ? 'Added' : 'Queue'}</span>
-                        </button>
-
                         {canEdit && (
-                          <button
-                            type="button"
-                            onClick={() => onRemoveSong(song.playlistSongId)}
-                            className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                            title="Remove song from playlist"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
+                          <button type="button" onClick={() => onRemoveSong(song.playlistSongId)} className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400" title="Remove song from playlist">
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
-                      </div>
+                      </JukeboxSongCard>
                     </td>
                   </tr>
                 );
