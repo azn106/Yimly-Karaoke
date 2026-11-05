@@ -16,6 +16,7 @@ type JukeboxSongCardProps = {
   unavailable?: boolean;
   leading?: React.ReactNode;
   artistContent?: React.ReactNode;
+  albumContent?: React.ReactNode;
 };
 
 /**
@@ -36,6 +37,7 @@ export default function JukeboxSongCard({
   unavailable = false,
   leading,
   artistContent,
+  albumContent,
 }: JukeboxSongCardProps) {
   const title = song?.title || 'Unknown track';
   const artist = song?.artist || 'Unknown Artist';
