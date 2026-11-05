@@ -24,6 +24,7 @@ export default function PlaylistsGrid({
   onCoverUpload, onCoverRemove, onPlayAll, layout = 'grid',
 }: PlaylistsGridProps) {
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPlaylistId, setUploadingPlaylistId] = useState<number | null>(null);
   const isAdmin = currentUser?.role === 'administrator';
@@ -48,28 +49,35 @@ export default function PlaylistsGrid({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const cardLayout = layout === 'carousel' ? 'grid' : layout;
+  const effectiveLayout = layout === 'carousel' ? 'carousel' : viewMode;
+  const cardLayout = effectiveLayout === 'carousel' ? 'grid' : effectiveLayout;
 
   return (
     <div className="space-y-6">
       <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={handleFilePicked} />
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">Playlists</h2>
           <p className="mt-0.5 text-xs text-zinc-400">{playlists.length} playlist{playlists.length === 1 ? '' : 's'} available</p>
         </div>
+        <div className="flex items-center gap-2">
+          {layout !== 'carousel' && <div className="inline-flex rounded-lg border border-white/10 bg-[#141622] p-1">
+            <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} className={`rounded-md px-3 py-1.5 text-xs ${viewMode === 'grid' ? 'bg-[#F472B6] text-white' : 'text-zinc-400 hover:text-white'}`}>Grid</button>
+            <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} className={`rounded-md px-3 py-1.5 text-xs ${viewMode === 'list' ? 'bg-[#F472B6] text-white' : 'text-zinc-400 hover:text-white'}`}>List</button>
+          </div>}
         <button type="button" onClick={onCreateNew} className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#F472B6] px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-[#F472B6]/20 transition hover:bg-[#DB2777]">
           <Plus className="h-4 w-4" /><span>New Playlist</span>
         </button>
+        </div>
       </div>
 
-      <div className={layout === 'carousel' ? 'yk-horizontal-rail flex items-stretch gap-4 overflow-x-auto pb-4 snap-x snap-mandatory' : layout === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'}>
+      <div className={effectiveLayout === 'carousel' ? 'yk-horizontal-rail flex items-stretch gap-4 overflow-x-auto pb-4 snap-x snap-mandatory' : effectiveLayout === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'}>
         {playlists.map(playlist => {
           const isOwner = playlist.userId === currentUser?.id;
           const canEdit = playlist.canEdit || isOwner || isAdmin;
           const isMenuOpen = activeMenuId === playlist.id;
           return (
-            <div key={playlist.id} className={layout === 'carousel' ? 'w-44 shrink-0 snap-start' : 'min-w-0'}>
+            <div key={playlist.id} className={effectiveLayout === 'carousel' ? 'w-44 shrink-0 snap-start' : 'min-w-0'}>
               <JukeboxPlaylistCard playlist={playlist} onOpen={() => onOpenPlaylist(playlist.id)} layout={cardLayout}>
                 <div className="relative" onClick={event => event.stopPropagation()}>
                   {playlist.isPublic && <span title="Public playlist" className="mr-1 inline-flex rounded-md bg-black/50 p-1 text-emerald-400"><Globe className="h-3.5 w-3.5" /></span>}
