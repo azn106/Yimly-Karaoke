@@ -161,6 +161,9 @@ test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', a
 
     // Playlist detail uses the same Jukebox card while keeping its separate Karaoke room queue action.
     assert.ok(playlistCode.includes('onAddToJukeboxQueue'), 'Playlist detail connects the Jukebox queue action');
+    assert.ok(playlistCode.includes('artworkTrailing={canEdit ?'), 'Playlist reorder controls stay beside the song artwork');
+    assert.ok(playlistCode.includes('w-full table-fixed text-left text-sm'), 'Playlist track and recommendation tables fit the available viewport width');
+    assert.ok(cardCode.includes('artworkTrailing'), 'Master card supports playlist-specific controls beside artwork');
     assert.ok(playlistCode.includes('onAddToQueue(song.id)'), 'Playlist detail retains its separate Karaoke room queue action');
 
     // Karaoke room UI is not migrated to the Jukebox Library master card.
