@@ -26,8 +26,6 @@ import {
   Search
 } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../../types';
-import LyricBadges from '../LyricBadges';
-import EqualizerIndicator from '../EqualizerIndicator';
 import JukeboxSongCard from '../jukebox/JukeboxSongCard';
 import { usePlayback, PlaybackSong } from '../../context/PlaybackContext';
 
