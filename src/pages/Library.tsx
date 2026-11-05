@@ -12,6 +12,9 @@ import PlaylistDetailView from '../components/playlist/PlaylistDetailView';
 import LyricBadges from '../components/LyricBadges';
 import EqualizerIndicator from '../components/EqualizerIndicator';
 import JukeboxSongCard from '../components/jukebox/JukeboxSongCard';
+import JukeboxArtistCard from '../components/jukebox/JukeboxArtistCard';
+import JukeboxAlbumCard from '../components/jukebox/JukeboxAlbumCard';
+import JukeboxPlaylistCard from '../components/jukebox/JukeboxPlaylistCard';
 import { clearAuthToken } from '../lib/auth';
 import { usePlayback, PlaybackSong } from '../context/PlaybackContext';
 
@@ -48,6 +51,7 @@ export default function Library() {
   const loadingMoreAlbumsRef = useRef(false);
   const ALBUMS_PAGE_SIZE = 40;
   const [activeJumpLetter, setActiveJumpLetter] = useState('#');
+  const [entityCardLayout, setEntityCardLayout] = useState<'grid' | 'list'>('grid');
   const [songs, setSongs] = useState<any[]>([]);
   const [songsSort, setSongsSort] = useState<'artist' | 'title' | 'album' | 'recent' | 'oldest' | 'duration' | 'track'>(() => {
     const savedSort = window.localStorage.getItem('yimly-songs-sort');
@@ -1555,28 +1559,7 @@ export default function Library() {
             <h2 className="text-xl font-bold text-white tracking-tight">Discography & Albums</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {selectedArtist.albums.map((album: any) => (
-                <div 
-                  key={album.id}
-                  onClick={() => openAlbum(album.id)}
-                  className="group w-44 shrink-0 snap-start cursor-pointer rounded-2xl border border-white/5 bg-[#141622] p-3 transition hover:border-[#F472B6]/30 hover:bg-[#1A1C2C]"
-                >
-                  <div className="w-full aspect-square bg-[#1C1E2D] rounded-xl mb-3 flex items-center justify-center relative overflow-hidden group-hover:border-[#F472B6]/20 border border-white/5">
-                    {album.hasArtwork ? (
-                      <img
-                        src={`/api/albums/${album.id}/artwork`}
-                        alt={album.title}
-                        className="h-[70%] w-[70%] object-cover yk-artwork-image yk-artwork-image"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <Disc className="w-10 h-10 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
-                    )}
-                  </div>
-                  <h3 className="font-semibold text-sm text-white truncate group-hover:text-[#F472B6] transition-colors">{album.title}</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">{album.year || 'Album'}</p>
-                </div>
+                <JukeboxAlbumCard key={album.id} album={album} onOpen={() => openAlbum(album.id)} layout="grid" />
               ))}
             </div>
           </div>
@@ -1952,42 +1935,11 @@ export default function Library() {
                   </div>
                   {playlists.length ? (
                     <div ref={playlistRailRef} className="yk-horizontal-rail flex items-stretch gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
-                      {playlists.map((playlist) => {
-                        return (
-                          <button
-                            key={playlist.id}
-                            type="button"
-                            onClick={() => openPlaylist(playlist.id)}
-                            className="group relative h-[7.5rem] w-[calc((100%_-_1rem)_/_2)] shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-[#141416] text-left shadow-lg shadow-black/20 sm:h-32"
-                            aria-label={`Open playlist ${playlist.name}`}
-                          >
-                            {playlist.coverImageUrl || playlist.coverPath ? (
-                              <img
-                                key={playlist.id}
-                                src={playlist.coverImageUrl && /^(https?:|data:)/i.test(playlist.coverImageUrl) ? playlist.coverImageUrl : `/api/playlists/${playlist.id}/cover`}
-                                alt=""
-                                className="absolute inset-0 h-full w-full object-cover yk-artwork-image yk-artwork-image"
-                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                              />
-                            ) : (
-                              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#24242B] to-[#111114]">
-                                <ListMusic className="h-8 w-8 text-white/20" strokeWidth={1} />
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
-                            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-2">
-                              <div className="min-w-0">
-                                <span className="mb-0.5 block text-[8px] font-bold uppercase tracking-[0.1em] text-[#F472B6]">Featured playlist</span>
-                                <h3 className="truncate text-sm font-bold text-white">{playlist.name}</h3>
-                                <p className="mt-0.5 text-[10px] text-white/70">{playlist.songCount || playlist.songs?.length || 0} songs</p>
-                              </div>
-                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F472B6] text-white shadow-lg shadow-[#F472B6]/25 transition-transform group-hover:scale-105">
-                                <ChevronRight className="h-4 w-4" />
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                      {playlists.map(playlist => (
+                        <div key={playlist.id} className="w-48 shrink-0 snap-start">
+                          <JukeboxPlaylistCard playlist={playlist} onOpen={() => openPlaylist(playlist.id)} layout="grid" />
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="flex h-60 w-full max-w-3xl flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#141416] p-6 text-center">
@@ -2011,28 +1963,11 @@ export default function Library() {
                     </button>
                   </div>
                   {artists.length ? (
-                    <div className="yk-horizontal-rail flex items-center gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
+                    <div className="yk-horizontal-rail flex items-stretch gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
                       {artists.map(artist => (
-                        <button
-                          type="button"
-                          key={artist.id}
-                          onClick={() => openArtist(artist.id)}
-                          className="yk-artist-carousel-card group flex w-[calc((100%_-_1.5rem)_/_3)] shrink-0 flex-col items-center snap-start text-center transition hover:opacity-90 cursor-pointer"
-                        >
-                          <div className="relative mb-2.5 flex aspect-square h-auto w-full max-w-[5rem] items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1C1E2D] shadow-md transition-colors group-hover:border-[#F472B6]/40">
-                            <Mic className="absolute h-8 w-8 text-zinc-600 group-hover:text-[#F472B6] transition-colors" />
-                            {artist.hasArtwork && (
-                              <img
-                                src={'/api/artists/' + artist.id + '/artwork'}
-                                alt={artist.name}
-                                className="relative z-10 h-full w-full object-cover yk-artwork-image"
-                                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                              />
-                            )}
-                          </div>
-                          <span className="w-full truncate text-xs font-semibold text-white group-hover:text-[#F472B6] transition-colors">{artist.name}</span>
-                          <span className="mt-0.5 text-[11px] text-zinc-500">{artist.songCount || 0} songs</span>
-                        </button>
+                        <div key={artist.id} className="w-28 shrink-0 snap-start">
+                          <JukeboxArtistCard artist={artist} onOpen={() => openArtist(artist.id)} layout="grid" />
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -2052,31 +1987,11 @@ export default function Library() {
                     </button>
                   </div>
                   {albums.length ? (
-                    <div className="yk-horizontal-rail flex items-start gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
+                    <div className="yk-horizontal-rail flex items-stretch gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
                       {albums.map(album => (
-                        <button
-                          type="button"
-                          key={album.id}
-                          onClick={() => openAlbum(album.id)}
-                          className="group w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start rounded-xl p-1 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F472B6]"
-                          aria-label={`Open album ${album.title}`}
-                        >
-                          <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
-                            {album.hasArtwork ? (
-                              <img
-                                src={`/api/albums/${album.id}/artwork`}
-                                alt={album.title}
-                                className="h-full w-full object-cover yk-artwork-image"
-                                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                              />
-                            ) : (
-                              <Disc className="h-10 w-10 text-zinc-500 transition-colors group-hover:text-[#F472B6]" />
-                            )}
-                          </div>
-                          <span className="block truncate text-xs font-semibold text-white transition-colors group-hover:text-[#F472B6]">{album.title}</span>
-                          <span className="mt-0.5 block truncate text-[11px] text-zinc-400">{album.artist || 'Unknown Artist'}</span>
-                          <span className="mt-1 block text-[10px] text-zinc-500">{album.songCount || 0} tracks</span>
-                        </button>
+                        <div key={album.id} className="w-36 shrink-0 snap-start">
+                          <JukeboxAlbumCard album={album} onOpen={() => openAlbum(album.id)} layout="grid" />
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -2163,56 +2078,41 @@ export default function Library() {
             );
           })()}
 
-          {/* Artists Grid: responsive, vertically scrolling catalogue */}
-          {tab === 'artists' && (
-            <div className="grid grid-cols-3 justify-center gap-3 pb-4 [@media(orientation:landscape)]:grid-cols-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4">
-              {artists.map(artist => (
-                <div id={`library-card-artists-${artist.id}`} key={artist.id} onClick={() => openArtist(artist.id)}
-                  className="group flex min-w-0 cursor-pointer flex-col items-center rounded-xl border border-white/5 bg-[#141622] p-1 text-center transition hover:border-[#F472B6]/30 hover:bg-[#1A1C2C] sm:rounded-2xl sm:p-4">
-                  <div className="relative mb-2.5 flex aspect-square h-auto w-full max-w-[5rem] items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/50">
-                    {artist.hasArtwork && !artistArtworkErrors[artist.id] && (
-                      <img
-                        key={`${artist.id}-${artistArtworkVersions[artist.id] || 0}`}
-                        src={`/api/artists/${artist.id}/artwork${artistArtworkVersions[artist.id] ? `?v=${artistArtworkVersions[artist.id]}` : ''}`}
-                        alt={artist.name}
-                        loading="lazy"
-                        decoding="async"
-                        className="yk-artwork-image relative z-10 h-full w-full object-cover"
-                        onError={() => {
-                          setArtistArtworkErrors(prev => ({ ...prev, [artist.id]: true }));
-                        }}
-                      />
-                    )}
-                  </div>
-                  <h3 className="w-full truncate text-xs font-semibold text-white transition-colors group-hover:text-[#F472B6] sm:text-sm">{artist.name}</h3>
-                  <p className="mt-1 text-[10px] text-zinc-400 sm:text-xs">{artist.songCount || 0} Songs • {artist.albumCount || 0} Albums</p>
+          {/* Artist and Album catalogues share their master cards across grid/list modes. */}
+          {(tab === 'artists' || tab === 'albums') && (
+            <section className="space-y-4">
+              <div className="flex justify-end">
+                <div className="inline-flex rounded-lg border border-white/10 bg-[#141622] p-1">
+                  <button type="button" onClick={() => setEntityCardLayout('grid')} aria-pressed={entityCardLayout === 'grid'} className={`rounded-md px-3 py-1.5 text-xs ${entityCardLayout === 'grid' ? 'bg-[#F472B6] text-white' : 'text-zinc-400 hover:text-white'}`}>Grid</button>
+                  <button type="button" onClick={() => setEntityCardLayout('list')} aria-pressed={entityCardLayout === 'list'} className={`rounded-md px-3 py-1.5 text-xs ${entityCardLayout === 'list' ? 'bg-[#F472B6] text-white' : 'text-zinc-400 hover:text-white'}`}>List</button>
                 </div>
-              ))}
-              {artists.length === 0 && !loading && <div className="col-span-full py-16 text-center text-zinc-500">No artists found. Run a library scan or configure a directory in Settings.</div>}
-            </div>
+              </div>
+              {tab === 'artists' && (
+                <div className={entityCardLayout === 'grid' ? 'grid grid-cols-3 justify-center gap-3 pb-4 [@media(orientation:landscape)]:grid-cols-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4' : 'flex flex-col gap-2 pb-4'}>
+                  {artists.map(artist => (
+                    <div id={`library-card-artists-${artist.id}`} key={artist.id}>
+                      <JukeboxArtistCard artist={artist} onOpen={() => openArtist(artist.id)} layout={entityCardLayout} artworkVersion={artistArtworkVersions[artist.id] || 0} artworkError={!!artistArtworkErrors[artist.id]} onArtworkError={() => setArtistArtworkErrors(prev => ({ ...prev, [artist.id]: true }))} />
+                    </div>
+                  ))}
+                  {artists.length === 0 && !loading && <div className="col-span-full py-16 text-center text-zinc-500">No artists found. Run a library scan or configure a directory in Settings.</div>}
+                </div>
+              )}
+              {tab === 'albums' && (
+                <div className={entityCardLayout === 'grid' ? 'grid grid-cols-3 justify-center gap-3 pb-4 [@media(orientation:landscape)]:grid-cols-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4' : 'flex flex-col gap-2 pb-4'}>
+                  {albums.map(album => (
+                    <div id={`library-card-albums-${album.id}`} key={album.id}>
+                      <JukeboxAlbumCard album={album} onOpen={() => openAlbum(album.id)} layout={entityCardLayout} />
+                    </div>
+                  ))}
+                  {albums.length === 0 && !loading && <div className="col-span-full py-16 text-center text-zinc-500">No albums found in media library.</div>}
+                </div>
+              )}
+            </section>
           )}
           {tab === 'artists' && hasMoreArtists && <div ref={artistsLoadMoreRef} className="flex min-h-16 items-center justify-center py-5 text-sm text-zinc-500" aria-live="polite">{loadingMoreArtists ? 'Loading more artists…' : 'Scroll for more artists'}</div>}
           {tab === 'artists' && !hasMoreArtists && artists.length > 0 && <div className="py-5 text-center text-xs text-zinc-600">All artists loaded</div>}
-
-          {/* Albums Grid: responsive, vertically scrolling catalogue */}
-          {tab === 'albums' && (
-            <div className="grid grid-cols-3 justify-center gap-3 pb-4 [@media(orientation:landscape)]:grid-cols-4 sm:grid-cols-[repeat(auto-fill,minmax(140px,180px))] sm:gap-4">
-              {albums.map(album => (
-                <div id={`library-card-albums-${album.id}`} key={album.id} onClick={() => openAlbum(album.id)} className="group min-w-0 cursor-pointer rounded-xl p-1 transition hover:bg-white/[0.04] sm:p-2">
-                  <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-[#1A1C2C] shadow-inner transition-colors group-hover:border-[#F472B6]/40">
-                    {album.hasArtwork ? <img src={`/api/albums/${album.id}/artwork`} alt={album.title} loading="lazy" decoding="async" className="yk-artwork-image h-full w-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} /> : <Disc className="h-12 w-12 text-zinc-500 transition-colors group-hover:text-[#F472B6]" />}
-                  </div>
-                  <h3 className="truncate text-xs font-semibold text-white transition-colors group-hover:text-[#F472B6] sm:text-sm">{album.title}</h3>
-                  <p className="mt-0.5 truncate text-[10px] text-zinc-400 sm:text-xs">{album.artist || 'Unknown Artist'}</p>
-                  <p className="mt-1 text-[10px] text-zinc-500 sm:text-[11px]">{album.year || 'Album'} • {album.songCount || 0} Tracks</p>
-                </div>
-              ))}
-              {albums.length === 0 && !loading && <div className="col-span-full py-16 text-center text-zinc-500">No albums found in media library.</div>}
-            </div>
-          )}
           {tab === 'albums' && hasMoreAlbums && <div ref={albumsLoadMoreRef} className="flex min-h-16 items-center justify-center py-5 text-sm text-zinc-500" aria-live="polite">{loadingMoreAlbums ? 'Loading more albums…' : 'Scroll for more albums'}</div>}
           {tab === 'albums' && !hasMoreAlbums && albums.length > 0 && <div className="py-5 text-center text-xs text-zinc-600">All albums loaded</div>}
-
 
           {(tab === 'artists' || tab === 'albums') && (
             <nav aria-label="Jump to artist or album letter" className="fixed right-1 top-[46%] z-30 flex max-h-[90vh] -translate-y-1/2 flex-col items-center overflow-y-auto rounded-full border border-white/10 bg-[#11121c]/90 px-1 py-1.5 shadow-lg backdrop-blur sm:right-3 sm:px-1.5 xl:right-[354px]">
