@@ -484,12 +484,7 @@ export default function PlaylistDetailView({
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
               <tr>
-                <th className="px-4 py-3.5 w-14">#</th>
-                <th className="px-4 py-3.5">Title</th>
-                <th className="px-4 py-3.5 hidden sm:table-cell">Artist</th>
-                <th className="px-4 py-3.5 hidden md:table-cell">Album</th>
-                <th className="px-4 py-3.5">Duration</th>
-                <th className="px-4 py-3.5 text-right">Actions</th>
+                <th colSpan={6} className="px-4 py-3.5 text-left">Track</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
