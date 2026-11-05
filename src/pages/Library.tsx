@@ -1556,10 +1556,16 @@ export default function Library() {
         {/* Albums by Artist */}
         {selectedArtist.albums?.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-white tracking-tight">Discography & Albums</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-white tracking-tight">Discography & Albums</h2>
+              <div className="inline-flex rounded-lg border border-white/10 bg-[#141622] p-1">
+                <button type="button" onClick={() => setEntityCardLayout('grid')} aria-pressed={entityCardLayout === 'grid'} className={`rounded-md px-3 py-1.5 text-xs ${entityCardLayout === 'grid' ? 'bg-[#F472B6] text-white' : 'text-zinc-400 hover:text-white'}`}>Grid</button>
+                <button type="button" onClick={() => setEntityCardLayout('list')} aria-pressed={entityCardLayout === 'list'} className={`rounded-md px-3 py-1.5 text-xs ${entityCardLayout === 'list' ? 'bg-[#F472B6] text-white' : 'text-zinc-400 hover:text-white'}`}>List</button>
+              </div>
+            </div>
+            <div className={entityCardLayout === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4' : 'flex flex-col gap-2'}>
               {selectedArtist.albums.map((album: any) => (
-                <JukeboxAlbumCard key={album.id} album={album} onOpen={() => openAlbum(album.id)} layout="grid" />
+                <JukeboxAlbumCard key={album.id} album={album} onOpen={() => openAlbum(album.id)} layout={entityCardLayout} />
               ))}
             </div>
           </div>
