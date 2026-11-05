@@ -1398,7 +1398,7 @@ export default function Library() {
           onOpenAddToPlaylist={handleOpenAddToPlaylist}
           onReplaceAudio={handleOpenReplaceSource}
           onReplaceInstrumental={handleOpenReplaceInstrumental}
-          onDeleteSong={handleDeleteSong}
+          onDeleteSong={handleOpenDeleteConfirm}
           onPlayAll={handlePlayAll}
           onOpenAddSongs={() => {
             setActiveModalPlaylist(selectedPlaylist);
