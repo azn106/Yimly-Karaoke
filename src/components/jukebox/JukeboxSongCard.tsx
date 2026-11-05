@@ -92,7 +92,7 @@ export default function JukeboxSongCard({
       </div>
 
       {showAlbum && song?.album && (
-        <span className="hidden max-w-[22%] shrink-0 truncate text-xs text-zinc-500 sm:block">{song.album}</span>
+        <span className="hidden max-w-[22%] shrink-0 truncate text-xs text-zinc-500 sm:block">{albumContent ?? song.album}</span>
       )}
       {showDuration && (
         <span className="hidden shrink-0 font-mono text-xs text-zinc-500 md:block">{formattedDuration}</span>
