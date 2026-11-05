@@ -1610,9 +1610,7 @@ export default function Library() {
                           onPlay={() => handlePlayInJukebox(song, selectedArtist.songs, idx)}
                           onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
                           showAlbum={false}
-                        >
-                          <span className="hidden text-[10px] capitalize text-zinc-500 sm:inline">{song.variant}</span>
-                        </JukeboxSongCard>
+                      />
                       </td>
                     </tr>
                   );
@@ -1709,10 +1707,7 @@ export default function Library() {
                         onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
                         showAlbum={false}
                         leading={<span className="w-6 shrink-0 text-center font-mono text-xs text-zinc-500">{song.trackNumber || idx + 1}</span>}
-                      >
-                        <button type="button" onClick={() => handleQueueInJukebox(song)} className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white" title="Add to Jukebox queue" aria-label="Add to Jukebox queue"><Plus className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => handleDeleteSong(song)} className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400" title="Delete song from library"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </JukeboxSongCard>
+                      />
                     </td>
                   </tr>
                 );
