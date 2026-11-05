@@ -2243,78 +2243,23 @@ export default function Library() {
                         const isFav = favoriteIds.has(song.id);
 
                         return (
-                          <div
+                          <JukeboxSongCard
                             key={song.id}
-                            className="flex items-center gap-2.5 py-2 transition-colors"
+                            song={song}
+                            isCurrent={isCurrent}
+                            isPlaying={isThisPlaying}
+                            onPlay={() => handlePlayInJukebox(song, songs, index)}
+                            onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
+                            showAlbum={false}
+                            showDuration={false}
                           >
-                            {/* Small square artwork */}
-                            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1C1E2D]">
-                              {song.hasArtwork ? (
-                                <img
-                                  src={'/api/songs/' + song.id + '/artwork'}
-                                  alt=""
-                                  className="h-full w-full object-cover yk-artwork-image yk-artwork-image"
-                                  onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                                />
-                              ) : (
-                                <Music className="h-5 w-5 text-zinc-600" />
-                              )}
-                            </div>
-
-                            {/* Song title on first line, artist name underneath */}
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <p className={`truncate text-sm font-semibold ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`} title={song.title}>
-                                  {song.title}
-                                </p>
-                                {isCurrent && <EqualizerIndicator isPlaying={isThisPlaying} />}
-                              </div>
-                              <p className="truncate text-xs text-zinc-400">
-                                {song.artist || 'Unknown Artist'}
-                              </p>
-                            </div>
-
-                            {/* Play/Pause, favourite-heart, and add-to-queue on the same row */}
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => handlePlayInJukebox(song, songs, index)}
-                                className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition ${
-                                  isThisPlaying
-                                    ? 'bg-[#F472B6] text-white shadow-sm'
-                                    : 'bg-white/5 hover:bg-[#F472B6] text-white'
-                                }`}
-                                aria-label={isThisPlaying ? 'Pause ' + song.title : 'Play ' + song.title}
-                                title={isThisPlaying ? 'Pause' : 'Play ' + song.title}
-                              >
-                                {isThisPlaying ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current ml-0.5" />}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleToggleFavorite(song.id)}
-                                className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition ${
-                                  isFav
-                                    ? 'text-[#F472B6] bg-[#F472B6]/15 hover:bg-[#F472B6]/25'
-                                    : 'text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10'
-                                }`}
-                                aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
-                                title={isFav ? 'Remove from favourites' : 'Add to favourites'}
-                              >
-                                <Heart className={`h-3.5 w-3.5 ${isFav ? 'fill-current' : ''}`} />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleQueueInJukebox(song)}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white transition"
-                                aria-label={'Add ' + song.title + ' to queue'}
-                                title={'Add ' + song.title + ' to queue'}
-                              >
-                                <Plus className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
+                            <button type="button" onClick={() => handleToggleFavorite(song.id)} className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition ${isFav ? 'bg-[#F472B6]/15 text-[#F472B6] hover:bg-[#F472B6]/25' : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'}`} aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'} title={isFav ? 'Remove from favourites' : 'Add to favourites'}>
+                              <Heart className={`h-3.5 w-3.5 ${isFav ? 'fill-current' : ''}`} />
+                            </button>
+                            <button type="button" onClick={() => handleQueueInJukebox(song)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white" aria-label={`Add ${song.title} to queue`} title={`Add ${song.title} to queue`}>
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </JukeboxSongCard>
                         );
                       })}
                     </div>
