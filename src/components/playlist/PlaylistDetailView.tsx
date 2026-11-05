@@ -52,6 +52,13 @@ interface PlaylistDetailViewProps {
   queuedSongId: number | null;
   playingAll?: boolean;
   onOpenLyrics?: (songId: number, title: string, format: 'lrc' | 'elrc') => void;
+  onAddToJukeboxQueue?: (song: PlaylistSongItem) => void;
+  favoriteIds?: Set<number>;
+  onToggleFavorite?: (songId: number) => void;
+  onOpenAddToPlaylist?: (song: PlaylistSongItem) => void;
+  onReplaceAudio?: (song: PlaylistSongItem) => void;
+  onReplaceInstrumental?: (song: PlaylistSongItem) => void;
+  onDeleteSong?: (song: PlaylistSongItem) => void;
   onSongAdded?: (song: PlaylistSongItem) => void;
 }
 
@@ -73,6 +80,13 @@ export default function PlaylistDetailView({
   onCoverRemove,
   onRemoveSong,
   onOpenLyrics,
+  onAddToJukeboxQueue,
+  favoriteIds,
+  onToggleFavorite,
+  onOpenAddToPlaylist,
+  onReplaceAudio,
+  onReplaceInstrumental,
+  onDeleteSong,
   onReorderSong,
   queuedSongId,
   playingAll = false,
@@ -496,6 +510,13 @@ export default function PlaylistDetailView({
                     <td colSpan={6} className="px-3">
                       <JukeboxSongCard
                         song={song}
+                        onAddToQueue={song.isUnavailable ? undefined : () => onAddToJukeboxQueue?.(song)}
+                        isFavorite={favoriteIds?.has(song.id)}
+                        onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(song.id) : undefined}
+                        onAddToPlaylist={onOpenAddToPlaylist ? () => onOpenAddToPlaylist(song) : undefined}
+                        onReplaceAudio={onReplaceAudio ? () => onReplaceAudio(song) : undefined}
+                        onReplaceInstrumental={onReplaceInstrumental ? () => onReplaceInstrumental(song) : undefined}
+                        onDeleteSong={onDeleteSong ? () => onDeleteSong(song) : undefined}
                         isCurrent={jukeboxCurrentSong?.id === song.id}
                         isPlaying={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying}
                         onPlay={song.isUnavailable ? undefined : () => handlePlaySongInJukebox(song, idx)}
