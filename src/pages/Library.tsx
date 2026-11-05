@@ -1392,6 +1392,13 @@ export default function Library() {
           onOpenArtist={openArtist}
           onOpenAlbum={openAlbum}
           onAddToQueue={addToQueue}
+          onAddToJukeboxQueue={handleQueueInJukebox}
+          favoriteIds={favoriteIds}
+          onToggleFavorite={handleToggleFavorite}
+          onOpenAddToPlaylist={handleOpenAddToPlaylist}
+          onReplaceAudio={handleOpenReplaceSource}
+          onReplaceInstrumental={handleOpenReplaceInstrumental}
+          onDeleteSong={handleDeleteSong}
           onPlayAll={handlePlayAll}
           onOpenAddSongs={() => {
             setActiveModalPlaylist(selectedPlaylist);
@@ -1697,6 +1704,7 @@ export default function Library() {
                     <td colSpan={4} className="px-3">
                       <JukeboxSongCard
                         song={{ ...song, artist: song.artist || selectedAlbum.artist, album: selectedAlbum.title }}
+                        {...getSongCardActions(song)}
                         isCurrent={isCurrent}
                         isPlaying={isThisPlaying}
                         onPlay={() => handlePlayInJukebox(song, selectedAlbum.songs, idx)}
