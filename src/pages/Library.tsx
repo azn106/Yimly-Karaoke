@@ -2192,30 +2192,16 @@ export default function Library() {
                   {songs.length ? (
                     <div className="yk-horizontal-rail flex items-start gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none">
                       {songs.slice(0, 10).map((song, idx) => (
-                        <div
-                          key={song.id}
-                          className="group flex w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start flex-col rounded-xl p-1 transition hover:bg-white/[0.04] cursor-pointer"
-                          onClick={() => handlePlayInJukebox(song, songs, idx)}
-                        >
-                          <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#1C1E2D] flex items-center justify-center">
-                            {song.hasArtwork ? (
-                              <img
-                                src={'/api/songs/' + song.id + '/artwork'}
-                                alt=""
-                                className="h-full w-full object-cover yk-artwork-image yk-artwork-image transition"
-                                onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                              />
-                            ) : (
-                              <Music className="h-7 w-7 text-zinc-600" />
-                            )}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                              <div className="w-8 h-8 rounded-full bg-[#F472B6] text-white flex items-center justify-center shadow-md">
-                                <Play className="w-4 h-4 fill-current ml-0.5" />
-                              </div>
-                            </div>
-                          </div>
-                          <span className="block truncate text-xs font-semibold text-white group-hover:text-[#F472B6] transition-colors">{song.title}</span>
-                          <span className="mt-0.5 block truncate text-[11px] text-zinc-400">{song.artist || 'Unknown Artist'}</span>
+                        <div key={song.id} className="w-[min(82vw,300px)] shrink-0 snap-start">
+                          <JukeboxSongCard
+                            song={song}
+                            isCurrent={jukeboxCurrentSong?.id === song.id}
+                            isPlaying={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying}
+                            onPlay={() => handlePlayInJukebox(song, songs, idx)}
+                            onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
+                            showAlbum={false}
+                            showDuration={false}
+                          />
                         </div>
                       ))}
                     </div>
