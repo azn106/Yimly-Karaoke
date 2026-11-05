@@ -15,6 +15,7 @@ type JukeboxSongCardProps = {
   showDuration?: boolean;
   unavailable?: boolean;
   leading?: React.ReactNode;
+  artistContent?: React.ReactNode;
 };
 
 /**
@@ -34,6 +35,7 @@ export default function JukeboxSongCard({
   showDuration = true,
   unavailable = false,
   leading,
+  artistContent,
 }: JukeboxSongCardProps) {
   const title = song?.title || 'Unknown track';
   const artist = song?.artist || 'Unknown Artist';
@@ -84,7 +86,7 @@ export default function JukeboxSongCard({
           )}
           {unavailable && <span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">Unavailable</span>}
         </div>
-        <div className="truncate text-xs text-zinc-400" title={artist}>{artist}</div>
+        <div className="truncate text-xs text-zinc-400" title={artist}>{artistContent ?? artist}</div>
       </div>
 
       {showAlbum && song?.album && (
