@@ -127,46 +127,45 @@ test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', a
   const song2Id = songRes2[0].id;
 
   // --- SECTION 1: SONGS PAGE UI SPECIFICATION AUDIT ---
-  await t.test('UI Audit: Songs page individual cards feature More Options menu and maintain clean layout', () => {
+  await t.test('UI Audit: one master Jukebox song card owns the full Library action set', () => {
     const libraryCode = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/Library.tsx'), 'utf-8');
+    const cardCode = fs.readFileSync(path.resolve(process.cwd(), 'src/components/jukebox/JukeboxSongCard.tsx'), 'utf-8');
+    const playlistCode = fs.readFileSync(path.resolve(process.cwd(), 'src/components/playlist/PlaylistDetailView.tsx'), 'utf-8');
 
-    // 1. More options icon is imported and rendered on individual song cards under tab === 'songs'
-    assert.ok(libraryCode.includes('song-more-options-container'), 'More options container exists on song cards');
-    assert.ok(libraryCode.includes('MoreVertical'), 'Three-dot MoreVertical icon is used for more options');
+    // The master card owns the shared artwork/playback/lyrics UI and the complete More Options menu.
+    assert.ok(cardCode.includes('MoreVertical'), 'Master card renders the More Options control');
+    assert.ok(cardCode.includes('onAddToQueue'), 'Master card owns Add to Queue');
+    assert.ok(cardCode.includes('onToggleFavorite'), 'Master card supports favourites');
+    assert.ok(cardCode.includes('onAddToPlaylist'), 'Master card supports Add to Playlist');
+    assert.ok(cardCode.includes('onReplaceAudio'), 'Master card supports Replace Audio');
+    assert.ok(cardCode.includes('onReplaceInstrumental'), 'Master card supports Replace Instrumental');
+    assert.ok(cardCode.includes('onDeleteSong'), 'Master card supports Delete Song');
 
-    // 2. The 5 actions are present in the exact specified order
-    const startIndex = libraryCode.indexOf('song-more-options-container');
-    assert.ok(startIndex !== -1, 'More options container exists on song cards');
-    const menuText = libraryCode.slice(startIndex, startIndex + 6000);
+    const favIndex = cardCode.indexOf('Remove from Favourites');
+    const playlistIndex = cardCode.indexOf('Add to Playlist');
+    const replaceAudioIndex = cardCode.indexOf('Replace Audio');
+    const replaceInstIndex = cardCode.indexOf('Replace Instrumental');
+    const deleteIndex = cardCode.indexOf('Delete Song');
+    assert.ok(favIndex !== -1 && playlistIndex !== -1 && replaceAudioIndex !== -1 && replaceInstIndex !== -1 && deleteIndex !== -1,
+      'All five More Options actions are present');
+    assert.ok(favIndex < playlistIndex && playlistIndex < replaceAudioIndex && replaceAudioIndex < replaceInstIndex && replaceInstIndex < deleteIndex,
+      'More Options actions appear in the expected order');
 
-    const favIndex = menuText.indexOf('handleToggleFavorite');
-    const playlistIndex = menuText.indexOf('handleOpenAddToPlaylist');
-    const replaceAudioIndex = menuText.indexOf('handleOpenReplaceSource');
-    const replaceInstIndex = menuText.indexOf('handleOpenReplaceInstrumental');
-    const deleteIndex = menuText.indexOf('handleOpenDeleteConfirm');
+    // Library song lists and search results pass their actions into the same component.
+    assert.ok(libraryCode.includes('getSongCardActions(song)'), 'Library song rows use the shared action set');
+    assert.ok(libraryCode.includes('getSongCardActions(item)'), 'Song search results use the shared action set');
+    assert.ok(libraryCode.includes('handlePlayInJukebox(song, songs, idx)'), 'Play artwork button remains connected to the active song list');
+    assert.ok(libraryCode.includes('handleQueueInJukebox(song)'), 'Jukebox queue handler remains connected');
+    assert.ok(libraryCode.includes('deleteConfirmModal') && libraryCode.includes('Delete Song?'),
+      'Delete Song continues to require confirmation');
 
-    assert.ok(favIndex !== -1, 'Add/Remove Favourites exists in menu');
-    assert.ok(playlistIndex !== -1, 'Add to Playlist exists in menu');
-    assert.ok(replaceAudioIndex !== -1, 'Replace Audio exists in menu');
-    assert.ok(replaceInstIndex !== -1, 'Replace Instrumental exists in menu');
-    assert.ok(deleteIndex !== -1, 'Delete Song exists in menu');
+    // Playlist detail uses the same Jukebox card while keeping its separate Karaoke room queue action.
+    assert.ok(playlistCode.includes('onAddToJukeboxQueue'), 'Playlist detail connects the Jukebox queue action');
+    assert.ok(playlistCode.includes('onAddToQueue(song.id)'), 'Playlist detail retains its separate Karaoke room queue action');
 
-    assert.ok(favIndex < playlistIndex, 'Action 1 (Favourites) comes before Action 2 (Playlist)');
-    assert.ok(playlistIndex < replaceAudioIndex, 'Action 2 (Playlist) comes before Action 3 (Replace Audio)');
-    assert.ok(replaceAudioIndex < replaceInstIndex, 'Action 3 (Replace Audio) comes before Action 4 (Replace Instrumental)');
-    assert.ok(replaceInstIndex < deleteIndex, 'Action 4 (Replace Instrumental) comes before Action 5 (Delete Song)');
-
-    // 3. Play and Add to queue remain visible on card
-    assert.ok(libraryCode.includes('handlePlayInJukebox(song, songs, idx)'), 'Play artwork button preserved');
-    assert.ok(libraryCode.includes('handleQueueInJukebox(song)'), 'Add to queue button preserved');
-
-    // 4. Delete requires confirmation modal
-    assert.ok(libraryCode.includes('deleteConfirmModal'), 'Delete confirmation modal state exists');
-    assert.ok(libraryCode.includes('Delete Song?'), 'Delete confirmation modal displays title');
-
-    // 5. Main Jukebox page remains untouched
+    // Karaoke room UI is not migrated to the Jukebox Library master card.
     const roomSessionCode = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/RoomSession.tsx'), 'utf-8');
-    assert.ok(!roomSessionCode.includes('song-more-options-container'), 'RoomSession Jukebox queue is completely untouched');
+    assert.ok(!roomSessionCode.includes('JukeboxSongCard'), 'RoomSession remains on its own Karaoke UI');
   });
 
   // --- SECTION 2: VERIFIED SOURCE PERSISTENCE & PIPELINE REUSE ---
