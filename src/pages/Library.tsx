@@ -96,7 +96,6 @@ export default function Library() {
   const [isSharePlaylistOpen, setIsSharePlaylistOpen] = useState(false);
   const [isAddSongsOpen, setIsAddSongsOpen] = useState(false);
   const [activeModalPlaylist, setActiveModalPlaylist] = useState<Playlist | null>(null);
-  const [openMenuSongId, setOpenMenuSongId] = useState<number | null>(null);
 
   const [replaceSourceModal, setReplaceSourceModal] = useState<{
     isOpen: boolean;
@@ -417,6 +416,16 @@ export default function Library() {
       }));
     }
   };
+
+  const getSongCardActions = (song: any) => ({
+    onAddToQueue: () => handleQueueInJukebox(song),
+    isFavorite: favoriteIds.has(song.id),
+    onToggleFavorite: () => handleToggleFavorite(song.id),
+    onAddToPlaylist: () => handleOpenAddToPlaylist(song),
+    onReplaceAudio: () => handleOpenReplaceSource(song),
+    onReplaceInstrumental: () => handleOpenReplaceInstrumental(song),
+    onDeleteSong: () => handleDeleteSong(song),
+  });
 
   const handleOpenDeleteConfirm = (song: any) => {
     setDeleteConfirmModal({
@@ -1588,6 +1597,7 @@ export default function Library() {
                       <td colSpan={4} className="px-3">
                         <JukeboxSongCard
                           song={song}
+                          {...getSongCardActions(song)}
                           isCurrent={isCurrent}
                           isPlaying={isThisPlaying}
                           onPlay={() => handlePlayInJukebox(song, selectedArtist.songs, idx)}
@@ -1795,6 +1805,7 @@ export default function Library() {
                       <td colSpan={4} className="px-3">
                         <JukeboxSongCard
                           song={item}
+                          {...getSongCardActions(item)}
                           isCurrent={jukeboxCurrentSong?.id === item.id}
                           isPlaying={jukeboxCurrentSong?.id === item.id && jukeboxIsPlaying}
                           onPlay={() => handlePlayInJukebox(item)}
@@ -2022,6 +2033,7 @@ export default function Library() {
                         <div key={song.id} className="w-[min(82vw,300px)] shrink-0 snap-start">
                           <JukeboxSongCard
                             song={song}
+                          {...getSongCardActions(song)}
                             isCurrent={jukeboxCurrentSong?.id === song.id}
                             isPlaying={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying}
                             onPlay={() => handlePlayInJukebox(song, songs, idx)}
@@ -2059,6 +2071,7 @@ export default function Library() {
                           <JukeboxSongCard
                             key={song.id}
                             song={song}
+                          {...getSongCardActions(song)}
                             isCurrent={isCurrent}
                             isPlaying={isThisPlaying}
                             onPlay={() => handlePlayInJukebox(song, songs, index)}
@@ -2066,12 +2079,7 @@ export default function Library() {
                             showAlbum={false}
                             showDuration={false}
                           >
-                            <button type="button" onClick={() => handleToggleFavorite(song.id)} className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition ${isFav ? 'bg-[#F472B6]/15 text-[#F472B6] hover:bg-[#F472B6]/25' : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'}`} aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'} title={isFav ? 'Remove from favourites' : 'Add to favourites'}>
-                              <Heart className={`h-3.5 w-3.5 ${isFav ? 'fill-current' : ''}`} />
-                            </button>
-                            <button type="button" onClick={() => handleQueueInJukebox(song)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white" aria-label={`Add ${song.title} to queue`} title={`Add ${song.title} to queue`}>
-                              <Plus className="h-3.5 w-3.5" />
-                            </button>
+                            
                           </JukeboxSongCard>
                         );
                       })}
@@ -2171,34 +2179,14 @@ export default function Library() {
                     <JukeboxSongCard
                       key={song.id}
                       song={song}
+                          {...getSongCardActions(song)}
                       isCurrent={isCurrent}
                       isPlaying={isThisPlaying}
                       onPlay={() => handlePlayInJukebox(song, songs, idx)}
                       onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
                       artistContent={renderArtistLinks(song)}
                     >
-                      <button type="button" onClick={() => handleQueueInJukebox(song)} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white" title={`Add ${song.title} to queue`} aria-label={`Add ${song.title} to queue`}>
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                      <div className="relative song-more-options-container">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); setOpenMenuSongId(prev => prev === song.id ? null : song.id); }} className={`rounded-full p-2 transition-colors ${openMenuSongId === song.id ? 'bg-white/15 text-[#F472B6]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`} title="More options" aria-label={`More options for ${song.title}`}>
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                        {openMenuSongId === song.id && (
-                          <div className="absolute right-0 top-full z-50 mt-1.5 w-52 rounded-xl border border-white/10 bg-[#171926] p-1.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
-                            <button type="button" onClick={() => { handleToggleFavorite(song.id); setOpenMenuSongId(null); }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white">
-                              <Heart className={`h-4 w-4 ${favoriteIds.has(song.id) ? 'fill-[#F472B6] text-[#F472B6]' : 'text-zinc-400'}`} />
-                              <span>{favoriteIds.has(song.id) ? 'Remove from Favourites' : 'Add to Favourites'}</span>
-                            </button>
-                            <button type="button" onClick={() => { handleOpenAddToPlaylist(song); setOpenMenuSongId(null); }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><ListMusic className="h-4 w-4 text-zinc-400" /><span>Add to Playlist</span></button>
-                            <button type="button" onClick={() => { handleOpenReplaceSource(song); setOpenMenuSongId(null); }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><RefreshCw className="h-4 w-4 text-zinc-400" /><span>Replace Audio</span></button>
-                            <button type="button" onClick={() => { handleOpenReplaceInstrumental(song); setOpenMenuSongId(null); }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><Mic className="h-4 w-4 text-zinc-400" /><span>Replace Instrumental</span></button>
-                            <div className="my-1 border-t border-white/5" />
-                            <button type="button" onClick={() => { handleOpenDeleteConfirm(song); setOpenMenuSongId(null); }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4 text-red-400" /><span>Delete Song</span></button>
-                          </div>
-                        )}
-                      </div>
-                    </JukeboxSongCard>
+                      </JukeboxSongCard>
                   );
               })}
                 {songs.length === 0 && (
