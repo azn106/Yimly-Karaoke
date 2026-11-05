@@ -1588,7 +1588,7 @@ export default function Library() {
           <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                <tr><th className="px-5 py-3.5 text-left">Songs</th></tr>
+                <tr><th colSpan={4} className="px-5 py-3.5 text-left">Songs</th></tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {selectedArtist.songs?.map((song: any, idx: number) => {
@@ -1687,7 +1687,7 @@ export default function Library() {
         <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#141416]">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-white/[0.06] bg-[#17171B] text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-              <tr><th className="px-5 py-3.5 text-left">Tracks</th></tr>
+              <tr><th colSpan={4} className="px-5 py-3.5 text-left">Tracks</th></tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {selectedAlbum.songs?.map((song: any, idx: number) => {
