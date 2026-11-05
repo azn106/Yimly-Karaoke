@@ -78,10 +78,11 @@ export default function PlaylistsGrid({
           const isMenuOpen = activeMenuId === playlist.id;
           return (
             <div key={playlist.id} className={effectiveLayout === 'carousel' ? 'w-44 shrink-0 snap-start' : 'min-w-0'}>
-              <JukeboxPlaylistCard playlist={playlist} onOpen={() => onOpenPlaylist(playlist.id)} layout={cardLayout}>
+              <JukeboxPlaylistCard playlist={playlist} onOpen={() => onOpenPlaylist(playlist.id)} onPlay={() => onPlayAll(playlist)} layout={cardLayout}>
                 <div className="relative" onClick={event => event.stopPropagation()}>
                   {playlist.isPublic && <span title="Public playlist" className="mr-1 inline-flex rounded-md bg-black/50 p-1 text-emerald-400"><Globe className="h-3.5 w-3.5" /></span>}
                   {!playlist.isPublic && <span title="Private playlist" className="mr-1 inline-flex rounded-md bg-black/50 p-1 text-zinc-400"><Lock className="h-3.5 w-3.5" /></span>}
+                  {playlist.permission === 'edit' && !isOwner && !isAdmin && <span title="Collaborative editor" className="mr-1 rounded-md bg-[#F472B6]/80 px-1.5 py-1 text-[9px] font-bold uppercase text-white">Edit</span>}
                   <button type="button" onClick={event => { event.stopPropagation(); setActiveMenuId(isMenuOpen ? null : playlist.id); }} className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white" title="More options" aria-label={`More options for ${playlist.name}`}>
                     <MoreVertical className="h-4 w-4" />
                   </button>
