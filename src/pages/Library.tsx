@@ -1811,6 +1811,25 @@ export default function Library() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {searchResults.map((item: any, idx: number) => (
+                  item.type === 'song' ? (
+                    <tr key={`song-${item.id}`}>
+                      <td colSpan={4} className="px-3">
+                        <JukeboxSongCard
+                          song={item}
+                          isCurrent={jukeboxCurrentSong?.id === item.id}
+                          isPlaying={jukeboxCurrentSong?.id === item.id && jukeboxIsPlaying}
+                          onPlay={() => handlePlayInJukebox(item)}
+                          onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: item.id, title: item.title, format })}
+                          showAlbum={false}
+                          showDuration={false}
+                          artistContent={renderArtistLinks(item)}
+                        >
+                          <button type="button" onClick={() => handleQueueInJukebox(item)} className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white" title="Add to Jukebox queue"><Plus className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={() => handleDeleteSong(item)} className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400" title="Delete song from library"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </JukeboxSongCard>
+                      </td>
+                    </tr>
+                  ) : (
                   <tr key={idx} className="hover:bg-[#1A1C2C]/60 transition-colors">
                     <td className="px-5 py-3.5">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">
@@ -1904,6 +1923,7 @@ export default function Library() {
                       )}
                     </td>
                   </tr>
+                  )
                 ))}
                 {searchResults.length === 0 && (
                   <tr>
