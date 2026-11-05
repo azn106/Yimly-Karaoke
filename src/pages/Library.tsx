@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { Search, Play, Pause, Music, Disc, Mic, RefreshCw, Calendar, FileText, ChevronRight, ChevronLeft, ArrowLeft, AlertCircle, ListMusic, Trash2, Plus, Heart, MoreVertical, Check, Loader2, X } from 'lucide-react';
+import { Search, Play, Pause, Music, Disc, Mic, RefreshCw, Calendar, FileText, ChevronRight, ChevronLeft, ArrowLeft, AlertCircle, ListMusic, Trash2, Plus, Check, Loader2, X } from 'lucide-react';
 import { Playlist, PlaylistSongItem } from '../types';
 import CreatePlaylistModal from '../components/playlist/CreatePlaylistModal';
 import EditPlaylistModal from '../components/playlist/EditPlaylistModal';
