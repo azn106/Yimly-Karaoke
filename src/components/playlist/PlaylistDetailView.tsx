@@ -492,9 +492,9 @@ export default function PlaylistDetailView({
           <span className="text-xs text-zinc-400">{songs.length} song{songs.length === 1 ? '' : 's'}</span>
         </div>
 
-        <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
+        <div className="min-w-0 w-full overflow-hidden bg-[#141622] border border-white/5 rounded-2xl shadow-xl">
+          <table className="w-full table-fixed text-left text-sm">
+            <thead className="hidden bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider sm:table-header-group">
               <tr>
                 <th colSpan={6} className="px-4 py-3.5 text-left">Track</th>
               </tr>
@@ -532,17 +532,13 @@ export default function PlaylistDetailView({
                             </React.Fragment>
                           ))
                         ) : song.artist}
-                        leading={
-                          <div className="flex shrink-0 items-center gap-1">
-                            <span className="w-5 text-center font-mono text-xs text-zinc-500">{idx + 1}</span>
-                            {canEdit && (
-                              <div className="flex flex-col">
-                                <button type="button" disabled={idx === 0} onClick={() => onReorderSong(song.playlistSongId, 'up')} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-20" title="Move up"><ArrowUp className="h-3 w-3" /></button>
-                                <button type="button" disabled={idx === songs.length - 1} onClick={() => onReorderSong(song.playlistSongId, 'down')} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-20" title="Move down"><ArrowDown className="h-3 w-3" /></button>
-                              </div>
-                            )}
+                        leading={<span className="w-5 shrink-0 text-center font-mono text-xs text-zinc-500">{idx + 1}</span>}
+                        artworkTrailing={canEdit ? (
+                          <div className="flex shrink-0 flex-col items-center justify-center -ml-1">
+                            <button type="button" disabled={idx === 0} onClick={() => onReorderSong(song.playlistSongId, 'up')} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-20" title="Move up" aria-label={`Move ${song.title} up`}><ArrowUp className="h-3 w-3" /></button>
+                            <button type="button" disabled={idx === songs.length - 1} onClick={() => onReorderSong(song.playlistSongId, 'down')} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-20" title="Move down" aria-label={`Move ${song.title} down`}><ArrowDown className="h-3 w-3" /></button>
                           </div>
-                        }
+                        ) : undefined}
                       >
                         <button type="button" disabled={song.isUnavailable} onClick={() => onAddToQueue(song.id)} className={`rounded-lg p-1.5 transition-colors ${song.isUnavailable ? 'cursor-not-allowed text-zinc-700' : isQueued ? 'bg-[#F472B6] text-white' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`} title={song.isUnavailable ? 'Track unavailable' : 'Add song to active karaoke room queue'}>
                           {isQueued ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
@@ -601,9 +597,9 @@ export default function PlaylistDetailView({
             />
           </div>
 
-          <div className="bg-[#141622] border border-white/5 rounded-2xl overflow-x-auto shadow-xl">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider">
+          <div className="min-w-0 w-full overflow-hidden bg-[#141622] border border-white/5 rounded-2xl shadow-xl">
+            <table className="w-full table-fixed text-left text-sm">
+              <thead className="hidden bg-[#0E0F17] text-zinc-400 border-b border-white/5 text-xs font-semibold uppercase tracking-wider sm:table-header-group">
                 <tr>
                   <th className="px-5 py-3.5">Title</th>
                   <th className="px-5 py-3.5 hidden sm:table-cell">Artist</th>
