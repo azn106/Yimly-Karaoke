@@ -23,6 +23,7 @@ type JukeboxSongCardProps = {
   showDuration?: boolean;
   unavailable?: boolean;
   leading?: React.ReactNode;
+  artworkTrailing?: React.ReactNode;
   artistContent?: React.ReactNode;
   albumContent?: React.ReactNode;
 };
@@ -46,6 +47,7 @@ export default function JukeboxSongCard({
   showDuration = true,
   unavailable = false,
   leading,
+  artworkTrailing,
   artistContent,
   albumContent,
 }: JukeboxSongCardProps) {
@@ -82,6 +84,7 @@ export default function JukeboxSongCard({
           </span>
         )}
       </button>
+      {artworkTrailing}
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
