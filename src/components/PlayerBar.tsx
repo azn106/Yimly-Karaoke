@@ -18,6 +18,7 @@ import {
   Radio
 } from 'lucide-react';
 import { usePlayback, PlaybackSong } from '../context/PlaybackContext';
+import JukeboxSongCard from './jukebox/JukeboxSongCard';
 
 export default function PlayerBar() {
   const {
@@ -150,62 +151,26 @@ export default function PlayerBar() {
                 queue.map((song, idx) => {
                   const isCurrent = idx === queueIndex;
                   return (
-                    <div
+                    <JukeboxSongCard
                       key={`${song.id}-${idx}`}
-                      className={`flex items-center justify-between p-3 rounded-xl transition-all group ${
-                        isCurrent 
-                          ? 'bg-[#F472B6]/15 border border-[#F472B6]/30 text-white' 
-                          : 'bg-[#181A28]/60 hover:bg-[#1E2133] border border-white/5 text-zinc-300'
-                      }`}
+                      song={song}
+                      isCurrent={isCurrent}
+                      isPlaying={isCurrent && isPlaying}
+                      onPlay={() => jumpToQueueIndex(idx)}
+                      showAlbum={false}
+                      showDuration
+                      className={`rounded-xl px-2 group ${isCurrent ? 'border border-[#F472B6]/30 bg-[#F472B6]/10' : 'border border-transparent hover:bg-white/[0.04]'}`}
                     >
                       <button
-                        onClick={() => jumpToQueueIndex(idx)}
-                        className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                        type="button"
+                        onClick={() => removeFromQueue(idx)}
+                        className="rounded p-1 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                        title="Remove from queue"
+                        aria-label={`Remove ${song.title} from queue`}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0 overflow-hidden relative border border-white/10">
-                          {song.hasArtwork ? (
-                            <img
-                              src={`/api/songs/${song.id}/artwork`}
-                              alt={song.title}
-                              className="w-full h-full object-cover yk-artwork-image yk-artwork-image"
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <Music className="w-4 h-4 text-zinc-500" />
-                          )}
-                          {isCurrent && isPlaying && (
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                              <span className="w-2 h-2 rounded-full bg-[#F472B6] animate-ping" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-sm font-semibold truncate ${isCurrent ? 'text-[#F472B6]' : 'text-white'}`}>
-                            {song.title}
-                          </p>
-                          <p className="text-xs text-zinc-400 truncate">
-                            {song.artist || 'Unknown Artist'}
-                          </p>
-                        </div>
+                        <X className="h-4 w-4" />
                       </button>
-
-                      <div className="flex items-center gap-2 shrink-0 ml-3">
-                        {song.duration ? (
-                          <span className="text-xs font-mono text-zinc-500">
-                            {formatTime(song.duration)}
-                          </span>
-                        ) : null}
-                        <button
-                          onClick={() => removeFromQueue(idx)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-red-400 transition-opacity rounded"
-                          title="Remove from queue"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+                    </JukeboxSongCard>
                   );
                 })
               )}
