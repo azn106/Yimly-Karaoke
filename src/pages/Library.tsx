@@ -1609,7 +1609,6 @@ export default function Library() {
                           isPlaying={isThisPlaying}
                           onPlay={() => handlePlayInJukebox(song, selectedArtist.songs, idx)}
                           onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
-                          showAlbum={false}
                       />
                       </td>
                     </tr>
@@ -1811,8 +1810,6 @@ export default function Library() {
                           isPlaying={jukeboxCurrentSong?.id === item.id && jukeboxIsPlaying}
                           onPlay={() => handlePlayInJukebox(item)}
                           onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: item.id, title: item.title, format })}
-                          showAlbum={false}
-                          showDuration={false}
                           artistContent={renderArtistLinks(item)}
                         >
                         </JukeboxSongCard>
@@ -2037,9 +2034,7 @@ export default function Library() {
                             isPlaying={jukeboxCurrentSong?.id === song.id && jukeboxIsPlaying}
                             onPlay={() => handlePlayInJukebox(song, songs, idx)}
                             onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
-                            showAlbum={false}
-                            showDuration={false}
-                          />
+                           />
                         </div>
                       ))}
                     </div>
@@ -2074,9 +2069,7 @@ export default function Library() {
                             isPlaying={isThisPlaying}
                             onPlay={() => handlePlayInJukebox(song, songs, index)}
                             onOpenLyrics={(format) => setEditorState({ isOpen: true, songId: song.id, title: song.title, format })}
-                            showAlbum={false}
-                            showDuration={false}
-                          >
+                           >
                             
                           </JukeboxSongCard>
                         );
