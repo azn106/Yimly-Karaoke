@@ -10,6 +10,7 @@ import { scanLibrary } from './scanner.js';
 import { fetchLyrics, saveLrcSidecar, stripLrcTimestamps } from './lyrics.js';
 import { matchSpotifyTrackToYouTube } from './youtube-matcher.js';
 import { isPreviewMode, simulateDownload } from './preview-mode.js';
+import { validateSafeUrl } from './ssrf-validator.js';
 
 const execFilePromise = promisify(execFile);
 const execPromise = promisify(exec);
@@ -73,6 +74,7 @@ export interface ActiveTrackJob {
 
 export interface ActiveDownloadJob {
   id: string;
+  userId?: number | null;
   playlistName?: string | null;
   playlistId?: number | null;
   type: string;
@@ -424,6 +426,7 @@ export class DownloadQueueManager {
 
         const activeJob: ActiveDownloadJob = {
           id: jobRec.id,
+          userId: (jobRec as any).userId || null,
           playlistName: jobRec.playlistName,
           type: jobRec.type,
           status: 'downloading',
@@ -554,6 +557,7 @@ export class DownloadQueueManager {
 
     const activeJob: ActiveDownloadJob = {
       id: jobId,
+      userId: params.userId || null,
       playlistName: params.playlistName || null,
       playlistId,
       type: params.type || 'playlist',
@@ -579,6 +583,7 @@ export class DownloadQueueManager {
     // Store in DB
     await db.insert(downloadJobs).values({
       id: activeJob.id,
+      userId: activeJob.userId,
       playlistName: activeJob.playlistName,
       playlistId: playlistId,
       type: activeJob.type,
@@ -1335,9 +1340,19 @@ export class DownloadQueueManager {
 
   public async downloadAndSavePlaylistCover(coverUrl: string): Promise<string | null> {
     try {
-      const res = await fetch(coverUrl);
+      validateSafeUrl(coverUrl);
+      const res = await fetch(coverUrl, {
+        signal: AbortSignal.timeout(8000),
+      });
       if (res.ok) {
+        const contentLength = parseInt(res.headers.get('content-length') || '0', 10);
+        if (contentLength > 10 * 1024 * 1024) {
+          throw new Error('Cover image exceeds maximum allowed size (10MB)');
+        }
         const buffer = Buffer.from(await res.arrayBuffer());
+        if (buffer.length > 10 * 1024 * 1024) {
+          throw new Error('Cover image exceeds maximum allowed size (10MB)');
+        }
         const ext = coverUrl.includes('.png') ? '.png' : '.jpg';
         const filename = `playlist_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`;
         const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(process.cwd(), 'data');

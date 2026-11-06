@@ -39,6 +39,8 @@ export class DemucsWorkerManager {
     this.jobsHandledCount = 0;
   }
 
+  private queueTail: Promise<void> = Promise.resolve();
+
   public stopWorker() {
     this.startingPromise = null;
     if (this.currentJob?.watchdogTimer) {
@@ -62,6 +64,48 @@ export class DemucsWorkerManager {
       this.currentJob = null;
       jobRef.reject(new Error('Demucs worker stopped'));
     }
+  }
+
+  public async drainAndStopWorker(timeoutMs = 3000): Promise<void> {
+    this.startingPromise = null;
+    if (this.currentJob?.watchdogTimer) {
+      clearTimeout(this.currentJob.watchdogTimer);
+    }
+    if (this.currentJob) {
+      const jobRef = this.currentJob;
+      this.currentJob = null;
+      jobRef.reject(new Error('Demucs worker stopped'));
+    }
+    if (!this.child) return;
+
+    const proc = this.child;
+    this.child = null;
+    proc.removeAllListeners();
+
+    return new Promise<void>((resolve) => {
+      let isResolved = false;
+      const finish = () => {
+        if (!isResolved) {
+          isResolved = true;
+          resolve();
+        }
+      };
+
+      proc.once('exit', finish);
+
+      try {
+        proc.kill('SIGTERM');
+      } catch {
+        finish();
+      }
+
+      setTimeout(() => {
+        try {
+          if (!proc.killed) proc.kill('SIGKILL');
+        } catch {}
+        finish();
+      }, timeoutMs);
+    });
   }
 
   public ensureWorker(pythonBin: string, modelsDir: string): Promise<void> {
@@ -199,33 +243,39 @@ export class DemucsWorkerManager {
     onProgress: (pct: number, msg: string) => void,
     onLog: (level: 'INFO' | 'WARN' | 'ERR', msg: string) => void
   ): Promise<void> {
-    await this.ensureWorker(pythonBin, modelsDir);
-    if (!this.child || !this.child.stdin || this.child.killed) {
-      throw new Error('Demucs worker process is not active');
-    }
+    const executeJob = async () => {
+      await this.ensureWorker(pythonBin, modelsDir);
+      if (!this.child || !this.child.stdin || this.child.killed) {
+        throw new Error('Demucs worker process is not active');
+      }
 
-    return new Promise((resolve, reject) => {
-      const watchdogTimer = setTimeout(() => {
-        if (this.currentJob) {
-          onLog('ERR', `Demucs worker job timed out after ${this.jobTimeoutMs / 1000}s. Terminating hung worker...`);
-          this.stopWorker();
-          reject(new Error(`Demucs worker separation timed out after ${this.jobTimeoutMs / 1000}s`));
-        }
-      }, this.jobTimeoutMs);
+      return new Promise<void>((resolve, reject) => {
+        const watchdogTimer = setTimeout(() => {
+          if (this.currentJob) {
+            onLog('ERR', `Demucs worker job timed out after ${this.jobTimeoutMs / 1000}s. Terminating hung worker...`);
+            this.stopWorker();
+            reject(new Error(`Demucs worker separation timed out after ${this.jobTimeoutMs / 1000}s`));
+          }
+        }, this.jobTimeoutMs);
 
-      this.currentJob = { resolve, reject, onProgress, onLog, watchdogTimer };
+        this.currentJob = { resolve, reject, onProgress, onLog, watchdogTimer };
 
-      const cmdLine = JSON.stringify({ request_file: splitReqPath, status_file: splitStatusPath }) + '\n';
-      this.child!.stdin!.write(cmdLine, 'utf-8', (err) => {
-        if (err && this.currentJob) {
-          clearTimeout(watchdogTimer);
-          const jobRef = this.currentJob;
-          this.currentJob = null;
-          this.stopWorker();
-          jobRef.reject(new Error(`Failed to send request to Demucs worker: ${err.message}`));
-        }
+        const cmdLine = JSON.stringify({ request_file: splitReqPath, status_file: splitStatusPath }) + '\n';
+        this.child!.stdin!.write(cmdLine, 'utf-8', (err) => {
+          if (err && this.currentJob) {
+            clearTimeout(watchdogTimer);
+            const jobRef = this.currentJob;
+            this.currentJob = null;
+            this.stopWorker();
+            jobRef.reject(new Error(`Failed to send request to Demucs worker: ${err.message}`));
+          }
+        });
       });
-    });
+    };
+
+    const nextPromise = this.queueTail.then(executeJob, executeJob);
+    this.queueTail = nextPromise.catch(() => {});
+    return nextPromise;
   }
 }
 

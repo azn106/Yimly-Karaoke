@@ -67,7 +67,7 @@ export const isPublicRoute = (req: Request): boolean => {
   }
 
   // Active song playback, stream, lyrics, artwork & lyric offset (needed for TV/room player & connected displays)
-  if ((method === 'GET' || method === 'HEAD') && (/^\/api\/songs\/\d+(\/(artwork|audio|stream|lyrics(\/offset)?))?$/.test(url) || /^\/api\/stream\/\d+(\/audio)?$/.test(url))) {
+  if ((method === 'GET' || method === 'HEAD') && (/^\/api\/songs\/\d+(\/(artwork|audio|instrumental|stream|lyrics(\/offset)?))?$/.test(url) || /^\/api\/stream\/\d+(\/audio|\/instrumental)?$/.test(url))) {
     return true;
   }
 
@@ -115,7 +115,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     if (isExempt) {
       return next();
     }
-    console.log(`[AUTH] authenticated-user failure: JWT verify failed - ${(error as Error).message}. Token prefix: ${token?.substring(0, 10)}`);
+    console.log(`[AUTH] authenticated-user failure: JWT verify failed - ${(error as Error).message}`);
     res.clearCookie('yimly_token', {
       httpOnly: true,
       secure: true,

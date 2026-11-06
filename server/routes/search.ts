@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { artists, albums, songs, songArtists, lyrics } from '../db/schema.js';
-import { eq, like, or, inArray, asc } from 'drizzle-orm';
+import { eq, like, or, inArray, asc, sql } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 import { formatArtistDisplay } from '../lib/artist-utils.js';
 import { getSongArtistsMap } from './songs.js';
@@ -14,7 +14,8 @@ router.get('/', async (req, res) => {
     const query = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 120) : '';
     if (!query) return res.json([]);
 
-    const searchStr = `%${query}%`;
+    const escapedQuery = query.replace(/([%_\\])/g, '\\$1');
+    const searchStr = `%${escapedQuery}%`;
 
     // Match artists first so an artist search can expand to their complete catalogue,
     // including songs where they are a featured/secondary artist.
@@ -22,7 +23,7 @@ router.get('/', async (req, res) => {
       id: artists.id,
       name: artists.name,
       artworkPath: artists.artworkPath,
-    }).from(artists).where(like(artists.name, searchStr));
+    }).from(artists).where(sql`${artists.name} LIKE ${searchStr} ESCAPE '\\'`);
     const matchingArtistIds = matchingArtists.map(artist => artist.id);
 
     // An artist match includes all of that artist's albums, not just albums whose
@@ -36,7 +37,7 @@ router.get('/', async (req, res) => {
     }).from(albums)
       .leftJoin(artists, eq(albums.artistId, artists.id))
       .where(or(
-        like(albums.title, searchStr),
+        sql`${albums.title} LIKE ${searchStr} ESCAPE '\\'`,
         ...(matchingArtistIds.length ? [inArray(albums.artistId, matchingArtistIds)] : [])
       ));
 
@@ -47,13 +48,13 @@ router.get('/', async (req, res) => {
     const linkedArtistMatches = await db.select({ songId: songArtists.songId })
       .from(songArtists)
       .innerJoin(artists, eq(songArtists.artistId, artists.id))
-      .where(like(artists.name, searchStr));
+      .where(sql`${artists.name} LIKE ${searchStr} ESCAPE '\\'`);
     const linkedSongIds = [...new Set(linkedArtistMatches.map(row => row.songId))];
 
     const songConditions = [
-      like(songs.title, searchStr),
-      like(artists.name, searchStr),
-      like(albums.title, searchStr),
+      sql`${songs.title} LIKE ${searchStr} ESCAPE '\\'`,
+      sql`${artists.name} LIKE ${searchStr} ESCAPE '\\'`,
+      sql`${albums.title} LIKE ${searchStr} ESCAPE '\\'`,
       ...(linkedSongIds.length ? [inArray(songs.id, linkedSongIds)] : []),
       ...(matchingArtistIds.length ? [inArray(songs.artistId, matchingArtistIds)] : []),
       ...(matchingAlbumIds.length ? [inArray(songs.albumId, matchingAlbumIds)] : []),

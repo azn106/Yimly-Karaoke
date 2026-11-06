@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import { settings, libraries } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
+import { validateSafeUrl } from '../lib/ssrf-validator.js';
 import {
   downloadQueue,
   getYtDlpPath,
@@ -155,12 +156,14 @@ export async function resolveUrlOrQuery(urlOrQuery: string, requestedOffset = 0)
 
   // 1. Check if Spotify URL
   if (trimmed.includes('spotify.com/')) {
+    validateSafeUrl(trimmed, { allowedDomains: ['spotify.com'] });
     const spotifyEntity = await resolveSpotifyEntity(trimmed);
     return spotifyEntity;
   }
 
   // 2. Check if YouTube / YouTube Music URL
   if (trimmed.includes('youtube.com/') || trimmed.includes('youtu.be/')) {
+    validateSafeUrl(trimmed, { allowedDomains: ['youtube.com', 'youtu.be'] });
     const ytDlpPath = await getYtDlpPath();
     const isPlaylist = trimmed.includes('list=');
 
@@ -596,6 +599,10 @@ router.get('/jobs/:jobId', async (req, res) => {
     if (!job) {
       return res.status(404).json({ error: 'Download job not found' });
     }
+    const user = (req as AuthenticatedRequest).user;
+    if (user && user.role !== 'administrator' && job.userId && job.userId !== user.id) {
+      return res.status(403).json({ error: 'Forbidden. You do not have permission to access this download job.' });
+    }
     res.json(job);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to get job' });
@@ -604,6 +611,14 @@ router.get('/jobs/:jobId', async (req, res) => {
 
 router.post('/cancel/:jobId', async (req, res) => {
   try {
+    const job = await downloadQueue.getJob(req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ error: 'Download job not found' });
+    }
+    const user = (req as AuthenticatedRequest).user;
+    if (user && user.role !== 'administrator' && job.userId && job.userId !== user.id) {
+      return res.status(403).json({ error: 'Forbidden. You do not have permission to cancel this download job.' });
+    }
     const success = await downloadQueue.cancelJob(req.params.jobId);
     if (!success) {
       return res.status(404).json({ error: 'Download job not found' });
@@ -616,6 +631,14 @@ router.post('/cancel/:jobId', async (req, res) => {
 
 router.post('/jobs/:jobId/retry-failed', async (req, res) => {
   try {
+    const job = await downloadQueue.getJob(req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ error: 'Download job not found' });
+    }
+    const user = (req as AuthenticatedRequest).user;
+    if (user && user.role !== 'administrator' && job.userId && job.userId !== user.id) {
+      return res.status(403).json({ error: 'Forbidden. You do not have permission to retry tracks on this download job.' });
+    }
     const success = await downloadQueue.retryFailedTracks(req.params.jobId);
     if (!success) {
       return res.status(404).json({ error: 'Download job not found' });
