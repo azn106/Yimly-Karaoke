@@ -501,6 +501,10 @@ export async function replaceSongInstrumental(songId: number): Promise<ReplaceSo
 
     const backupInst = oldInstPath && fs.existsSync(oldInstPath) ? `${oldInstPath}.bak_${Date.now()}` : null;
 
+    jobState.progress = 95;
+    jobState.message = 'Validating and committing instrumental replacement...';
+    jobState.updatedAt = new Date();
+
     try {
       if (backupInst && oldInstPath) {
         fs.copyFileSync(oldInstPath, backupInst);
