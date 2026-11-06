@@ -227,6 +227,7 @@ export default function RoomSession() {
   const artworkAudioContextRef = useRef<AudioContext | null>(null);
   const artworkAudioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const restorePositionRef = useRef<{ time: number, playing: boolean } | null>(null);
+  const variantSwitchPendingRef = useRef(false);
 
   // Background Music State & Controller (Host Only)
   const bgmAudioRef = useRef<HTMLAudioElement>(null);
@@ -1582,28 +1583,29 @@ export default function RoomSession() {
   };
 
   const handleToggleInstrumental = () => {
-    if (!isHost) return;
-    if (!currentSongDetails?.hasInstrumental && variant === 'original') {
+    if (!isHost || variantSwitchPendingRef.current) return;
+    if (variant === 'original' && !currentSongDetails?.hasInstrumental) {
       alert('Instrumental version not available for this song.');
       return;
     }
-    
+    if (variant === 'instrumental' && currentSongDetails?.hasOriginal === false) {
+      alert('Original version not available for this song.');
+      return;
+    }
+
     const currentPos = audioRef.current ? audioRef.current.currentTime : currentTime;
-    const wasPlaying = playing;
-    
+    const wasPlaying = audioRef.current ? !audioRef.current.paused : playing;
     const newVariant = variant === 'original' ? 'instrumental' : 'original';
-    setVariant(newVariant);
-    
+
+    // Lock the control until the replacement source loads or reports an error.
+    variantSwitchPendingRef.current = true;
     restorePositionRef.current = { time: currentPos, playing: wasPlaying };
-    
+    setVariant(newVariant);
+
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ 
-        type: 'VARIANT_CHANGED', 
-        payload: { 
-          variant: newVariant,
-          position: currentPos,
-          playing: wasPlaying
-        } 
+      ws.send(JSON.stringify({
+        type: 'VARIANT_CHANGED',
+        payload: { variant: newVariant, position: currentPos, playing: wasPlaying }
       }));
     }
   };
@@ -3109,6 +3111,7 @@ export default function RoomSession() {
                     }
                     restorePositionRef.current = null;
                   }
+                  variantSwitchPendingRef.current = false;
                 }
               }}
               onEnded={handleSongEnded}
@@ -3116,10 +3119,22 @@ export default function RoomSession() {
                 const err = audioRef.current?.error;
                 console.warn('[AUDIO] Loading error for current song:', err?.code, err?.message);
                 if (variant === 'instrumental' && currentSong) {
-                  console.warn('[AUDIO] Instrumental audio unavailable on disk, falling back to original variant');
+                  console.warn('[AUDIO] Instrumental audio unavailable; reverting the room to the original variant');
+                  const saved = restorePositionRef.current;
+                  const fallbackPosition = saved?.time ?? (audioRef.current?.currentTime || currentTime);
+                  const fallbackPlaying = saved?.playing ?? playing;
+                  restorePositionRef.current = { time: fallbackPosition, playing: fallbackPlaying };
                   setVariant('original');
+                  if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                      type: 'VARIANT_CHANGED',
+                      payload: { variant: 'original', position: fallbackPosition, playing: fallbackPlaying }
+                    }));
+                  }
                   return;
                 }
+                variantSwitchPendingRef.current = false;
+                restorePositionRef.current = null;
                 setKaraokeAudioActuallyPlaying(false);
                 setPlaying(false);
                 setAudioAutoplayBlocked(false);
