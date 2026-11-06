@@ -3502,7 +3502,7 @@ test('Jukebox global search expands artist and album catalogue relationships', a
     title: songOneTitle, mainAudioPath: '/test/search-fixture-one.mp3',
   }).returning();
   const [songTwo] = await db.insert(songs).values({
-    libraryId: library.id, artistId: userAId ? artist.id : artist.id, albumId: albumTwo.id,
+    libraryId: library.id, artistId: artist.id, albumId: albumTwo.id,
     title: songTwoTitle, mainAudioPath: '/test/search-fixture-two.mp3',
   }).returning();
   await db.insert(songArtists).values({ songId: songTwo.id, artistId: featuredArtist.id, position: 1 });
