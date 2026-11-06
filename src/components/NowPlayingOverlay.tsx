@@ -430,15 +430,12 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                             return <p
                               key={'cover-focus-' + line.id}
                               ref={active ? activeLyricRef : null}
-                              className="w-full text-balance break-words px-1"
+                              className="w-full text-balance break-words px-1 text-lg sm:text-xl font-bold text-white"
                               aria-current={active ? 'true' : undefined}
                               style={{
                                 animation: 'ykLyricsFocusIn 1000ms ease-out both',
-                                fontSize: 'clamp(0.72rem, 4vw, 1.15rem)',
                                 lineHeight: 1.25,
                                 opacity: 1,
-                                fontWeight: active ? 700 : 500,
-                                color: active ? '#F09ACB' : '#C6B1C4',
                                 display: '-webkit-box',
                                 WebkitBoxOrient: 'vertical',
                                 WebkitLineClamp: 3,
@@ -566,8 +563,8 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                       key={'fullscreen-section-' + sectionIndex + '-line-' + line.id}
                       ref={active ? fullscreenActiveLyricRef : null}
                       data-lyrics-section={sectionIndex}
-                      className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden"
-                      style={{ opacity: active ? 1 : lineOpacity, fontSize: 'clamp(0.82rem, 3.5vw, 2rem)', lineHeight: 1.25, fontWeight: active ? 700 : 500, color: active ? '#F09ACB' : '#C6B1C4' }}
+                      className="flex-1 min-h-0 w-full flex items-center justify-center text-center px-2 overflow-hidden text-lg sm:text-xl font-bold text-white"
+                      style={{ opacity: active ? 1 : lineOpacity, lineHeight: 1.25 }}
                     >
                       <p className="w-full text-balance break-words" style={{ animation: 'ykLyricsFocusIn ' + lyricEntranceFadeSec + 's ease-out both', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: window.matchMedia('(orientation: portrait)').matches ? 2 : 1, overflow: 'hidden' }}>{lineText}</p>
                     </div>;
