@@ -637,6 +637,31 @@ export class DownloadQueueManager {
     return activeJob;
   }
 
+  public async getAllJobs(): Promise<ActiveDownloadJob[]> {
+    await this.init();
+    const records = await db.select().from(downloadJobs).orderBy(asc(downloadJobs.createdAt));
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const visible: ActiveDownloadJob[] = [];
+    for (const record of records) {
+      const terminal = ['completed', 'failed', 'cancelled'].includes(record.status);
+      const updatedTime = record.updatedAt instanceof Date ? record.updatedAt.getTime() : new Date(record.updatedAt as any).getTime();
+      if (terminal && updatedTime < cutoff) continue;
+      const job = await this.getJob(record.id);
+      if (job) visible.push(job);
+    }
+    return visible;
+  }
+
+  public async clearFinishedJobs(): Promise<number> {
+    const finished = await db.select({ id: downloadJobs.id }).from(downloadJobs)
+      .where(inArray(downloadJobs.status, ['completed', 'failed', 'cancelled']));
+    if (finished.length === 0) return 0;
+    const ids = finished.map(job => job.id);
+    await db.delete(downloadJobs).where(inArray(downloadJobs.id, ids));
+    for (const id of ids) this.memoryJobs.delete(id);
+    return ids.length;
+  }
+
   public async getJob(jobId: string): Promise<ActiveDownloadJob | null> {
     const memory = this.memoryJobs.get(jobId);
     if (memory) return memory;
