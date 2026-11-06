@@ -191,14 +191,13 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   }, []);
 
   useEffect(() => {
-    setShowLyrics(false);
-    setIsLyricsFullscreen(false);
+    // Track changes should refresh lyric data without changing the user's current player view.
     setLyricsLines([]);
     setLyricsUnavailable(false);
   }, [currentSong?.id]);
 
   useEffect(() => {
-    if (!showLyrics || !currentSong?.id) return;
+    if ((!showLyrics && !isLyricsFullscreen) || !currentSong?.id) return;
     const controller = new AbortController(); setLyricsLoading(true); setLyricsUnavailable(false);
     const loadLyrics = async () => {
       try {
@@ -213,7 +212,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
     };
     loadLyrics().finally(() => { if (!controller.signal.aborted) setLyricsLoading(false); });
     return () => controller.abort();
-  }, [showLyrics, currentSong?.id]);
+  }, [showLyrics, isLyricsFullscreen, currentSong?.id]);
 
   const lyricStart = (line?: TimedLyricLine) => line?.words?.length ? line.words[0].start : (line?.time ?? Infinity);
   const activeLyricIndex = lyricsLines.reduce((active, line, index) => lyricStart(line) <= currentTime ? index : active, -1);
