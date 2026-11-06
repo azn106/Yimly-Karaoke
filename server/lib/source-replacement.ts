@@ -227,7 +227,12 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
       sepResult = await separateAndCreateInstrumental(
         stagedMainAudio,
         stagedInstrumental,
-        { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' }
+        { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' },
+        (pct, message) => {
+          jobState.progress = Math.min(94, 60 + Math.round(pct * 0.4));
+          jobState.message = message || 'Separating audio…';
+          jobState.updatedAt = new Date();
+        }
       );
     }
 
@@ -243,6 +248,9 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
     }
 
     // 8. Safe atomic file replacement with rollback protection
+    jobState.progress = 95;
+    jobState.message = 'Validating audio and saving replacement files…';
+    jobState.updatedAt = new Date();
     const oldMainPath = song.mainAudioPath;
     const oldInstPath = song.instrumentalAudioPath;
 
