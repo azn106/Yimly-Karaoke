@@ -308,6 +308,8 @@ export default function DownloadMusic() {
     );
   }
 
+  const queuedTrackIds = queueJobs.flatMap(job => job.tracks.filter(track => track.status === 'queued').map(track => track.id));
+
   return (
     <div className="p-4 md:p-10 max-w-6xl mx-auto space-y-8 font-sans select-none">
       {/* Page Header */}
@@ -655,7 +657,7 @@ export default function DownloadMusic() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-white truncate">{job.playlistName || 'Download job'}</div>
-                    <div className="text-[10px] text-zinc-500 font-mono truncate">Job {job.id} · {job.tracks.length} tracks</div>
+                    <div className="text-[10px] text-zinc-500 font-mono truncate">{job.playlistName === 'Karaoke Room Queue' ? 'Karaoke Room' : 'Admin Downloader'} · Job {job.id} · {job.tracks.length} tracks</div>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${job.status === 'completed' ? 'bg-emerald-500/15 text-emerald-400' : job.status === 'failed' || job.status === 'cancelled' ? 'bg-red-500/15 text-red-400' : 'bg-[#F472B6]/15 text-[#F472B6]'}`}>{job.status}</span>
                 </div>
@@ -676,7 +678,7 @@ export default function DownloadMusic() {
                       <div className="text-xs text-white truncate">{track.title}</div>
                       <div className="text-[10px] text-zinc-500 truncate">{track.artist}{track.error ? ` · ${track.error}` : ''}</div>
                     </div>
-                    <span className="text-[10px] text-zinc-400 capitalize shrink-0">{track.status === 'tagging' ? 'Finalising' : track.status}</span>
+                    <span className="text-[10px] text-zinc-400 capitalize shrink-0">{track.status === 'queued' ? `Queued #${queuedTrackIds.indexOf(track.id) + 1}` : track.status === 'tagging' ? 'Finalising / Processing' : track.status}</span>
                     <div className="w-14 h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0"><div className={`h-full ${track.status === 'completed' ? 'bg-emerald-400' : track.status === 'failed' ? 'bg-red-500' : 'bg-[#F472B6]'}`} style={{ width: `${track.progress}%` }} /></div>
                   </div>
                 ))}
