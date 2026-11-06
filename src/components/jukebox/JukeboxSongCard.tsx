@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Play, Pause, Music, Plus, MoreVertical, Heart, ListMusic, RefreshCw, Mic, Trash2 } from 'lucide-react';
 import LyricBadges from '../LyricBadges';
 import EqualizerIndicator from '../EqualizerIndicator';
@@ -52,6 +53,8 @@ export default function JukeboxSongCard({
   albumContent,
 }: JukeboxSongCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const title = song?.title || 'Unknown track';
   const artist = song?.artist || 'Unknown Artist';
   const duration = Number(song?.duration || 0);
@@ -106,17 +109,38 @@ export default function JukeboxSongCard({
       )}
       {hasLibraryActions && (
         <div className="relative shrink-0">
-          <button type="button" onClick={(event) => { event.stopPropagation(); setMenuOpen(open => !open); }} className={`rounded-full p-2 transition-colors ${menuOpen ? 'bg-white/15 text-[#F472B6]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`} title="More options" aria-label={`More options for ${title}`} aria-expanded={menuOpen}>
+          <button type="button" onClick={(event) => {
+            event.stopPropagation();
+            const nextOpen = !menuOpen;
+            if (nextOpen) {
+              const rect = menuButtonRef.current?.getBoundingClientRect();
+              if (rect) {
+                const menuHeight = Math.min(240, window.innerHeight * 0.8);
+                const top = rect.bottom + 6 + menuHeight <= window.innerHeight - 8
+                  ? rect.bottom + 6
+                  : Math.max(8, rect.top - menuHeight - 6);
+                const right = Math.min(window.innerWidth - 8, rect.right);
+                setMenuPosition({ top, left: Math.max(8, right - 208) });
+              }
+            }
+            setMenuOpen(nextOpen);
+          }} ref={menuButtonRef}
+            className={`rounded-full p-2 transition-colors ${menuOpen ? 'bg-white/15 text-[#F472B6]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`} title="More options" aria-label={`More options for ${title}`} aria-expanded={menuOpen}>
             <MoreVertical className="h-4 w-4" />
           </button>
-          {menuOpen && (
-            <div className="absolute right-0 top-full z-50 mt-1.5 w-52 rounded-xl border border-white/10 bg-[#171926] p-1.5 text-left shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100" onClick={event => event.stopPropagation()}>
+          {menuOpen && menuPosition && createPortal(
+            <div
+              style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: 208, maxHeight: '80vh', overflowY: 'auto' }}
+              className="z-[9999] rounded-xl border border-white/10 bg-[#171926] p-1.5 text-left shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
+              onClick={event => event.stopPropagation()}
+            >
               {onToggleFavorite && <button type="button" onClick={() => runAction(onToggleFavorite)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><Heart className={`h-4 w-4 ${isFavorite ? 'fill-[#F472B6] text-[#F472B6]' : 'text-zinc-400'}`} /><span>{isFavorite ? 'Remove from Favourites' : 'Add to Favourites'}</span></button>}
               {onAddToPlaylist && <button type="button" onClick={() => runAction(onAddToPlaylist)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><ListMusic className="h-4 w-4 text-zinc-400" /><span>Add to Playlist</span></button>}
               {onReplaceAudio && <button type="button" onClick={() => runAction(onReplaceAudio)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><RefreshCw className="h-4 w-4 text-zinc-400" /><span>Replace Audio</span></button>}
               {onReplaceInstrumental && <button type="button" onClick={() => runAction(onReplaceInstrumental)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><Mic className="h-4 w-4 text-zinc-400" /><span>Replace Instrumental</span></button>}
               {onDeleteSong && <><div className="my-1 border-t border-white/5" /><button type="button" onClick={() => runAction(onDeleteSong)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4 text-red-400" /><span>Delete Song</span></button></>}
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       )}
