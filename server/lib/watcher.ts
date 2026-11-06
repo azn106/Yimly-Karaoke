@@ -225,6 +225,11 @@ class LibraryWatcherManager {
     // Check for songs in the database that no longer exist on disk
     try {
       const dbSongs = await db.select().from(songs).where(eq(songs.libraryId, state.libraryId));
+      if (currentFiles.size === 0 && dbSongs.length > 0) {
+        console.warn('[LibraryWatcher] Initial snapshot is empty; retaining existing records until media is available.');
+        state.isInitialized = true;
+        return;
+      }
       for (const s of dbSongs) {
         const mainPath = s.mainAudioPath;
         const instPath = s.instrumentalAudioPath;
