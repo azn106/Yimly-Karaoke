@@ -250,6 +250,17 @@ export async function getYtDlpPath(): Promise<string> {
   }
 }
 
+/**
+ * Normalize library/database format labels to yt-dlp's accepted audio format names.
+ * Older song records may store the container label "MPEG" rather than "mp3".
+ */
+export function normalizeYtDlpAudioFormat(format: string): string {
+  const normalized = (format || 'mp3').trim().toLowerCase();
+  if (['mpeg', 'audio/mpeg', 'mpeg-1 audio layer iii', 'mpeg layer 3'].includes(normalized)) return 'mp3';
+  if (normalized === 'oga') return 'ogg';
+  return normalized || 'mp3';
+}
+
 export class DownloadQueueManager {
   private maxConcurrency: number = 1;
   private activeWorkers: number = 0;
@@ -291,6 +302,7 @@ export class DownloadQueueManager {
     maxAttempts: number = 3
   ): Promise<string> {
     const ytDlpPath = await getYtDlpPath();
+    const normalizedFormat = normalizeYtDlpAudioFormat(format);
     const tempFileBase = path.join(outputDir, `audio_${Date.now()}`);
     let downloadedAudioPath = '';
     const possibleExtensions = ['mp3', 'm4a', 'flac', 'wav', 'opus', 'webm', 'ogg'];
@@ -303,14 +315,14 @@ export class DownloadQueueManager {
         }
 
         if (isPreviewMode) {
-          const simPath = `${tempFileBase}.${format}`;
+          const simPath = `${tempFileBase}.${normalizedFormat}`;
           simulateDownload(simPath);
           downloadedAudioPath = simPath;
           break;
         } else {
           const dlArgs = [
             '-x',
-            '--audio-format', format === 'opus' ? 'opus' : format,
+            '--audio-format', normalizedFormat,
             '--audio-quality', quality === '128k' ? '5' : quality === '192k' ? '2' : '0',
             '--no-playlist',
             '--max-filesize', '100M',
