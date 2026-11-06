@@ -590,34 +590,6 @@ router.post('/start', async (req, res) => {
   }
 });
 
-router.get('/queue', requireAdmin, async (_req, res) => {
-  try {
-    const jobs = await downloadQueue.getAllJobs();
-    const tracks = jobs.flatMap(job => job.tracks);
-    res.json({
-      jobs,
-      summary: {
-        workers: tracks.filter(track => ['searching', 'downloading', 'tagging'].includes(track.status)).length,
-        queued: tracks.filter(track => track.status === 'queued').length,
-        completed: tracks.filter(track => track.status === 'completed').length,
-        failed: tracks.filter(track => track.status === 'failed').length,
-        maxWorkers: downloadQueue.getConcurrency(),
-      },
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to load download queue' });
-  }
-});
-
-router.post('/queue/clear-finished', requireAdmin, async (_req, res) => {
-  try {
-    const cleared = await downloadQueue.clearFinishedJobs();
-    res.json({ message: 'Finished download jobs cleared', cleared });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to clear finished jobs' });
-  }
-});
-
 router.get('/jobs/:jobId', async (req, res) => {
   try {
     const job = await downloadQueue.getJob(req.params.jobId);
