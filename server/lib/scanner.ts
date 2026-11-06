@@ -1088,10 +1088,12 @@ export async function removeSingleFile(libraryId: number, filePath: string): Pro
       const instStillExists = curr.instrumentalAudioPath && curr.instrumentalAudioPath !== filePath && fsSync.existsSync(curr.instrumentalAudioPath);
 
       if (!mainStillExists && !instStillExists) {
-        // Missing or inaccessible media file is treated as potentially temporary (e.g. unmounted storage).
-        // Never permanently delete song records or playlist associations based solely on a failed file-existence check.
-        console.warn(`[Scanner] Audio file ${filePath} is inaccessible for song ID ${curr.id} ("${curr.title}"). Preserving song record and playlist associations.`);
-        return;
+        // A watcher delete event confirms that a tracked audio file was removed while
+        // the library watcher is active. If no alternate audio variant remains, remove
+        // the song row; related lyrics, playlist entries, favourites, queue items, and
+        // artist links are removed by their song foreign-key cascades.
+        console.log(`[Scanner] Removing song ID ${curr.id} ("${curr.title}") because no audio variants remain.`);
+        await db.delete(songs).where(eq(songs.id, curr.id));
       } else if (!mainStillExists && instStillExists) {
         // Main removed, instrumental remains (never promote instrumental to mainAudioPath)
         await db.update(songs).set({
@@ -1495,9 +1497,13 @@ export async function scanLibrary(libraryId: number, dirPath: string) {
     const instExists = dbSong.instrumentalAudioPath ? fsSync.existsSync(dbSong.instrumentalAudioPath) : false;
 
     if (!mainExists && !instExists) {
-      // Inaccessible media files are treated as potentially temporary (e.g. unmounted volume or network share).
-      // Never permanently delete song records or playlist associations based solely on a failed file-existence check.
-      console.warn(`[Scanner] Media files for song ID ${dbSong.id} ("${dbSong.title}") are not accessible on disk. Preserving song record and playlist associations.`);
+      // The library root was validated and this scan discovered audio files, so a song
+      // with no remaining audio variants is genuinely absent from this library.
+      // Song foreign-key cascades clean up lyrics, playlists, favourites, queue items,
+      // and song/artist links without deleting any files from disk.
+      console.log(`[Scanner] Removing song ID ${dbSong.id} ("${dbSong.title}") because no audio variants remain in the scanned library.`);
+      await db.delete(songs).where(eq(songs.id, dbSong.id));
+      continue;
     } else if (!mainExists && instExists) {
       // Main removed, instrumental remains
       await db.update(songs).set({
