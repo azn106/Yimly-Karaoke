@@ -45,6 +45,7 @@ interface ActiveTrackJob {
 
 interface ActiveJob {
   id: string;
+  playlistName?: string | null;
   status: 'queued' | 'downloading' | 'completed' | 'failed' | 'cancelled';
   tracks: ActiveTrackJob[];
   libraryId: number;
@@ -74,6 +75,9 @@ export default function DownloadMusic() {
   // Active Job state
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
+  const [queueJobs, setQueueJobs] = useState<ActiveJob[]>([]);
+  const [queueSummary, setQueueSummary] = useState({ workers: 0, queued: 0, completed: 0, failed: 0, maxWorkers: 1 });
+  const [clearingFinished, setClearingFinished] = useState(false);
   const [startingDownload, setStartingDownload] = useState(false);
 
   // Fetch libraries & default settings on mount
@@ -84,27 +88,39 @@ export default function DownloadMusic() {
     }
   }, [user]);
 
-  // Poll active job status if present
+  const refreshQueue = async () => {
+    try {
+      const res = await fetch('/api/downloader/queue');
+      if (!res.ok) return;
+      const data = await res.json();
+      setQueueJobs(Array.isArray(data.jobs) ? data.jobs : []);
+      if (data.summary) setQueueSummary(data.summary);
+    } catch (error) {
+      console.error('Failed to refresh download queue', error);
+    }
+  };
+
   useEffect(() => {
-    if (!activeJobId) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/downloader/jobs/${activeJobId}`);
-        if (res.ok) {
-          const data: ActiveJob = await res.json();
-          setActiveJob(data);
-          if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
-            clearInterval(interval);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to poll job status', e);
-      }
-    }, 1500);
-
+    if (user?.role !== 'administrator') return;
+    refreshQueue();
+    const interval = setInterval(refreshQueue, 1500);
     return () => clearInterval(interval);
-  }, [activeJobId]);
+  }, [user]);
+
+  const handleClearFinished = async () => {
+    if (!window.confirm('Clear all finished download entries? Queued and currently processing downloads will not be affected.')) return;
+    setClearingFinished(true);
+    try {
+      const res = await fetch('/api/downloader/queue/clear-finished', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to clear finished downloads');
+      await refreshQueue();
+    } catch (error) {
+      console.error('Clear finished downloads failed', error);
+      alert('Could not clear finished downloads. Please try again.');
+    } finally {
+      setClearingFinished(false);
+    }
+  };
 
   const fetchLibraries = async () => {
     try {
@@ -275,11 +291,9 @@ export default function DownloadMusic() {
       }
 
       setActiveJobId(data.jobId);
-      // Fetch initial job state immediately
       const jobRes = await fetch(`/api/downloader/jobs/${data.jobId}`);
-      if (jobRes.ok && jobRes.headers.get('content-type')?.includes('application/json')) {
-        setActiveJob(await jobRes.json());
-      }
+      if (jobRes.ok) setActiveJob(await jobRes.json());
+      await refreshQueue();
     } catch (err: any) {
       alert(err.message || 'Error starting download.');
     } finally {
@@ -620,148 +634,91 @@ export default function DownloadMusic() {
         </div>
       )}
 
-      {/* Active Download Progress Monitor */}
-      {activeJob && (
-        <div className="bg-[#141622] border border-[#F472B6]/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-[#F472B6] animate-pulse" />
-                <h3 className="text-lg font-extrabold text-white">Active Download Progress</h3>
-              </div>
-              <p className="text-xs text-zinc-400 mt-1 font-mono">
-                Job ID: {activeJob.id} • Library Path: {activeJob.libraryPath}
-              </p>
+      {/* Permanent shared Download Queue Monitor */}
+      <section className="bg-[#141622] border border-[#F472B6]/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Radio className="w-4 h-4 text-[#F472B6]" />
+              <h3 className="text-lg font-extrabold text-white">Download Queue Monitor</h3>
+              <span className="text-[10px] px-2 py-1 rounded-full bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">LIVE</span>
             </div>
-
-            <div className="flex items-center gap-3">
-              {activeJob.tracks.some(t => t.status === 'failed') && (
-                <button
-                  type="button"
-                  onClick={handleRetryFailed}
-                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold rounded-xl border border-amber-500/30 transition-colors flex items-center gap-1.5"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Retry Failed ({activeJob.tracks.filter(t => t.status === 'failed').length})</span>
-                </button>
-              )}
-
-              {activeJob.status === 'downloading' || activeJob.status === 'queued' ? (
-                <button
-                  type="button"
-                  onClick={handleCancelJob}
-                  className="px-3 py-1.5 bg-red-950/60 hover:bg-red-900 text-red-300 text-xs font-semibold rounded-xl border border-red-500/30 transition-colors"
-                >
-                  Cancel Job
-                </button>
-              ) : (
-                <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#F472B6]/20 text-[#F472B6] border border-[#F472B6]/30">
-                  {activeJob.status}
-                </span>
-              )}
-            </div>
+            <p className="text-xs text-zinc-400 mt-1">Shared queue • live updates • finished entries retained for 24 hours</p>
           </div>
-
-          {/* Stats Badges */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="bg-[#08090E] border border-white/5 rounded-xl p-2.5 text-center">
-              <span className="text-[10px] uppercase font-bold text-zinc-500 block">Total</span>
-              <span className="text-base font-extrabold text-white font-mono">{activeJob.totalCount}</span>
-            </div>
-            <div className="bg-[#08090E] border border-emerald-500/10 rounded-xl p-2.5 text-center">
-              <span className="text-[10px] uppercase font-bold text-emerald-400 block">Completed</span>
-              <span className="text-base font-extrabold text-emerald-400 font-mono">{activeJob.completedCount}</span>
-            </div>
-            <div className="bg-[#08090E] border border-[#F472B6]/10 rounded-xl p-2.5 text-center">
-              <span className="text-[10px] uppercase font-bold text-[#F472B6] block">In Progress / Queued</span>
-              <span className="text-base font-extrabold text-[#F472B6] font-mono">
-                {activeJob.tracks.filter(t => t.status === 'queued' || t.status === 'searching' || t.status === 'downloading' || t.status === 'tagging').length}
-              </span>
-            </div>
-            <div className="bg-[#08090E] border border-red-500/10 rounded-xl p-2.5 text-center">
-              <span className="text-[10px] uppercase font-bold text-red-400 block">Failed</span>
-              <span className="text-base font-extrabold text-red-400 font-mono">
-                {activeJob.tracks.filter(t => t.status === 'failed').length}
-              </span>
-            </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={refreshQueue} className="px-3 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs rounded-xl border border-white/10 flex items-center gap-2">
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            </button>
+            <button type="button" onClick={handleClearFinished} disabled={clearingFinished || !queueJobs.some(job => ['completed', 'failed', 'cancelled'].includes(job.status))} className="px-3 py-2 bg-red-950/50 hover:bg-red-900/70 text-red-300 text-xs rounded-xl border border-red-500/30 disabled:opacity-40">
+              {clearingFinished ? 'Clearing…' : 'Clear All Finished'}
+            </button>
           </div>
-
-          {/* Summary Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-bold text-white">Overall Completion</span>
-              <span className="font-mono text-[#F472B6] font-bold">
-                {activeJob.completedCount} of {activeJob.totalCount} tracks finished (
-                {Math.round((activeJob.completedCount / (activeJob.totalCount || 1)) * 100)}%)
-              </span>
-            </div>
-
-            <div className="w-full h-3 bg-[#08090E] rounded-full overflow-hidden p-0.5 border border-white/10">
-              <div
-                style={{ width: `${(activeJob.completedCount / (activeJob.totalCount || 1)) * 100}%` }}
-                className="h-full bg-gradient-to-r from-[#F472B6] to-[#ff7ebd] rounded-full transition-all duration-300 shadow-md shadow-[#F472B6]/30"
-              />
-            </div>
-          </div>
-
-          {/* Individual Tracks Processing List */}
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Tracks Processing</h4>
-
-            <div className="bg-[#08090E] border border-white/5 rounded-2xl divide-y divide-white/5">
-              {activeJob.tracks.map((tr) => (
-                <div key={tr.id} className="p-3.5 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <StatusIcon status={tr.status} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-semibold text-white truncate">{tr.title}</div>
-                      <div className="text-[11px] text-zinc-400 truncate">{tr.artist}</div>
-                      {tr.error && <div className="text-[10px] text-red-400 mt-0.5">{tr.error}</div>}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-[11px] font-mono capitalize text-zinc-400">{tr.status}</span>
-                    <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        style={{ width: `${tr.progress}%` }}
-                        className={`h-full transition-all ${
-                          tr.status === 'completed'
-                            ? 'bg-emerald-400'
-                            : tr.status === 'failed'
-                            ? 'bg-red-500'
-                            : 'bg-[#F472B6]'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {activeJob.status === 'completed' && (
-            <div className="p-4 bg-emerald-950/40 border border-emerald-500/30 rounded-2xl text-emerald-300 text-xs flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2.5">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                <div>
-                  <div className="font-bold">Music Download Complete!</div>
-                  <p className="text-[11px] text-emerald-400/80 mt-0.5">
-                    Newly downloaded tracks have been saved to your Yimly media directory and auto-rescanned into your music catalog.
-                  </p>
-                </div>
-              </div>
-
-              <Link
-                to="/library"
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs rounded-xl transition-colors shrink-0"
-              >
-                View in Library
-              </Link>
-            </div>
-          )}
         </div>
-      )}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {[
+            ['Active', queueSummary.workers, 'text-[#F472B6]'],
+            ['Queued', queueSummary.queued, 'text-zinc-200'],
+            ['Completed', queueSummary.completed, 'text-emerald-400'],
+            ['Failed', queueSummary.failed, 'text-red-400'],
+            ['Worker limit', queueSummary.maxWorkers, 'text-zinc-300'],
+          ].map(([label, value, color]) => (
+            <div key={String(label)} className="bg-[#08090E] border border-white/5 rounded-xl p-3 text-center">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 block">{label}</span>
+              <span className={`text-lg font-extrabold font-mono ${color}`}>{value}</span>
+            </div>
+          ))}
+        </div>
+        {queueJobs.length === 0 ? (
+          <div className="bg-[#08090E] border border-white/5 rounded-2xl p-8 text-center">
+            <Music className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-zinc-300">The download queue is empty</p>
+            <p className="text-xs text-zinc-500 mt-1">Admin Downloader and Karaoke room jobs will appear here automatically.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {queueJobs.map(job => (
+              <div key={job.id} className="bg-[#08090E] border border-white/5 rounded-2xl p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{job.playlistName || 'Download job'}</div>
+                    <div className="text-[10px] text-zinc-500 font-mono truncate">Job {job.id} · {job.tracks.length} tracks</div>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${job.status === 'completed' ? 'bg-emerald-500/15 text-emerald-400' : job.status === 'failed' || job.status === 'cancelled' ? 'bg-red-500/15 text-red-400' : 'bg-[#F472B6]/15 text-[#F472B6]'}`}>{job.status}</span>
+                </div>
+                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-[#F472B6] to-[#ff7ebd]" style={{ width: `${Math.round((job.completedCount / (job.totalCount || 1)) * 100)}%` }} />
+                </div>
+                <div className="flex flex-wrap gap-3 text-[10px] text-zinc-400">
+                  <span>{job.completedCount}/{job.totalCount} completed</span>
+                  <span>{job.tracks.filter(t => t.status === 'queued').length} queued</span>
+                  <span>{job.tracks.filter(t => ['searching', 'downloading'].includes(t.status)).length} downloading</span>
+                  <span>{job.tracks.filter(t => t.status === 'tagging').length} finalising / processing</span>
+                  <span>{job.tracks.filter(t => t.status === 'failed').length} failed</span>
+                </div>
+                {job.tracks.map(track => (
+                  <div key={track.id} className="flex items-center gap-3 border-t border-white/5 pt-2">
+                    <StatusIcon status={track.status} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-white truncate">{track.title}</div>
+                      <div className="text-[10px] text-zinc-500 truncate">{track.artist}{track.error ? ` · ${track.error}` : ''}</div>
+                    </div>
+                    <span className="text-[10px] text-zinc-400 capitalize shrink-0">{track.status === 'tagging' ? 'Finalising' : track.status}</span>
+                    <div className="w-14 h-1.5 bg-white/10 rounded-full overflow-hidden shrink-0"><div className={`h-full ${track.status === 'completed' ? 'bg-emerald-400' : track.status === 'failed' ? 'bg-red-500' : 'bg-[#F472B6]'}`} style={{ width: `${track.progress}%` }} /></div>
+                  </div>
+                ))}
+                {job.tracks.some(t => t.status === 'failed') && (
+                  <button type="button" onClick={async () => { await fetch(`/api/downloader/jobs/${job.id}/retry-failed`, { method: 'POST' }); await refreshQueue(); }} className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs rounded-lg border border-amber-500/25">
+                    <RefreshCw className="w-3 h-3 inline mr-1" /> Retry Failed ({job.tracks.filter(t => t.status === 'failed').length})
+                  </button>
+                )}
+                {['queued', 'downloading'].includes(job.status) && (
+                  <button type="button" onClick={async () => { await fetch(`/api/downloader/cancel/${job.id}`, { method: 'POST' }); await refreshQueue(); }} className="px-3 py-1.5 bg-red-950/50 hover:bg-red-900/70 text-red-300 text-xs rounded-lg border border-red-500/25">Cancel Job</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
