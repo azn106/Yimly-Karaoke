@@ -2965,7 +2965,7 @@ export default function RoomSession() {
             ) : (
               /* Queue is Empty State (Clean & Centered) */
               <div className="text-center z-10 py-12 px-6 max-w-md mx-auto flex flex-col items-center justify-center">
-                <div className="w-32 h-32 rounded-3xl bg-[#12131D] border border-white/10 overflow-hidden flex items-center justify-center mx-auto mb-5 shadow-xl">
+                <div className="w-full max-w-[320px] aspect-square rounded-3xl bg-[#12131D] border border-white/10 overflow-hidden flex items-center justify-center mx-auto mb-5 shadow-xl">
                   {bgmSettings.enabled && bgmCurrentSong ? (
                     <img
                       src={`/api/songs/${bgmCurrentSong.id}/artwork`}
@@ -2982,7 +2982,7 @@ export default function RoomSession() {
                 </p>
 
                 {bgmSettings.enabled && bgmCurrentSong && (
-                  <div className="mt-6 px-4 py-2 rounded-2xl bg-[#141622]/80 border border-white/10 flex items-center gap-3 text-xs text-zinc-300 shadow-lg">
+                  <div className="mt-6 w-full max-w-[320px] px-4 py-2 rounded-2xl bg-[#141622]/80 border border-white/10 flex items-center gap-3 text-xs text-zinc-300 shadow-lg box-border">
                     <Disc3 className={`w-4 h-4 text-[#F472B6] ${bgmIsActive ? 'animate-spin' : ''}`} />
                     <div className="text-left">
                       <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider block">Background Music</span>
