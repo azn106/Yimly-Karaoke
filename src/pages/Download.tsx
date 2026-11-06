@@ -73,8 +73,6 @@ export default function DownloadMusic() {
   const [downloadLyrics, setDownloadLyrics] = useState(true);
 
   // Active Job state
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
   const [queueJobs, setQueueJobs] = useState<ActiveJob[]>([]);
   const [queueSummary, setQueueSummary] = useState({ workers: 0, queued: 0, completed: 0, failed: 0, maxWorkers: 1 });
   const [clearingFinished, setClearingFinished] = useState(false);
@@ -290,9 +288,6 @@ export default function DownloadMusic() {
         throw new Error(data.error || 'Failed to start download process');
       }
 
-      setActiveJobId(data.jobId);
-      const jobRes = await fetch(`/api/downloader/jobs/${data.jobId}`);
-      if (jobRes.ok) setActiveJob(await jobRes.json());
       await refreshQueue();
     } catch (err: any) {
       alert(err.message || 'Error starting download.');
@@ -301,28 +296,7 @@ export default function DownloadMusic() {
     }
   };
 
-  const handleCancelJob = async () => {
-    if (!activeJobId) return;
-    try {
-      await fetch(`/api/downloader/cancel/${activeJobId}`, { method: 'POST' });
-    } catch (e) {
-      console.error('Cancel error', e);
-    }
-  };
 
-  const handleRetryFailed = async () => {
-    if (!activeJobId) return;
-    try {
-      await fetch(`/api/downloader/jobs/${activeJobId}/retry-failed`, { method: 'POST' });
-      // Fetch latest state immediately
-      const res = await fetch(`/api/downloader/jobs/${activeJobId}`);
-      if (res.ok) {
-        setActiveJob(await res.json());
-      }
-    } catch (e) {
-      console.error('Retry error', e);
-    }
-  };
 
   if (user?.role !== 'administrator') {
     return (
