@@ -106,6 +106,8 @@ export default function Library() {
     loading: boolean;
     error: string | null;
     successMsg: string | null;
+    progress: number;
+    progressMessage: string;
   }>({
     isOpen: false,
     songId: null,
@@ -115,6 +117,8 @@ export default function Library() {
     loading: false,
     error: null,
     successMsg: null,
+    progress: 0,
+    progressMessage: 'Ready to replace audio.',
   });
 
   const [replaceInstrumentalModal, setReplaceInstrumentalModal] = useState<{
@@ -299,31 +303,64 @@ export default function Library() {
       loading: false,
       error: null,
       successMsg: null,
+      progress: 0,
+      progressMessage: 'Ready to replace audio.',
     });
   };
 
   const handleExecuteReplaceSource = async () => {
-    if (!replaceSourceModal.songId || !replaceSourceModal.youtubeUrl.trim()) return;
-    setReplaceSourceModal(prev => ({ ...prev, loading: true, error: null, successMsg: null }));
+    if (!replaceSourceModal.songId || !replaceSourceModal.youtubeUrl.trim() || replaceSourceModal.loading) return;
+    const songId = replaceSourceModal.songId;
+    const startedAt = Date.now();
+    setReplaceSourceModal(prev => ({ ...prev, loading: true, error: null, successMsg: null, progress: 2, progressMessage: 'Starting replacement…' }));
+
+    let requestFinished = false;
+    const replacementRequest = fetch(`/api/songs/${songId}/replace-source`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ youtubeUrl: replaceSourceModal.youtubeUrl.trim() }),
+    }).then(async res => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.details || 'Failed to replace recording source');
+      return data;
+    }).finally(() => { requestFinished = true; });
 
     try {
-      const res = await fetch(`/api/songs/${replaceSourceModal.songId}/replace-source`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ youtubeUrl: replaceSourceModal.youtubeUrl.trim() }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || data.details || 'Failed to replace recording source');
+      // The status endpoint is polled independently while the long-running POST
+      // performs the download, Demucs separation, validation and file commit.
+      while (!requestFinished) {
+        try {
+          const statusRes = await fetch(`/api/songs/${songId}/replace-status?since=${startedAt}`, { credentials: 'same-origin' });
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            const job = statusData.job;
+            if (job) {
+              setReplaceSourceModal(prev => ({
+                ...prev,
+                progress: Math.max(prev.progress, Math.min(99, Number(job.progress) || 0)),
+                progressMessage: job.message || 'Processing replacement…',
+              }));
+              if (job.status === 'failed') throw new Error(job.error || job.message || 'Audio replacement failed');
+            }
+          }
+        } catch (statusError: any) {
+          if (statusError?.message && /replacement failed|failed/i.test(statusError.message)) throw statusError;
+          // A transient status poll failure must not cancel the actual replacement.
+        }
+        if (!requestFinished) await new Promise(resolve => setTimeout(resolve, 900));
       }
 
+      await replacementRequest;
       setReplaceSourceModal(prev => ({
         ...prev,
         loading: false,
+        progress: 100,
+        progressMessage: 'Replacement completed successfully.',
         successMsg: 'Recording replaced and audio reprocessed successfully!',
       }));
     } catch (err: any) {
+      // Consume any request rejection if the status poll failed first.
+      replacementRequest.catch(() => {});
       setReplaceSourceModal(prev => ({
         ...prev,
         loading: false,
@@ -2250,6 +2287,25 @@ export default function Library() {
                 />
               </div>
 
+              {replaceSourceModal.loading && (
+                <div className="space-y-2 rounded-xl border border-white/10 bg-[#0D0E15] p-3" role="status" aria-live="polite">
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <span className="font-medium text-zinc-200">{replaceSourceModal.progressMessage}</span>
+                    <span className="shrink-0 tabular-nums text-[#F472B6]">{Math.round(replaceSourceModal.progress)}%</span>
+                  </div>
+                  <div
+                    className="h-2 w-full overflow-hidden rounded-full bg-white/10"
+                    role="progressbar"
+                    aria-label="Audio replacement progress"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(replaceSourceModal.progress)}
+                  >
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#F472B6] to-[#FF4FA3] transition-[width] duration-500 ease-out" style={{ width: `${Math.max(0, Math.min(100, replaceSourceModal.progress))}%` }} />
+                  </div>
+                </div>
+              )}
+
               {replaceSourceModal.error && (
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-xs text-red-400">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -2275,11 +2331,18 @@ export default function Library() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleExecuteReplaceSource}
-                  disabled={replaceSourceModal.loading || !replaceSourceModal.youtubeUrl.trim()}
+                  onClick={replaceSourceModal.successMsg
+                    ? () => setReplaceSourceModal(prev => ({ ...prev, isOpen: false, error: null, successMsg: null }))
+                    : handleExecuteReplaceSource}
+                  disabled={replaceSourceModal.loading || (!replaceSourceModal.successMsg && !replaceSourceModal.youtubeUrl.trim())}
                   className="px-4 py-2 bg-[#F472B6] hover:bg-[#DB2777] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-[#F472B6]/25 cursor-pointer"
                 >
-                  {replaceSourceModal.loading ? (
+                  {replaceSourceModal.successMsg ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Done</span>
+                    </>
+                  ) : replaceSourceModal.loading ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       <span>Replacing Audio…</span>
