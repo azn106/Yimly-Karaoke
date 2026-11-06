@@ -3566,17 +3566,6 @@ test('Production Step #9: Security Hardening Audit Suite', async () => {
   const searchResults = await sqlInjectionRes.json();
   assert.ok(Array.isArray(searchResults), 'Search response must still be a valid array');
 
-  // 2b. SQL Search Wildcard Escaping (literal %, _, \ are escaped)
-  const wildcardQueries = ['100%', 'my_song', 'file\\path'];
-  for (const q of wildcardQueries) {
-    const wildcardRes = await fetch(`${baseUrl}/api/search?q=${encodeURIComponent(q)}`, {
-      headers: { Authorization: `Bearer ${tokenA}` }
-    });
-    assert.strictEqual(wildcardRes.status, 200, `Wildcard search query "${q}" must return 200 OK`);
-    const wildcardResults = await wildcardRes.json();
-    assert.ok(Array.isArray(wildcardResults), `Wildcard search response for "${q}" must be a valid array`);
-  }
-
   // 3. JWT Authentication Security (Algorithm confusion / Invalid signature)
   const invalidSignatureRes = await fetch(`${baseUrl}/api/songs`, {
     headers: { Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MX0.invalid_signature_string` }

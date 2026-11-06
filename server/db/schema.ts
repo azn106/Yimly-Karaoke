@@ -86,19 +86,14 @@ export const lyrics = sqliteTable('lyrics', {
   songId: integer('song_id').references(() => songs.id, { onDelete: 'cascade' }).notNull(),
   lrcPath: text('lrc_path'),
   elrcPath: text('elrc_path'),
-}, (table) => ({
-  songIdIdx: index('lyrics_song_id_idx').on(table.songId),
-}));
+});
 
 export const songArtists = sqliteTable('song_artists', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   songId: integer('song_id').references(() => songs.id, { onDelete: 'cascade' }).notNull(),
   artistId: integer('artist_id').references(() => artists.id, { onDelete: 'cascade' }).notNull(),
   position: integer('position').notNull().default(0),
-}, (table) => ({
-  songIdIdx: index('song_artists_song_id_idx').on(table.songId),
-  artistIdIdx: index('song_artists_artist_id_idx').on(table.artistId),
-}));
+});
 
 export const queueItems = sqliteTable('queue_items', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -116,10 +111,7 @@ export const queueItems = sqliteTable('queue_items', {
   downloadJobId: text('download_job_id'),
   downloadTrackId: text('download_track_id'),
   downloadStatus: text('download_status'), // 'downloading', 'ready', 'failed'
-}, (table) => ({
-  sessionIdx: index('queue_items_session_id_idx').on(table.sessionId),
-  songIdx: index('queue_items_song_id_idx').on(table.songId),
-}));
+});
 
 export const playlists = sqliteTable('playlists', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -140,10 +132,7 @@ export const playlistSongs = sqliteTable('playlist_songs', {
   songId: integer('song_id').references(() => songs.id, { onDelete: 'cascade' }).notNull(),
   position: integer('position').notNull().default(0),
   addedAt: integer('added_at', { mode: 'timestamp' }).notNull(),
-}, (table) => ({
-  playlistIdx: index('playlist_songs_playlist_id_idx').on(table.playlistId),
-  songIdx: index('playlist_songs_song_id_idx').on(table.songId),
-}));
+});
 
 export const playlistShares = sqliteTable('playlist_shares', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -171,7 +160,6 @@ export const settings = sqliteTable('settings', {
 
 export const downloadJobs = sqliteTable('download_jobs', {
   id: text('id').primaryKey(),
-  userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
   playlistName: text('playlist_name'),
   playlistId: integer('playlist_id').references(() => playlists.id, { onDelete: 'set null' }),
   type: text('type').notNull().default('playlist'),
@@ -191,9 +179,7 @@ export const downloadJobs = sqliteTable('download_jobs', {
   failedCount: integer('failed_count').notNull().default(0),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-}, (table) => ({
-  userIdIdx: index('download_jobs_user_id_idx').on(table.userId),
-}));
+});
 
 export const downloadTrackJobs = sqliteTable('download_track_jobs', {
   id: text('id').primaryKey(),
@@ -215,9 +201,7 @@ export const downloadTrackJobs = sqliteTable('download_track_jobs', {
   position: integer('position').notNull().default(0),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-}, (table) => ({
-  jobIdIdx: index('download_track_jobs_job_id_idx').on(table.jobId),
-}));
+});
 
 export const songVerifiedSources = sqliteTable('song_verified_sources', {
   id: integer('id').primaryKey({ autoIncrement: true }),

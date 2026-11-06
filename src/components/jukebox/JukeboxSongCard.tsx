@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
 import { Play, Pause, Music, Plus, MoreVertical, Heart, ListMusic, RefreshCw, Mic, Trash2 } from 'lucide-react';
 import LyricBadges from '../LyricBadges';
 import EqualizerIndicator from '../EqualizerIndicator';
@@ -53,9 +52,6 @@ export default function JukeboxSongCard({
   albumContent,
 }: JukeboxSongCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuCoords, setMenuCoords] = useState<{ top: number; right: number; dropUp: boolean } | null>(null);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-
   const title = song?.title || 'Unknown track';
   const artist = song?.artist || 'Unknown Artist';
   const duration = Number(song?.duration || 0);
@@ -63,37 +59,6 @@ export default function JukeboxSongCard({
     ? `${Math.floor(duration / 60)}:${String(Math.floor(duration % 60)).padStart(2, '0')}`
     : '--:--';
   const hasLibraryActions = !!(onToggleFavorite || onAddToPlaylist || onReplaceAudio || onReplaceInstrumental || onDeleteSong);
-
-  const handleToggleMenu = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (!menuOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      const dropUp = rect.bottom + 220 > window.innerHeight;
-      const right = Math.max(12, window.innerWidth - rect.right);
-      const top = dropUp ? rect.top - 4 : rect.bottom + 4;
-      setMenuCoords({ top, right, dropUp });
-    }
-    setMenuOpen(prev => !prev);
-  };
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleOutsideClick = (e: MouseEvent) => {
-      setMenuOpen(false);
-    };
-    const handleScrollOrResize = () => {
-      setMenuOpen(false);
-    };
-    window.addEventListener('click', handleOutsideClick);
-    window.addEventListener('scroll', handleScrollOrResize, true);
-    window.addEventListener('resize', handleScrollOrResize);
-    return () => {
-      window.removeEventListener('click', handleOutsideClick);
-      window.removeEventListener('scroll', handleScrollOrResize, true);
-      window.removeEventListener('resize', handleScrollOrResize);
-    };
-  }, [menuOpen]);
-
   const runAction = (action?: () => void) => {
     setMenuOpen(false);
     action?.();
@@ -141,33 +106,17 @@ export default function JukeboxSongCard({
       )}
       {hasLibraryActions && (
         <div className="relative shrink-0">
-          <button
-            ref={buttonRef}
-            type="button"
-            onClick={handleToggleMenu}
-            className={`rounded-full p-2 transition-colors ${menuOpen ? 'bg-white/15 text-[#F472B6]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}
-            title="More options"
-            aria-label={`More options for ${title}`}
-            aria-expanded={menuOpen}
-          >
+          <button type="button" onClick={(event) => { event.stopPropagation(); setMenuOpen(open => !open); }} className={`rounded-full p-2 transition-colors ${menuOpen ? 'bg-white/15 text-[#F472B6]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`} title="More options" aria-label={`More options for ${title}`} aria-expanded={menuOpen}>
             <MoreVertical className="h-4 w-4" />
           </button>
-          {menuOpen && menuCoords && createPortal(
-            <div
-              className="fixed z-[9999] w-52 rounded-xl border border-white/10 bg-[#171926] p-1.5 text-left shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
-              style={{
-                right: menuCoords.right,
-                ...(menuCoords.dropUp ? { bottom: window.innerHeight - menuCoords.top } : { top: menuCoords.top })
-              }}
-              onClick={event => event.stopPropagation()}
-            >
+          {menuOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1.5 w-52 rounded-xl border border-white/10 bg-[#171926] p-1.5 text-left shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100" onClick={event => event.stopPropagation()}>
               {onToggleFavorite && <button type="button" onClick={() => runAction(onToggleFavorite)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><Heart className={`h-4 w-4 ${isFavorite ? 'fill-[#F472B6] text-[#F472B6]' : 'text-zinc-400'}`} /><span>{isFavorite ? 'Remove from Favourites' : 'Add to Favourites'}</span></button>}
               {onAddToPlaylist && <button type="button" onClick={() => runAction(onAddToPlaylist)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><ListMusic className="h-4 w-4 text-zinc-400" /><span>Add to Playlist</span></button>}
               {onReplaceAudio && <button type="button" onClick={() => runAction(onReplaceAudio)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><RefreshCw className="h-4 w-4 text-zinc-400" /><span>Replace Audio</span></button>}
               {onReplaceInstrumental && <button type="button" onClick={() => runAction(onReplaceInstrumental)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"><Mic className="h-4 w-4 text-zinc-400" /><span>Replace Instrumental</span></button>}
               {onDeleteSong && <><div className="my-1 border-t border-white/5" /><button type="button" onClick={() => runAction(onDeleteSong)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4 text-red-400" /><span>Delete Song</span></button></>}
-            </div>,
-            document.body
+            </div>
           )}
         </div>
       )}

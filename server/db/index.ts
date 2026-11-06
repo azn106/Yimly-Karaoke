@@ -501,27 +501,9 @@ export async function setupDatabase(migrationsFolderOverride?: string) {
     `);
     await sqlite.execute('CREATE INDEX IF NOT EXISTS download_jobs_status_idx ON download_jobs (status);');
     await sqlite.execute('CREATE INDEX IF NOT EXISTS download_track_jobs_job_id_idx ON download_track_jobs (job_id);');
+    await sqlite.execute('CREATE INDEX IF NOT EXISTS download_track_jobs_status_idx ON download_track_jobs (status);');
   } catch (e) {
     console.error('Failed to create download jobs tables:', e);
-  }
-
-  try {
-    await sqlite.execute('ALTER TABLE download_jobs ADD COLUMN user_id integer;');
-  } catch (e) {}
-
-  const additionalPerfIndexes = [
-    'CREATE INDEX IF NOT EXISTS lyrics_song_id_idx ON lyrics (song_id);',
-    'CREATE INDEX IF NOT EXISTS song_artists_song_id_idx ON song_artists (song_id);',
-    'CREATE INDEX IF NOT EXISTS song_artists_artist_id_idx ON song_artists (artist_id);',
-    'CREATE INDEX IF NOT EXISTS queue_items_session_id_idx ON queue_items (session_id);',
-    'CREATE INDEX IF NOT EXISTS queue_items_song_id_idx ON queue_items (song_id);',
-    'CREATE INDEX IF NOT EXISTS playlist_songs_song_id_idx ON playlist_songs (song_id);',
-    'CREATE INDEX IF NOT EXISTS download_jobs_user_id_idx ON download_jobs (user_id);',
-  ];
-  for (const stmt of additionalPerfIndexes) {
-    try {
-      await sqlite.execute(stmt);
-    } catch (e) {}
   }
 
   // Ensure song_verified_sources table exists

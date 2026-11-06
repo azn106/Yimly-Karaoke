@@ -7,13 +7,8 @@ import { replaceSongRecordingSource, replaceSongInstrumental, getReplacementJob,
 import { formatArtistDisplay, cleanupOrphanedRecords } from '../lib/artist-utils.js';
 import { broadcastSongOffsetToRooms } from '../ws/index.js';
 import { isLrcContentValid } from '../lib/lyrics.js';
-import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
-
-const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.DATA_DIR?.includes('test'));
-const DETERMINISTIC_TEST_JWT_SECRET = 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe';
-const JWT_SECRET = process.env.JWT_SECRET || (isTestEnv ? DETERMINISTIC_TEST_JWT_SECRET : 'fallback_secret_for_dev');
 
 const router = Router();
 router.use(requireAuth);
@@ -160,14 +155,13 @@ router.get('/search', async (req, res) => {
     const q = req.query.q as string;
     if (!q) return res.json([]);
 
-    const escapedQ = q.replace(/([%_\\])/g, '\\$1');
-    const searchStr = `%${escapedQ}%`;
+    const searchStr = `%${q}%`;
 
     // Find song IDs where any linked artist matches search
     const matchingArtistSongIds = await db.select({ songId: songArtists.songId })
       .from(songArtists)
       .innerJoin(artists, eq(songArtists.artistId, artists.id))
-      .where(sql`${artists.name} LIKE ${searchStr} ESCAPE '\\'`);
+      .where(like(artists.name, searchStr));
 
     const songIdsFromArtists = matchingArtistSongIds.map(r => r.songId);
 
@@ -186,10 +180,10 @@ router.get('/search', async (req, res) => {
     .leftJoin(albums, eq(songs.albumId, albums.id))
     .where(
       or(
-        sql`${songs.title} LIKE ${searchStr} ESCAPE '\\'`,
-        sql`${artists.name} LIKE ${searchStr} ESCAPE '\\'`,
-        sql`${albums.title} LIKE ${searchStr} ESCAPE '\\'`,
-        sql`${songs.mainAudioPath} LIKE ${searchStr} ESCAPE '\\'`,
+        like(songs.title, searchStr),
+        like(artists.name, searchStr),
+        like(albums.title, searchStr),
+        like(songs.mainAudioPath, searchStr),
         songIdsFromArtists.length > 0 ? inArray(songs.id, songIdsFromArtists) : undefined
       )
     )
@@ -390,48 +384,6 @@ export async function handleAudioStream(req: express.Request, res: express.Respo
       return res.status(400).json({ error: 'Invalid song ID' });
     }
 
-    // Verify media streaming authorization:
-    // Requires authenticated user OR a valid active karaoke room session
-    let isAuthorized = false;
-    if ((req as AuthenticatedRequest).user) {
-      isAuthorized = true;
-    } else {
-      const rawToken = req.cookies?.yimly_token || req.headers.authorization?.split(' ')[1] || (req.query.token as string);
-      if (rawToken) {
-        try {
-          const decoded = jwt.verify(rawToken, JWT_SECRET) as any;
-          if (decoded && decoded.id) {
-            isAuthorized = true;
-          }
-        } catch {}
-      }
-    }
-
-    if (!isAuthorized) {
-      const sessionIdParam = (req.query.sessionId as string) || (req.headers['x-session-id'] as string);
-      if (sessionIdParam) {
-        const matchingSession = await db.select({ id: sessions.id })
-          .from(sessions)
-          .where(and(eq(sessions.id, sessionIdParam), eq(sessions.status, 'active')))
-          .limit(1);
-        if (matchingSession.length > 0) {
-          isAuthorized = true;
-        }
-      } else {
-        const anyActive = await db.select({ id: sessions.id })
-          .from(sessions)
-          .where(eq(sessions.status, 'active'))
-          .limit(1);
-        if (anyActive.length > 0) {
-          isAuthorized = true;
-        }
-      }
-    }
-
-    if (!isAuthorized) {
-      return res.status(401).json({ error: 'Authentication or active room session required for audio playback' });
-    }
-
     const type = (req.query.type as string)?.toLowerCase(); // 'main' or 'instrumental'
 
     const song = await db.select().from(songs).where(eq(songs.id, id)).limit(1);
@@ -466,11 +418,11 @@ export async function handleAudioStream(req: express.Request, res: express.Respo
       await fs.promises.access(resolvedPath, fs.constants.R_OK);
       stat = await fs.promises.stat(resolvedPath);
     } catch (accessErr: any) {
-      return res.status(404).json({ error: 'Audio file not found' });
+      return res.status(404).json({ error: 'Audio file not found or inaccessible on disk' });
     }
 
     if (!stat.isFile()) {
-      return res.status(404).json({ error: 'Audio file not found' });
+      return res.status(404).json({ error: 'Audio path is not a file' });
     }
 
     const ext = path.extname(resolvedPath).toLowerCase();
@@ -623,14 +575,6 @@ export async function handleAudioStream(req: express.Request, res: express.Respo
 
 router.get('/:id/audio', handleAudioStream);
 router.head('/:id/audio', handleAudioStream);
-router.get('/:id/instrumental', (req, res) => {
-  req.query.type = 'instrumental';
-  return handleAudioStream(req, res);
-});
-router.head('/:id/instrumental', (req, res) => {
-  req.query.type = 'instrumental';
-  return handleAudioStream(req, res);
-});
 router.get('/:id/stream', handleAudioStream);
 router.head('/:id/stream', handleAudioStream);
 

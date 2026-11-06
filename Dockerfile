@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
   && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
-  && curl -L https://github.com/yt-dlp/yt-dlp/releases/download/2024.12.08/yt-dlp -o /usr/local/bin/yt-dlp \
+  && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
   && chmod +x /usr/local/bin/yt-dlp \
   && pip3 install --no-cache-dir --upgrade pip \
   && pip3 install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu124 \
@@ -61,13 +61,8 @@ COPY --from=builder /app/server/lib/split.py ./server/lib/split.py
 # Copy database migrations for production migration runner
 COPY --from=builder /app/server/db/migrations ./server/db/migrations
 
-# Create persistent mount points and worker directories with correct ownership
-RUN mkdir -p /app/data /media /app/data/artwork /app/data/playlist_covers /app/data/fonts \
-  && groupadd -r yimly && useradd -r -g yimly -d /app -s /bin/bash yimly \
-  && chown -R yimly:yimly /app /media
-
-# Switch to dedicated non-root user
-USER yimly
+# Create persistent mount points
+RUN mkdir -p /app/data /media
 
 # Expose HTTP port
 EXPOSE 3000

@@ -80,7 +80,7 @@ function detectFontTypeFromBuffer(buf: Buffer): { ext: string; mime: string } | 
 }
 
 function generateRoomCode() {
-  return crypto.randomInt(100000, 1000000).toString();
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 // Global Lyric Appearance Settings (Host defaults)
@@ -750,19 +750,9 @@ router.post('/sessions/join', async (req, res) => {
 
 router.get('/active-sessions', async (req, res) => {
   try {
-    const user = (req as AuthenticatedRequest).user;
     // Only return active sessions
     const active = await db.select().from(sessions).where(eq(sessions.status, 'active'));
-    const sanitized = active.map(s => {
-      const isHostOrAdmin = user && (user.role === 'administrator' || user.id === s.hostId);
-      if (isHostOrAdmin) {
-        return s;
-      }
-      // Public / non-host callers: omit private credentials and roomCode to prevent unauthorized access
-      const { roomCode, hostId, ...safe } = s;
-      return safe;
-    });
-    res.json(sanitized);
+    res.json(active);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch sessions' });
   }
@@ -1577,13 +1567,12 @@ router.get('/search', async (req, res) => {
     const q = req.query.q as string;
     if (!q) return res.json({ library: [], external: [] });
 
-    const escapedQ = q.replace(/([%_\\])/g, '\\$1');
-    const searchStr = `%${escapedQ}%`;
+    const searchStr = `%${q}%`;
 
     const matchingArtistSongIds = await db.select({ songId: songArtists.songId })
       .from(songArtists)
       .innerJoin(artists, eq(songArtists.artistId, artists.id))
-      .where(sql`${artists.name} LIKE ${searchStr} ESCAPE '\\'`);
+      .where(like(artists.name, searchStr));
 
     const songIdsFromArtists = matchingArtistSongIds.map(r => r.songId);
 
@@ -1604,9 +1593,9 @@ router.get('/search', async (req, res) => {
     .leftJoin(albums, eq(songs.albumId, albums.id))
     .where(
       or(
-        sql`${songs.title} LIKE ${searchStr} ESCAPE '\\'`,
-        sql`${artists.name} LIKE ${searchStr} ESCAPE '\\'`,
-        sql`${albums.title} LIKE ${searchStr} ESCAPE '\\'`,
+        like(songs.title, searchStr),
+        like(artists.name, searchStr),
+        like(albums.title, searchStr),
         songIdsFromArtists.length > 0 ? inArray(songs.id, songIdsFromArtists) : undefined
       )
     )
