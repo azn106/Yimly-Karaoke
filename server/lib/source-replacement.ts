@@ -479,7 +479,12 @@ export async function replaceSongInstrumental(songId: number): Promise<ReplaceSo
     const sepResult = await separateAndCreateInstrumental(
       song.mainAudioPath,
       stagingInstrumentalPath,
-      { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' }
+      { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' },
+      (pct, message) => {
+        jobState.progress = Math.min(99, 50 + Math.round(pct * 0.45));
+        jobState.message = message || 'Separating instrumental…';
+        jobState.updatedAt = new Date();
+      }
     );
 
     if (!sepResult.ok || !fs.existsSync(stagingInstrumentalPath) || fs.statSync(stagingInstrumentalPath).size <= 1024) {
