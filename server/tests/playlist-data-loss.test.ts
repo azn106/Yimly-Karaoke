@@ -152,6 +152,9 @@ test('Playlist Data Loss Safeguards Regression Suite', async (t) => {
       addedAt: now,
     });
 
+    await db.insert(songs).values({ libraryId: lib.id, artistId: artist.id, title: 'Artist Keeper', mainAudioPath: path.join(libDir, 'ArtistKeeper.mp3'), duration: 120, variant: 'original' });
+    fs.writeFileSync(path.join(libDir, 'ArtistKeeper.mp3'), 'dummy-audio');
+
     // Simulate media file deletion or temporary unmounting
     if (song.mainAudioPath && fs.existsSync(song.mainAudioPath)) {
       fs.unlinkSync(song.mainAudioPath);
