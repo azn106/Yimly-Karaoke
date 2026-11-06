@@ -17,11 +17,19 @@ import { replaceSongRecordingSource, replaceSongInstrumental, isValidYouTubeUrl,
 import songsRoutes from '../routes/songs.js';
 import playlistsRoutes from '../routes/playlists.js';
 import favoritesRoutes from '../routes/favorites.js';
-import { downloadQueue, sanitizeErrorMessage } from '../lib/download-queue.js';
+import { downloadQueue, sanitizeErrorMessage, normalizeYtDlpAudioFormat } from '../lib/download-queue.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe';
 
 test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', async (t) => {
+  await t.test('legacy MPEG database format is normalized for yt-dlp', () => {
+    assert.equal(normalizeYtDlpAudioFormat('MPEG'), 'mp3');
+    assert.equal(normalizeYtDlpAudioFormat('audio/mpeg'), 'mp3');
+    assert.equal(normalizeYtDlpAudioFormat('MP3'), 'mp3');
+    assert.equal(normalizeYtDlpAudioFormat('m4a'), 'm4a');
+    assert.equal(normalizeYtDlpAudioFormat('opus'), 'opus');
+  });
+
   await setupDatabase();
 
   // Setup Express test app for route and permission tests
