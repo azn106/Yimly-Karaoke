@@ -1042,6 +1042,10 @@ export async function importSingleLrcFile(libraryId: number, lrcFullPath: string
  * Handles deletion or removal of an audio or lyrics file from disk.
  */
 export async function removeSingleFile(libraryId: number, filePath: string): Promise<void> {
+  const libraryRows = await db.select().from(libraries).where(eq(libraries.id, libraryId)).limit(1);
+  const libraryRoot = libraryRows[0]?.path;
+  if (!libraryRoot || !fsSync.existsSync(libraryRoot) || !fsSync.statSync(libraryRoot).isDirectory()) return;
+
   const ext = path.extname(filePath).toLowerCase();
   const lower = filePath.toLowerCase();
   const isLrc = lower.endsWith('.elrc.lrc') || ext === '.lrc';
