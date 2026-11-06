@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 import fsSync from 'fs';
 import path from 'path';
 import { db, setupDatabase } from '../db/index.js';
-import { users, libraries, artists, albums, songs, favorites, playlists, playlistSongs, lyrics, settings, controllers, queueItems, sessions } from '../db/schema.js';
+import { users, libraries, artists, albums, songs, songArtists, favorites, playlists, playlistSongs, lyrics, settings, controllers, queueItems, sessions } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 import playlistsRoutes from '../routes/playlists.js';
@@ -3479,6 +3479,70 @@ test('Production Step #6: High Concurrency, Stress & Load Testing Suite', async 
       method: 'POST',
       headers: { Authorization: `Bearer ${tokenA}` }
     });
+  }
+});
+
+test('Jukebox global search expands artist and album catalogue relationships', async () => {
+  const suffix = Date.now();
+  const artistName = `Search Fixture Artist ${suffix}`;
+  const featuredArtistName = `Search Fixture Featured ${suffix}`;
+  const albumOneTitle = `Search Fixture Album One ${suffix}`;
+  const albumTwoTitle = `Search Fixture Album Two ${suffix}`;
+  const songOneTitle = `Search Fixture Track One ${suffix}`;
+  const songTwoTitle = `Search Fixture Track Two ${suffix}`;
+
+  const [library] = await db.select().from(libraries).limit(1);
+  assert.ok(library, 'Search tests require a library fixture');
+  const [artist] = await db.insert(artists).values({ name: artistName }).returning();
+  const [featuredArtist] = await db.insert(artists).values({ name: featuredArtistName }).returning();
+  const [albumOne] = await db.insert(albums).values({ artistId: artist.id, title: albumOneTitle }).returning();
+  const [albumTwo] = await db.insert(albums).values({ artistId: artist.id, title: albumTwoTitle }).returning();
+  const [songOne] = await db.insert(songs).values({
+    libraryId: library.id, artistId: artist.id, albumId: albumOne.id,
+    title: songOneTitle, mainAudioPath: '/test/search-fixture-one.mp3',
+  }).returning();
+  const [songTwo] = await db.insert(songs).values({
+    libraryId: library.id, artistId: userAId ? artist.id : artist.id, albumId: albumTwo.id,
+    title: songTwoTitle, mainAudioPath: '/test/search-fixture-two.mp3',
+  }).returning();
+  await db.insert(songArtists).values({ songId: songTwo.id, artistId: featuredArtist.id, position: 1 });
+
+  try {
+    const headers = { Authorization: `Bearer ${tokenA}` };
+    const artistResponse = await fetch(`${baseUrl}/api/search?q=${encodeURIComponent(artistName)}`, { headers });
+    assert.equal(artistResponse.status, 200);
+    const artistResults = await artistResponse.json();
+    assert.ok(artistResults.some((item: any) => item.type === 'artist' && item.id === artist.id));
+    assert.ok(artistResults.some((item: any) => item.type === 'album' && item.id === albumOne.id));
+    assert.ok(artistResults.some((item: any) => item.type === 'album' && item.id === albumTwo.id));
+    assert.ok(artistResults.some((item: any) => item.type === 'song' && item.id === songOne.id));
+    assert.ok(artistResults.some((item: any) => item.type === 'song' && item.id === songTwo.id));
+
+    const albumResponse = await fetch(`${baseUrl}/api/search?q=${encodeURIComponent(albumOneTitle)}`, { headers });
+    assert.equal(albumResponse.status, 200);
+    const albumResults = await albumResponse.json();
+    assert.ok(albumResults.some((item: any) => item.type === 'album' && item.id === albumOne.id));
+    assert.ok(albumResults.some((item: any) => item.type === 'song' && item.id === songOne.id));
+
+    const songResponse = await fetch(`${baseUrl}/api/search?q=${encodeURIComponent(songOneTitle)}`, { headers });
+    assert.equal(songResponse.status, 200);
+    const songResults = await songResponse.json();
+    assert.ok(songResults.some((item: any) => item.type === 'song' && item.id === songOne.id));
+    assert.ok(songResults.some((item: any) => item.type === 'artist' && item.id === artist.id));
+    assert.ok(songResults.some((item: any) => item.type === 'album' && item.id === albumOne.id));
+
+    const featuredResponse = await fetch(`${baseUrl}/api/search?q=${encodeURIComponent(featuredArtistName)}`, { headers });
+    assert.equal(featuredResponse.status, 200);
+    const featuredResults = await featuredResponse.json();
+    assert.ok(featuredResults.some((item: any) => item.type === 'song' && item.id === songTwo.id),
+      'Searching a featured artist must return their linked song');
+  } finally {
+    await db.delete(songs).where(eq(songs.id, songOne.id));
+    await db.delete(songs).where(eq(songs.id, songTwo.id));
+    await db.delete(albums).where(eq(albums.id, albumOne.id));
+    await db.delete(albums).where(eq(albums.id, albumTwo.id));
+    await db.delete(artists).where(eq(artists.id, featuredArtist.id));
+    await db.delete(artists).where(eq(artists.id, artist.id));
   }
 });
 
