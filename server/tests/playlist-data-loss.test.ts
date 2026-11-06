@@ -132,7 +132,7 @@ test('Playlist Data Loss Safeguards Regression Suite', async (t) => {
     assert.strictEqual(songsAfter.length, existingSongs.length, 'Existing songs must not be wiped when scan finds 0 files');
   });
 
-  await t.test('3. Temporary media unavailability (removeSingleFile does not delete song or playlist associations)', async () => {
+  await t.test('3. Confirmed audio deletion removes the song and cascading playlist associations', async () => {
     // Query a song
     const [song] = await db.select().from(songs).where(eq(songs.libraryId, lib.id)).limit(1);
     assert.ok(song, 'A song must exist for this test');
@@ -160,12 +160,12 @@ test('Playlist Data Loss Safeguards Regression Suite', async (t) => {
     // Call removeSingleFile
     await removeSingleFile(lib.id, song.mainAudioPath || '/path/to/missing/file.mp3');
 
-    // Verify song and playlist_songs associations are still intact
+    // A confirmed watcher deletion with no alternate audio variant removes the song.
     const songAfter = await db.select().from(songs).where(eq(songs.id, song.id));
-    assert.strictEqual(songAfter.length, 1, 'Song record should not be deleted when media file is inaccessible');
+    assert.strictEqual(songAfter.length, 0, 'Song record should be deleted when its only audio file is removed');
 
     const associationsAfter = await db.select().from(playlistSongs).where(eq(playlistSongs.playlistId, playlist.id));
-    assert.strictEqual(associationsAfter.length, 1, 'Playlist association should not be deleted when media file is inaccessible');
+    assert.strictEqual(associationsAfter.length, 0, 'Playlist association should cascade when its song is deleted');
   });
 
   await t.test('4. Playlist detail retrieval preserves valid playlist entries and handles missing song records gracefully', async () => {
@@ -259,7 +259,62 @@ test('Playlist Data Loss Safeguards Regression Suite', async (t) => {
     assert.strictEqual(entry3.isUnavailable, true);
   });
 
-  await t.test('5. Duplicate-song reconciliation preserves playlist associations', async () => {
+  await t.test('5. Manual rescan removes songs whose audio variants were deleted from an accessible library', async () => {
+    const manualDir = path.join(testDataDir, 'manual_rescan_library');
+    fs.mkdirSync(manualDir, { recursive: true });
+    const deletedPath = path.join(manualDir, 'DeletedTrack.mp3');
+    const remainingPath = path.join(manualDir, 'RemainingTrack.mp3');
+    fs.writeFileSync(deletedPath, 'dummy-audio');
+    fs.writeFileSync(remainingPath, 'dummy-audio');
+
+    const [manualLib] = await db.insert(libraries).values({
+      name: 'Manual Rescan Test Library',
+      path: manualDir,
+      lastScan: now,
+    }).returning();
+
+    const [deletedSong] = await db.insert(songs).values({
+      libraryId: manualLib.id,
+      artistId: artist.id,
+      title: 'Deleted Track',
+      mainAudioPath: deletedPath,
+      duration: 180,
+      variant: 'original',
+    }).returning();
+    const [remainingSong] = await db.insert(songs).values({
+      libraryId: manualLib.id,
+      artistId: artist.id,
+      title: 'Remaining Track',
+      mainAudioPath: remainingPath,
+      duration: 181,
+      variant: 'original',
+    }).returning();
+
+    const [manualPlaylist] = await db.insert(playlists).values({
+      userId: user.id,
+      name: 'Manual Rescan Deletion Playlist',
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+    await db.insert(playlistSongs).values({
+      playlistId: manualPlaylist.id,
+      songId: deletedSong.id,
+      position: 1,
+      addedAt: now,
+    });
+
+    fs.unlinkSync(deletedPath);
+    await scanLibrary(manualLib.id, manualDir);
+
+    const deletedRows = await db.select().from(songs).where(eq(songs.id, deletedSong.id));
+    assert.strictEqual(deletedRows.length, 0, 'Manual rescan should delete the missing song record');
+    const deletedPlaylistRows = await db.select().from(playlistSongs).where(eq(playlistSongs.playlistId, manualPlaylist.id));
+    assert.strictEqual(deletedPlaylistRows.length, 0, 'Manual rescan deletion should cascade playlist associations');
+    const remainingRows = await db.select().from(songs).where(eq(songs.id, remainingSong.id));
+    assert.strictEqual(remainingRows.length, 1, 'Manual rescan should preserve songs whose audio files still exist');
+  });
+
+  await t.test('6. Duplicate-song reconciliation preserves playlist associations', async () => {
     // Create two duplicate song rows in the database for the same artist & normalized title
     const [primarySong] = await db.insert(songs).values({
       libraryId: lib.id,
