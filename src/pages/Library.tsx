@@ -970,20 +970,62 @@ export default function Library() {
   };
 
   useEffect(() => {
-    if (search.trim()) {
-      fetch(`/api/search?q=${encodeURIComponent(search)}`)
-        .then(async res => {
-          if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
-            return await res.json();
-          }
-          return [];
-        })
-        .then(data => setSearchResults(Array.isArray(data) ? data : []))
-        .catch(err => console.error('Search failed:', err));
-    } else {
+    const query = search.trim();
+    if (!query) {
       setSearchResults([]);
+      return;
     }
-  }, [search]);
+
+    let cancelled = false;
+    const loadSearchResults = async () => {
+      try {
+        const searchRequest = fetch(`/api/search?q=${encodeURIComponent(query)}`)
+          .then(async res => {
+            if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+              return await res.json();
+            }
+            return [];
+          });
+
+        // Playlists are already part of the Library's accessible playlist catalogue,
+        // but are intentionally not part of the shared /api/search response.
+        const playlistRequest = (tab === 'home' || tab === 'playlists')
+          ? fetch('/api/playlists', { credentials: 'same-origin' })
+              .then(async res => res.ok && res.headers.get('content-type')?.includes('application/json')
+                ? await res.json()
+                : [])
+              .catch(() => [])
+          : Promise.resolve([]);
+
+        const [catalogueResults, accessiblePlaylists] = await Promise.all([searchRequest, playlistRequest]);
+        if (cancelled) return;
+
+        const matchingPlaylists = Array.isArray(accessiblePlaylists)
+          ? accessiblePlaylists
+              .filter((playlist: Playlist) => playlist.name?.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+              .map((playlist: Playlist) => ({ ...playlist, type: 'playlist' }))
+          : [];
+
+        setSearchResults([
+          ...(Array.isArray(catalogueResults) ? catalogueResults : []),
+          ...matchingPlaylists,
+        ]);
+      } catch (err) {
+        if (!cancelled) console.error('Search failed:', err);
+      }
+    };
+
+    void loadSearchResults();
+    return () => { cancelled = true; };
+  }, [search, tab]);
+
+  const visibleSearchResults = searchResults.filter((item: any) => {
+    if (tab === 'home') return ['playlist', 'artist', 'album', 'song'].includes(item.type);
+    if (tab === 'playlists') return ['playlist', 'song'].includes(item.type);
+    if (tab === 'artists') return ['artist', 'song'].includes(item.type);
+    if (tab === 'albums') return ['album', 'song'].includes(item.type);
+    return item.type === 'song';
+  });
 
   const triggerScan = async () => {
     try {
@@ -1738,7 +1780,7 @@ export default function Library() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <input 
               type="text" 
-              placeholder="Search artists, albums, or songs..."
+              placeholder="Search playlists, artists, albums, or songs..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-[#141622] border border-white/10 rounded-full text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-1 focus:ring-[#F472B6] transition-all"
@@ -1799,8 +1841,18 @@ export default function Library() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {searchResults.map((item: any, idx: number) => (
-                  item.type === 'song' ? (
+                {visibleSearchResults.map((item: any, idx: number) => (
+                  item.type === 'playlist' ? (
+                    <tr key={`playlist-${item.id}`}>
+                      <td colSpan={4} className="px-3 py-1">
+                        <JukeboxPlaylistCard
+                          playlist={item}
+                          onOpen={() => openPlaylist(item.id)}
+                          layout="list"
+                        />
+                      </td>
+                    </tr>
+                  ) : item.type === 'song' ? (
                     <tr key={`song-${item.id}`}>
                       <td colSpan={4} className="px-3">
                         <JukeboxSongCard
@@ -1836,7 +1888,7 @@ export default function Library() {
                     </tr>
                   ) : null
                 ))}
-                {searchResults.length === 0 && (
+                {visibleSearchResults.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-5 py-10 text-center text-zinc-500 text-sm">No matching items found.</td>
                   </tr>
