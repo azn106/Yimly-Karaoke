@@ -340,11 +340,15 @@ export default function Library() {
                 progress: Math.max(prev.progress, Math.min(99, Number(job.progress) || 0)),
                 progressMessage: job.message || 'Processing replacement…',
               }));
-              if (job.status === 'failed') throw new Error(job.error || job.message || 'Audio replacement failed');
+              if (job.status === 'failed') {
+                const failure = new Error(job.error || job.message || 'Audio replacement failed');
+                (failure as any).replacementFailed = true;
+                throw failure;
+              }
             }
           }
         } catch (statusError: any) {
-          if (statusError?.message && /replacement failed|failed/i.test(statusError.message)) throw statusError;
+          if (statusError?.replacementFailed) throw statusError;
           // A transient status poll failure must not cancel the actual replacement.
         }
         if (!requestFinished) await new Promise(resolve => setTimeout(resolve, 900));
@@ -2261,7 +2265,8 @@ export default function Library() {
               <button 
                 type="button"
                 onClick={() => setReplaceSourceModal(prev => ({ ...prev, isOpen: false, error: null, successMsg: null }))}
-                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                disabled={replaceSourceModal.loading}
+                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2287,7 +2292,7 @@ export default function Library() {
                 />
               </div>
 
-              {replaceSourceModal.loading && (
+              {(replaceSourceModal.loading || replaceSourceModal.successMsg) && (
                 <div className="space-y-2 rounded-xl border border-white/10 bg-[#0D0E15] p-3" role="status" aria-live="polite">
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <span className="font-medium text-zinc-200">{replaceSourceModal.progressMessage}</span>
