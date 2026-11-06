@@ -1584,11 +1584,12 @@ export default function RoomSession() {
 
   const handleToggleInstrumental = () => {
     if (!isHost || variantSwitchPendingRef.current) return;
-    if (variant === 'original' && !currentSongDetails?.hasInstrumental) {
+    const detailsMatchCurrentSong = currentSongDetails?.id === currentSong?.songId;
+    if (detailsMatchCurrentSong && variant === 'original' && !currentSongDetails.hasInstrumental) {
       alert('Instrumental version not available for this song.');
       return;
     }
-    if (variant === 'instrumental' && currentSongDetails?.hasOriginal === false) {
+    if (detailsMatchCurrentSong && variant === 'instrumental' && currentSongDetails.hasOriginal === false) {
       alert('Original version not available for this song.');
       return;
     }
