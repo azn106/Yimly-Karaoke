@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Play, Pause, Music, Plus, MoreVertical, Heart, ListMusic, RefreshCw, Mic, Trash2 } from 'lucide-react';
 import LyricBadges from '../LyricBadges';
 import EqualizerIndicator from '../EqualizerIndicator';
+import { useSongReplacement } from '../../context/ReplacementContext';
+import ReplacementBadge from './ReplacementBadge';
 
 type JukeboxSongCardProps = {
   song: any;
@@ -77,6 +79,7 @@ export default function JukeboxSongCard({
   }, [menuOpen]);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const { audioJob, instrumentalJob } = useSongReplacement(song?.id);
   const title = song?.title || 'Unknown track';
   const artist = song?.artist || 'Unknown Artist';
   const duration = Number(song?.duration || 0);
@@ -112,10 +115,12 @@ export default function JukeboxSongCard({
       {artworkTrailing}
 
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
           <span className={`truncate text-sm font-semibold ${unavailable ? 'italic text-zinc-500' : isCurrent ? 'text-[#F472B6]' : 'text-white'}`} title={title}>{title}</span>
           {isCurrent && <EqualizerIndicator isPlaying={isPlaying} />}
           {!unavailable && (song?.hasLrc || song?.hasElrc) && <LyricBadges hasLrc={song.hasLrc} hasElrc={song.hasElrc} onOpenLyrics={onOpenLyrics} />}
+          {audioJob && <ReplacementBadge job={audioJob} />}
+          {instrumentalJob && <ReplacementBadge job={instrumentalJob} />}
           {unavailable && <span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">Unavailable</span>}
         </div>
         <div className="truncate text-xs text-zinc-400" title={artist}>{artistContent ?? artist}</div>

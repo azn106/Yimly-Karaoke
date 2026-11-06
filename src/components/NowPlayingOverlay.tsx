@@ -510,7 +510,6 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                 <h2 className="text-lg sm:text-xl font-bold text-white truncate mt-1">{currentSong?.title || 'No track selected'}</h2>
                 <p className="text-sm text-white/75 truncate">{currentSong?.artist || 'Unknown Artist'}{currentSong?.album ? ' · ' + currentSong.album : ''}</p>
               </div>
-              </div>
             </header>
             <div data-lyrics-scroll className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-10 pb-[max(2rem,env(safe-area-inset-bottom))] text-center" onClick={() => { setShowLyrics(fullscreenReturnToLyrics); setIsLyricsFullscreen(false); }} onTouchStart={(event) => { isQueueTouch.current = true; touchStartY.current = null; event.stopPropagation(); }} onTouchMove={(event) => event.stopPropagation()} onTouchEnd={(event) => { event.stopPropagation(); isQueueTouch.current = false; }} onWheel={(event) => event.stopPropagation()}>
               {lyricsLoading ? (

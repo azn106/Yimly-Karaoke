@@ -261,10 +261,37 @@ export function normalizeYtDlpAudioFormat(format: string): string {
   return normalized || 'mp3';
 }
 
+export type ReplacementStatus = 'queued' | 'pending' | 'downloading' | 'separating' | 'finalising' | 'completed' | 'failed' | 'cancelled';
+
+export interface ActiveReplacementJob {
+  id: string;
+  jobId: string;
+  songId: number;
+  type: 'replace_audio' | 'replace_instrumental';
+  status: ReplacementStatus;
+  progress: number;
+  message: string;
+  error?: string;
+  result?: any;
+  startedAt: Date;
+  updatedAt: Date;
+  completedAt?: Date;
+  execute: (job: ActiveReplacementJob) => Promise<any>;
+  cancel?: () => void;
+  resolve?: (res: any) => void;
+  reject?: (err: any) => void;
+}
+
+export type GlobalQueueItem = 
+  | { kind: 'download_track'; jobId: string; trackId: string }
+  | { kind: 'replacement'; id: string };
+
 export class DownloadQueueManager {
   private maxConcurrency: number = 1;
   private activeWorkers: number = 0;
   private memoryJobs = new Map<string, ActiveDownloadJob>();
+  private replacementJobs = new Map<string, ActiveReplacementJob>();
+  private fifoQueue: GlobalQueueItem[] = [];
   private activeChildProcesses = new Map<string, ChildProcess>();
   private isPumping: boolean = false;
   private initialized: boolean = false;
@@ -446,6 +473,11 @@ export class DownloadQueueManager {
         };
 
         this.memoryJobs.set(activeJob.id, activeJob);
+        for (const t of activeTracks) {
+          if (t.status === 'queued') {
+            this.fifoQueue.push({ kind: 'download_track', jobId: activeJob.id, trackId: t.id });
+          }
+        }
       }
 
       console.log(`[Downloader Queue] Initialized with concurrency ${this.maxConcurrency}. Recovered ${pendingJobs.length} active jobs.`);
@@ -632,6 +664,9 @@ export class DownloadQueueManager {
     }
 
     this.memoryJobs.set(activeJob.id, activeJob);
+    for (const t of activeTracks) {
+      this.fifoQueue.push({ kind: 'download_track', jobId: activeJob.id, trackId: t.id });
+    }
     this.pumpQueue();
 
     return activeJob;
@@ -695,8 +730,31 @@ export class DownloadQueueManager {
   }
 
   public async cancelJob(jobId: string): Promise<boolean> {
+    const rep = this.replacementJobs.get(jobId);
+    if (rep) {
+      rep.status = 'cancelled';
+      rep.error = 'Job cancelled by user';
+      rep.message = 'Job cancelled by user';
+      rep.updatedAt = new Date();
+      rep.completedAt = new Date();
+      rep.cancel?.();
+      const cancelResult = {
+        success: false,
+        message: 'Job cancelled by user',
+        songId: rep.songId,
+        jobId: rep.id,
+        error: 'Job cancelled by user',
+      };
+      rep.result = cancelResult;
+      this.cleanupFifoQueue();
+      rep.resolve?.(cancelResult);
+      return true;
+    }
+
     const job = await this.getJob(jobId);
-    if (!job) return false;
+    if (!job) {
+      return false;
+    }
 
     job.status = 'cancelled';
     job.updatedAt = new Date();
@@ -731,6 +789,7 @@ export class DownloadQueueManager {
       updatedAt: new Date(),
     }).where(and(eq(downloadTrackJobs.jobId, jobId), inArray(downloadTrackJobs.status, ['queued', 'searching', 'downloading', 'tagging'])));
 
+    this.cleanupFifoQueue();
     return true;
   }
 
@@ -767,6 +826,10 @@ export class DownloadQueueManager {
       updatedAt: new Date(),
     }).where(inArray(downloadTrackJobs.id, failedIds));
 
+    for (const track of failedTracks) {
+      this.fifoQueue.push({ kind: 'download_track', jobId, trackId: track.id });
+    }
+
     this.pumpQueue();
     return true;
   }
@@ -777,44 +840,200 @@ export class DownloadQueueManager {
 
     try {
       while (this.activeWorkers < this.maxConcurrency) {
-        // Find next queued track across all active jobs
-        let nextJob: ActiveDownloadJob | null = null;
-        let nextTrack: ActiveTrackJob | null = null;
-
-        for (const job of this.memoryJobs.values()) {
-          if (job.status === 'cancelled' || job.status === 'completed' || job.status === 'failed') continue;
-
-          const candidate = job.tracks.find(t => t.status === 'queued');
-          if (candidate) {
-            nextJob = job;
-            nextTrack = candidate;
-            break;
+        let nextIndex = -1;
+        for (let i = 0; i < this.fifoQueue.length; i++) {
+          const item = this.fifoQueue[i];
+          if (item.kind === 'download_track') {
+            const job = this.memoryJobs.get(item.jobId);
+            if (!job || job.status === 'cancelled' || job.status === 'failed') continue;
+            const track = job.tracks.find(t => t.id === item.trackId);
+            if (track && track.status === 'queued') {
+              nextIndex = i;
+              break;
+            }
+          } else if (item.kind === 'replacement') {
+            const rep = this.replacementJobs.get(item.id);
+            if (!rep || rep.status === 'cancelled' || rep.status === 'failed' || rep.status === 'completed') continue;
+            if (rep.status === 'queued' || rep.status === 'pending') {
+              nextIndex = i;
+              break;
+            }
           }
         }
 
-        if (!nextJob || !nextTrack) {
-          break; // Queue is currently empty or all tracks are running
+        if (nextIndex === -1) {
+          break; // Queue is currently empty or all active tracks/replacements are running
         }
 
+        const selectedItem = this.fifoQueue[nextIndex];
         this.activeWorkers++;
-        // Start processing this track asynchronously
-        this.processTrack(nextJob, nextTrack).finally(async () => {
-          try {
-            // Keep the worker slot occupied through job finalization. Releasing it
-            // before the awaited DB/library work finishes lets another concurrent
-            // pumpQueue() call start a second global pipeline too early.
-            await this.checkJobCompletion(nextJob!);
-          } catch (err) {
-            console.error('[Downloader] Job finalization failed:', err);
-          } finally {
-            this.activeWorkers--;
-            this.pumpQueue();
-          }
-        });
+
+        if (selectedItem.kind === 'download_track') {
+          const job = this.memoryJobs.get(selectedItem.jobId)!;
+          const track = job.tracks.find(t => t.id === selectedItem.trackId)!;
+
+          this.processTrack(job, track).finally(async () => {
+            try {
+              await this.checkJobCompletion(job);
+            } catch (err) {
+              console.error('[Downloader] Job finalization failed:', err);
+            } finally {
+              this.cleanupFifoQueue();
+              this.activeWorkers--;
+              this.pumpQueue();
+            }
+          });
+        } else if (selectedItem.kind === 'replacement') {
+          const repJob = this.replacementJobs.get(selectedItem.id)!;
+
+          this.processReplacement(repJob).finally(() => {
+            try {
+              this.cleanupFifoQueue();
+            } catch (err) {
+              console.error('[Downloader] Replacement cleanup failed:', err);
+            } finally {
+              this.activeWorkers--;
+              this.pumpQueue();
+              repJob.resolve?.(repJob.result);
+            }
+          });
+        }
       }
     } finally {
       this.isPumping = false;
     }
+  }
+
+  private async processReplacement(repJob: ActiveReplacementJob) {
+    if (repJob.status === 'cancelled') {
+      return;
+    }
+
+    try {
+      console.log(`[DownloadQueueManager] Starting replacement job "${repJob.id}" for song #${repJob.songId} (${repJob.type})`);
+      const result = await repJob.execute(repJob);
+      repJob.result = result;
+      repJob.status = result.success ? 'completed' : 'failed';
+      repJob.progress = result.success ? 100 : 0;
+      repJob.message = result.message || (result.success ? 'Replacement completed successfully.' : 'Replacement failed.');
+      repJob.updatedAt = new Date();
+      repJob.completedAt = new Date();
+    } catch (err: any) {
+      console.error(`[DownloadQueueManager] Replacement job "${repJob.id}" failed:`, err);
+      repJob.status = 'failed';
+      repJob.progress = 0;
+      repJob.error = err.message || 'Replacement failed';
+      repJob.message = err.message || 'Replacement failed';
+      repJob.updatedAt = new Date();
+      repJob.completedAt = new Date();
+      const failResult = {
+        success: false,
+        message: err.message || 'Replacement failed',
+        songId: repJob.songId,
+        jobId: repJob.id,
+        error: err.message,
+      };
+      repJob.result = failResult;
+    }
+  }
+
+  private cleanupFifoQueue() {
+    while (this.fifoQueue.length > 0) {
+      const first = this.fifoQueue[0];
+      if (first.kind === 'download_track') {
+        const job = this.memoryJobs.get(first.jobId);
+        if (!job || job.status === 'cancelled' || job.status === 'failed') {
+          this.fifoQueue.shift();
+          continue;
+        }
+        const track = job.tracks.find(t => t.id === first.trackId);
+        if (!track || track.status === 'completed' || track.status === 'failed') {
+          this.fifoQueue.shift();
+          continue;
+        }
+      } else if (first.kind === 'replacement') {
+        const rep = this.replacementJobs.get(first.id);
+        if (!rep || rep.status === 'completed' || rep.status === 'failed' || rep.status === 'cancelled') {
+          this.fifoQueue.shift();
+          continue;
+        }
+      }
+      break;
+    }
+  }
+
+  public enqueueReplacementJob(params: {
+    id: string;
+    songId: number;
+    type: 'replace_audio' | 'replace_instrumental';
+    execute: (job: ActiveReplacementJob) => Promise<any>;
+    cancel?: () => void;
+  }): Promise<any> {
+    const job: ActiveReplacementJob = {
+      id: params.id,
+      jobId: params.id,
+      songId: params.songId,
+      type: params.type,
+      status: 'queued',
+      progress: 5,
+      message: params.type === 'replace_audio'
+        ? 'Queued in global queue for recording replacement...'
+        : 'Queued in global queue for instrumental regeneration...',
+      startedAt: new Date(),
+      updatedAt: new Date(),
+      execute: () => params.execute(job),
+      cancel: params.cancel,
+    };
+
+    this.replacementJobs.set(job.id, job);
+    this.fifoQueue.push({ kind: 'replacement', id: job.id });
+
+    const promise = new Promise<any>((resolve, reject) => {
+      job.resolve = resolve;
+      job.reject = reject;
+    });
+
+    this.pumpQueue();
+    return promise;
+  }
+
+  public getReplacementJob(jobId: string): ActiveReplacementJob | undefined {
+    return this.replacementJobs.get(jobId);
+  }
+
+  public getActiveSongReplacement(songId: number): ActiveReplacementJob | undefined {
+    for (const job of this.replacementJobs.values()) {
+      if (job.songId === songId && (job.status === 'queued' || job.status === 'pending' || job.status === 'downloading' || job.status === 'separating' || job.status === 'finalising')) {
+        return job;
+      }
+    }
+    return undefined;
+  }
+
+  public getLatestSongReplacement(songId: number, since?: number): ActiveReplacementJob | undefined {
+    let latest: ActiveReplacementJob | undefined;
+    for (const job of this.replacementJobs.values()) {
+      if (job.songId !== songId) continue;
+      if (since !== undefined && job.startedAt.getTime() < since) continue;
+      if (!latest || job.startedAt.getTime() > latest.startedAt.getTime()) {
+        latest = job;
+      }
+    }
+    return latest;
+  }
+
+  public getActiveReplacementJobs(songId?: number): ActiveReplacementJob[] {
+    const now = Date.now();
+    return Array.from(this.replacementJobs.values()).filter(j => {
+      if (songId !== undefined && j.songId !== songId) return false;
+      const isActive = j.status === 'queued' || j.status === 'pending' || j.status === 'downloading' || j.status === 'separating' || j.status === 'finalising';
+      const isRecent = j.completedAt && (now - j.completedAt.getTime() < 10000);
+      return isActive || isRecent;
+    });
+  }
+
+  public getSongReplacements(songId: number): ActiveReplacementJob[] {
+    return this.getActiveReplacementJobs(songId);
   }
 
   private async checkJobCompletion(job: ActiveDownloadJob) {

@@ -17,9 +17,10 @@ import JukeboxAlbumCard from '../components/jukebox/JukeboxAlbumCard';
 import JukeboxPlaylistCard from '../components/jukebox/JukeboxPlaylistCard';
 import { clearAuthToken } from '../lib/auth';
 import { usePlayback, PlaybackSong } from '../context/PlaybackContext';
-
+import { useReplacementQueue } from '../context/ReplacementContext';
 
 export default function Library() {
+  const { refresh: refreshReplacements } = useReplacementQueue();
   const { user } = useOutletContext<{ user: any }>() || {};
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as 'home' | 'artists' | 'albums' | 'songs' | 'playlists' | null;
@@ -307,6 +308,7 @@ export default function Library() {
     setReplaceSourceModal(prev => ({ ...prev, loading: true, error: null, successMsg: null }));
 
     try {
+      refreshReplacements();
       const res = await fetch(`/api/songs/${replaceSourceModal.songId}/replace-source`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -323,12 +325,14 @@ export default function Library() {
         loading: false,
         successMsg: 'Recording replaced and audio reprocessed successfully!',
       }));
+      refreshReplacements();
     } catch (err: any) {
       setReplaceSourceModal(prev => ({
         ...prev,
         loading: false,
         error: err.message || 'Failed to replace recording source',
       }));
+      refreshReplacements();
     }
   };
 
@@ -349,6 +353,7 @@ export default function Library() {
     setReplaceInstrumentalModal(prev => ({ ...prev, loading: true, error: null, successMsg: null }));
 
     try {
+      refreshReplacements();
       const res = await fetch(`/api/songs/${replaceInstrumentalModal.songId}/replace-instrumental`, {
         method: 'POST',
       });
@@ -363,12 +368,14 @@ export default function Library() {
         loading: false,
         successMsg: 'Instrumental regenerated and replaced successfully!',
       }));
+      refreshReplacements();
     } catch (err: any) {
       setReplaceInstrumentalModal(prev => ({
         ...prev,
         loading: false,
         error: err.message || 'Failed to regenerate instrumental',
       }));
+      refreshReplacements();
     }
   };
 

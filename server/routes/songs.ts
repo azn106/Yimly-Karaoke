@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { songs, artists, albums, lyrics, songArtists, playlistSongs, favorites, queueItems, sessions, songVerifiedSources } from '../db/schema.js';
 import { eq, like, or, inArray, asc, desc, and, sql } from 'drizzle-orm';
 import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
-import { replaceSongRecordingSource, replaceSongInstrumental, getReplacementJob, getActiveSongReplacement, getLatestSongReplacement } from '../lib/source-replacement.js';
+import { replaceSongRecordingSource, replaceSongInstrumental, getReplacementJob, getActiveSongReplacement, getLatestSongReplacement, getActiveSongReplacements } from '../lib/source-replacement.js';
 import { formatArtistDisplay, cleanupOrphanedRecords } from '../lib/artist-utils.js';
 import { broadcastSongOffsetToRooms } from '../ws/index.js';
 import { isLrcContentValid } from '../lib/lyrics.js';
@@ -1126,6 +1126,15 @@ router.get('/:id/verified-source', requireAuth, async (req, res) => {
   }
 });
 
+router.get('/replace-status/active', requireAuth, async (req, res) => {
+  try {
+    const activeJobs = getActiveSongReplacements();
+    res.json({ jobs: activeJobs });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch active replacement jobs' });
+  }
+});
+
 router.get('/:id/replace-status', requireAuth, async (req, res) => {
   try {
     const songId = parseInt(req.params.id, 10);
@@ -1145,9 +1154,11 @@ router.get('/:id/replace-status', requireAuth, async (req, res) => {
       ? activeJob
       : undefined;
     const latestJob = matchingActiveJob || getLatestSongReplacement(songId, since);
+    const songActiveJobs = getActiveSongReplacements(songId);
     res.json({
       active: !!matchingActiveJob,
       job: latestJob || null,
+      jobs: songActiveJobs,
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to fetch replacement status' });

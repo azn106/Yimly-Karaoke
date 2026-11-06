@@ -20,6 +20,7 @@ import Join from './pages/Join.tsx';
 import Download from './pages/Download.tsx';
 
 import { PlaybackProvider } from './context/PlaybackContext.tsx';
+import { ReplacementProvider } from './context/ReplacementContext.tsx';
 
 export default function App() {
   const [setupStatus, setSetupStatus] = useState<boolean | null>(null);
@@ -43,7 +44,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <PlaybackProvider>
-        <Routes>
+        <ReplacementProvider>
+          <Routes>
           {!setupStatus ? (
             <>
               <Route path="/setup" element={<Setup onComplete={() => setSetupStatus(true)} />} />
@@ -70,6 +72,7 @@ export default function App() {
             </>
           )}
         </Routes>
+        </ReplacementProvider>
       </PlaybackProvider>
     </BrowserRouter>
   );
