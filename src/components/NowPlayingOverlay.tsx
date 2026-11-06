@@ -573,9 +573,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
             </div>
             <footer className="shrink-0 px-5 sm:px-8 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-[#190D18]/65 to-transparent">
               <div className="w-full max-w-2xl mx-auto">
-                <div className="h-1 rounded-full bg-white/20 overflow-hidden"><div className="h-full rounded-full bg-[#F472B6] transition-all duration-150" style={{ width: progress + '%' }} /></div>
-                <div className="flex justify-between text-xs font-mono text-white/70 tabular-nums mt-2"><span>{formatTime(activeTime)}</span><span>{formatTime(trackDuration)}</span></div>
-                <div className="flex items-center justify-center gap-8 sm:gap-12 mt-4">
+                <div className="flex items-center justify-center gap-8 sm:gap-12">
                   <button type="button" onClick={previous} className="p-2 text-white/85 hover:text-white" aria-label="Previous track"><SkipBack className="w-6 h-6 fill-current" /></button>
                   <button type="button" onClick={togglePlay} className="w-14 h-14 rounded-full border-2 border-pink-300 text-white flex items-center justify-center shadow-[0_0_20px_rgba(244,114,182,0.2)] hover:bg-white/10" aria-label={isPlaying ? 'Pause playback' : 'Start playback'}>{isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}</button>
                   <button type="button" onClick={next} className="p-2 text-white/85 hover:text-white" aria-label="Next track"><SkipForward className="w-6 h-6 fill-current" /></button>
