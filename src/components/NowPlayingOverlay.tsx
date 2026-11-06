@@ -504,8 +504,8 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
           {currentSong?.hasArtwork && <img key={currentSong.id + '-fullscreen-lyrics'} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(190,24,93,0.42) 0%, rgba(157,23,77,0.52) 54%, rgba(35,12,29,0.78) 100%)' }} />
           <div className="relative z-10 flex flex-col h-full min-h-0" style={{ animation: 'ykLyricsFadeIn 350ms ease-out both' }}>
-            <header className="flex items-center justify-center px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-4 shrink-0">
-              <div className="min-w-0 max-w-[min(90vw,36rem)] text-center rounded-2xl border border-white/10 bg-black/45 backdrop-blur-md shadow-lg px-5 py-3">
+            <header className="flex items-center justify-center px-0 pt-[max(0.75rem,env(safe-area-inset-top))] pb-4 shrink-0">
+              <div className="w-full max-w-none min-w-0 text-center rounded-none border-y border-white/10 bg-black/45 backdrop-blur-md shadow-lg px-5 py-3">
                 <p className="text-[11px] tracking-[0.22em] font-semibold text-pink-200/90 uppercase">Synced lyrics</p>
                 <h2 className="text-lg sm:text-xl font-bold text-white truncate mt-1">{currentSong?.title || 'No track selected'}</h2>
                 <p className="text-sm text-white/75 truncate">{currentSong?.artist || 'Unknown Artist'}{currentSong?.album ? ' · ' + currentSong.album : ''}</p>
