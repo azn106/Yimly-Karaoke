@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Play, Pause, Music, Plus, MoreVertical, Heart, ListMusic, RefreshCw, Mic, Trash2 } from 'lucide-react';
 import LyricBadges from '../LyricBadges';
@@ -53,6 +53,28 @@ export default function JukeboxSongCard({
   albumContent,
 }: JukeboxSongCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (menuButtonRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('[data-song-card-menu]')) return;
+      setMenuOpen(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [menuOpen]);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const title = song?.title || 'Unknown track';
@@ -131,6 +153,7 @@ export default function JukeboxSongCard({
           {menuOpen && menuPosition && createPortal(
             <div
               style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: 208, maxHeight: '80vh', overflowY: 'auto' }}
+              data-song-card-menu
               className="z-[9999] rounded-xl border border-white/10 bg-[#171926] p-1.5 text-left shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
               onClick={event => event.stopPropagation()}
             >
