@@ -298,7 +298,6 @@ router.get('/:id', async (req, res) => {
     const lrcOffsetVal = typeof songRec[0].lrcOffset === 'number' ? songRec[0].lrcOffset : (songRec[0].lyricOffset ?? 0);
     const elrcOffsetVal = typeof songRec[0].elrcOffset === 'number' ? songRec[0].elrcOffset : (songRec[0].lyricOffset ?? 0);
     const hasInstrumental = !!(songRec[0].instrumentalAudioPath && fs.existsSync(songRec[0].instrumentalAudioPath));
-    const hasOriginal = !!(songRec[0].mainAudioPath && fs.existsSync(songRec[0].mainAudioPath));
 
     const responseSong: Record<string, any> = {
       ...songRec[0],
@@ -308,7 +307,6 @@ router.get('/:id', async (req, res) => {
       hasLrc: hasLrc,
       hasElrc: hasElrc,
       hasInstrumental,
-      hasOriginal,
       lrcOffset: lrcOffsetVal,
       elrcOffset: elrcOffsetVal,
       lyricOffset: songRec[0].lyricOffset ?? 0,

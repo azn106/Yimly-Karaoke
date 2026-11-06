@@ -129,8 +129,6 @@ export default function Library() {
     loading: boolean;
     error: string | null;
     successMsg: string | null;
-    progress: number;
-    progressMessage: string;
   }>({
     isOpen: false,
     songId: null,
@@ -139,8 +137,6 @@ export default function Library() {
     loading: false,
     error: null,
     successMsg: null,
-    progress: 0,
-    progressMessage: 'Ready to regenerate instrumental.',
   });
 
   const [addToPlaylistModal, setAddToPlaylistModal] = useState<{
@@ -386,68 +382,33 @@ export default function Library() {
       loading: false,
       error: null,
       successMsg: null,
-      progress: 0,
-      progressMessage: 'Ready to regenerate instrumental.',
     });
   };
 
   const handleExecuteReplaceInstrumental = async () => {
-    if (!replaceInstrumentalModal.songId || replaceInstrumentalModal.loading) return;
-    const songId = replaceInstrumentalModal.songId;
-    const startedAt = Date.now();
-    setReplaceInstrumentalModal(prev => ({
-      ...prev, loading: true, error: null, successMsg: null,
-      progress: 2, progressMessage: 'Starting instrumental regeneration…',
-    }));
-
-    let requestFinished = false;
-    const replacementRequest = fetch(`/api/songs/${songId}/replace-instrumental`, {
-      method: 'POST',
-    }).then(async res => {
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.success === false) {
-        throw new Error(data.error || data.details || data.message || 'Failed to regenerate instrumental');
-      }
-      return data;
-    }).finally(() => { requestFinished = true; });
+    if (!replaceInstrumentalModal.songId) return;
+    setReplaceInstrumentalModal(prev => ({ ...prev, loading: true, error: null, successMsg: null }));
 
     try {
-      while (!requestFinished) {
-        try {
-          const statusRes = await fetch(`/api/songs/${songId}/replace-status?since=${startedAt}`, { credentials: 'same-origin' });
-          if (statusRes.ok) {
-            const statusData = await statusRes.json();
-            const job = statusData.job;
-            if (job) {
-              setReplaceInstrumentalModal(prev => ({
-                ...prev,
-                progress: Math.max(prev.progress, Math.min(99, Number(job.progress) || 0)),
-                progressMessage: job.message || 'Processing instrumental…',
-              }));
-              if (job.status === 'failed') {
-                const failure = new Error(job.error || job.message || 'Instrumental replacement failed');
-                (failure as any).replacementFailed = true;
-                throw failure;
-              }
-            }
-          }
-        } catch (statusError: any) {
-          if (statusError?.replacementFailed) throw statusError;
-          // Transient status polling failures must not cancel the actual job.
-        }
-        if (!requestFinished) await new Promise(resolve => setTimeout(resolve, 900));
+      const res = await fetch(`/api/songs/${replaceInstrumentalModal.songId}/replace-instrumental`, {
+        method: 'POST',
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || data.details || 'Failed to regenerate instrumental');
       }
 
-      await replacementRequest;
       setReplaceInstrumentalModal(prev => ({
-        ...prev, loading: false, progress: 100,
-        progressMessage: 'Instrumental replacement completed successfully.',
+        ...prev,
+        loading: false,
         successMsg: 'Instrumental regenerated and replaced successfully!',
       }));
     } catch (err: any) {
-      replacementRequest.catch(() => {});
       setReplaceInstrumentalModal(prev => ({
-        ...prev, loading: false, error: err.message || 'Failed to regenerate instrumental',
+        ...prev,
+        loading: false,
+        error: err.message || 'Failed to regenerate instrumental',
       }));
     }
   };
@@ -2421,8 +2382,7 @@ export default function Library() {
               <button 
                 type="button"
                 onClick={() => setReplaceInstrumentalModal(prev => ({ ...prev, isOpen: false, error: null, successMsg: null }))}
-                disabled={replaceInstrumentalModal.loading}
-                className="p-1.5 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2432,18 +2392,6 @@ export default function Library() {
               <p className="text-xs text-zinc-300 leading-relaxed">
                 This will regenerate the instrumental track from the existing original audio file using vocal separation. The original audio, song metadata, lyrics, and playlists will remain completely unchanged.
               </p>
-
-              {(replaceInstrumentalModal.loading || replaceInstrumentalModal.successMsg) && (
-                <div className="space-y-2 rounded-xl border border-white/10 bg-[#0D0E15] p-3" role="status" aria-live="polite">
-                  <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="font-medium text-zinc-200">{replaceInstrumentalModal.progressMessage}</span>
-                    <span className="shrink-0 tabular-nums text-[#F472B6]">{Math.round(replaceInstrumentalModal.progress)}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#F472B6] to-[#DB2777] transition-all duration-500" style={{ width: `${Math.max(0, Math.min(100, replaceInstrumentalModal.progress))}%` }} />
-                  </div>
-                </div>
-              )}
 
               {replaceInstrumentalModal.error && (
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-xs text-red-400">
@@ -2470,19 +2418,14 @@ export default function Library() {
                 </button>
                 <button
                   type="button"
-                  onClick={replaceInstrumentalModal.successMsg ? () => setReplaceInstrumentalModal(prev => ({ ...prev, isOpen: false, error: null, successMsg: null })) : handleExecuteReplaceInstrumental}
+                  onClick={handleExecuteReplaceInstrumental}
                   disabled={replaceInstrumentalModal.loading}
                   className="px-4 py-2 bg-[#F472B6] hover:bg-[#DB2777] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-[#F472B6]/25 cursor-pointer"
                 >
-                  {replaceInstrumentalModal.successMsg ? (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Done</span>
-                    </>
-                  ) : replaceInstrumentalModal.loading ? (
+                  {replaceInstrumentalModal.loading ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Regenerating Instrumental…</span>
+                      <span>Regenerating…</span>
                     </>
                   ) : (
                     <>

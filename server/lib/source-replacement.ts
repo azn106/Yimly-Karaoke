@@ -266,10 +266,6 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
     const backupMain = oldMainPath && fs.existsSync(oldMainPath) ? `${oldMainPath}.bak_${Date.now()}` : null;
     const backupInst = oldInstPath && fs.existsSync(oldInstPath) ? `${oldInstPath}.bak_${Date.now()}` : null;
 
-    jobState.progress = 95;
-    jobState.message = 'Validating and committing instrumental replacement...';
-    jobState.updatedAt = new Date();
-
     try {
       if (backupMain && oldMainPath) fs.copyFileSync(oldMainPath, backupMain);
       if (backupInst && oldInstPath) fs.copyFileSync(oldInstPath, backupInst);
@@ -483,12 +479,7 @@ export async function replaceSongInstrumental(songId: number): Promise<ReplaceSo
     const sepResult = await separateAndCreateInstrumental(
       song.mainAudioPath,
       stagingInstrumentalPath,
-      { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' },
-      (pct, message) => {
-        jobState.progress = Math.min(94, 50 + Math.round(pct * 0.44));
-        jobState.message = message || `Separating instrumental for "${song.title}"...`;
-        jobState.updatedAt = new Date();
-      }
+      { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' }
     );
 
     if (!sepResult.ok || !fs.existsSync(stagingInstrumentalPath) || fs.statSync(stagingInstrumentalPath).size <= 1024) {
@@ -500,10 +491,6 @@ export async function replaceSongInstrumental(songId: number): Promise<ReplaceSo
     const oldInstPath = song.instrumentalAudioPath;
 
     const backupInst = oldInstPath && fs.existsSync(oldInstPath) ? `${oldInstPath}.bak_${Date.now()}` : null;
-
-    jobState.progress = 95;
-    jobState.message = 'Validating and committing instrumental replacement...';
-    jobState.updatedAt = new Date();
 
     try {
       if (backupInst && oldInstPath) {
