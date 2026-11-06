@@ -2965,8 +2965,16 @@ export default function RoomSession() {
             ) : (
               /* Queue is Empty State (Clean & Centered) */
               <div className="text-center z-10 py-12 px-6 max-w-md mx-auto flex flex-col items-center justify-center">
-                <div className="w-16 h-16 rounded-3xl bg-[#12131D] border border-white/10 flex items-center justify-center mx-auto mb-5 shadow-xl">
-                  <Music className="w-8 h-8 text-[#F472B6]" />
+                <div className="w-16 h-16 rounded-3xl bg-[#12131D] border border-white/10 overflow-hidden flex items-center justify-center mx-auto mb-5 shadow-xl">
+                  {bgmSettings.enabled && bgmCurrentSong ? (
+                    <img
+                      src={`/api/songs/${bgmCurrentSong.id}/artwork`}
+                      alt=""
+                      className="w-full h-full object-cover yk-artwork-image"
+                    />
+                  ) : (
+                    <Music className="w-8 h-8 text-[#F472B6]" />
+                  )}
                 </div>
                 <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-2">Queue is Empty</h2>
                 <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">
