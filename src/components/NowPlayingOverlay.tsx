@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic, Music, ArrowLeft, ChevronUp, ChevronDown, Volume2, VolumeX, Volume1, Captions, LoaderCircle } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic, Music, ChevronUp, ChevronDown, Volume2, VolumeX, Volume1, Captions, LoaderCircle } from 'lucide-react';
 import { usePlayback } from '../context/PlaybackContext';
 import EqualizerIndicator from './EqualizerIndicator';
 import { computeWordIntervals, calculateWordProgress } from '../utils/lyricsProgress';
@@ -47,6 +47,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
   const [seekTime, setSeekTime] = useState(0);
   const [showLyrics, setShowLyrics] = useState(false);
   const [isLyricsFullscreen, setIsLyricsFullscreen] = useState(false);
+  const [fullscreenReturnToLyrics, setFullscreenReturnToLyrics] = useState(false);
   const [lyricsLines, setLyricsLines] = useState<TimedLyricLine[]>([]);
   const [lyricsFormat, setLyricsFormat] = useState<'lrc' | 'elrc'>('lrc');
   const [lyricsLoading, setLyricsLoading] = useState(false);
@@ -387,12 +388,12 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
               <div className="yk-now-playing-artwork-size w-[min(58vw,320px)] h-[min(58vw,320px)] sm:w-[min(28vw,300px)] sm:h-[min(28vw,300px)] max-w-[320px] max-h-[320px] min-w-[116px] min-h-[116px]">
                 <div
                   ref={artworkCardRef}
-                  className={'yk-audio-reactive-border relative w-full h-full rounded-2xl overflow-hidden border bg-black/20 will-change-[border-color,background,box-shadow] shadow-xl ' + (showLyrics ? 'cursor-zoom-in' : '')}
-                  onClick={() => { if (showLyrics) setIsLyricsFullscreen(true); }}
-                  role={showLyrics ? 'button' : undefined}
-                  tabIndex={showLyrics ? 0 : undefined}
-                  onKeyDown={(event) => { if (showLyrics && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setIsLyricsFullscreen(true); } }}
-                  aria-label={showLyrics ? 'Open full-screen lyrics' : undefined}
+                  className="yk-audio-reactive-border relative w-full h-full rounded-2xl overflow-hidden border bg-black/20 will-change-[border-color,background,box-shadow] shadow-xl cursor-zoom-in"
+                  onClick={() => { setFullscreenReturnToLyrics(false); setIsLyricsFullscreen(true); }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setFullscreenReturnToLyrics(false); setIsLyricsFullscreen(true); } }}
+                  aria-label="Open full-screen lyrics"
                   style={{
                     borderColor: 'transparent',
                     borderWidth: '1px',
@@ -411,7 +412,7 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
                       className="absolute inset-0 z-20 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 text-center"
                       style={{ animation: 'ykLyricsFadeIn 450ms ease-out both' }}
                       data-lyrics-scroll
-                      onClick={(event) => { event.stopPropagation(); setIsLyricsFullscreen(true); }}
+                      onClick={(event) => { event.stopPropagation(); setFullscreenReturnToLyrics(true); setIsLyricsFullscreen(true); }}
                       onTouchStart={(event) => { isQueueTouch.current = true; touchStartY.current = null; event.stopPropagation(); }}
                       onTouchMove={(event) => event.stopPropagation()}
                       onTouchEnd={(event) => { event.stopPropagation(); isQueueTouch.current = false; }}
@@ -502,21 +503,20 @@ export default function NowPlayingOverlay({ mode = 'overlay' }: { mode?: 'overla
         </div>
       </div>
 
-      {isExpanded && showLyrics && isLyricsFullscreen && (
+      {isExpanded && isLyricsFullscreen && (
         <div className="fixed inset-0 z-[60] h-[100dvh] w-[100vw] max-w-none rounded-none border-0 m-0 overflow-hidden bg-[#190D18]" role="dialog" aria-modal="true" aria-label="Full-screen synced lyrics">
           {currentSong?.hasArtwork && <img key={currentSong.id + '-fullscreen-lyrics'} src={'/api/songs/' + currentSong.id + '/artwork'} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover pointer-events-none" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(190,24,93,0.42) 0%, rgba(157,23,77,0.52) 54%, rgba(35,12,29,0.78) 100%)' }} />
           <div className="relative z-10 flex flex-col h-full min-h-0" style={{ animation: 'ykLyricsFadeIn 350ms ease-out both' }}>
-            <header className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3 px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-4 shrink-0">
-              <button type="button" onClick={() => setIsLyricsFullscreen(false)} className="w-10 h-10 flex items-center justify-center rounded-full text-white/90 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200" aria-label="Back to player" title="Back to player"><ArrowLeft className="w-6 h-6" /></button>
+            <header className="flex items-center justify-center px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-4 shrink-0">
               <div className="min-w-0 text-center">
                 <p className="text-[11px] tracking-[0.22em] font-semibold text-pink-200/90 uppercase">Synced lyrics</p>
                 <h2 className="text-lg sm:text-xl font-bold text-white truncate mt-1">{currentSong?.title || 'No track selected'}</h2>
                 <p className="text-sm text-white/75 truncate">{currentSong?.artist || 'Unknown Artist'}{currentSong?.album ? ' · ' + currentSong.album : ''}</p>
               </div>
-              <div aria-hidden="true" />
+              </div>
             </header>
-            <div data-lyrics-scroll className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-10 pb-[max(2rem,env(safe-area-inset-bottom))] text-center" onTouchStart={(event) => { isQueueTouch.current = true; touchStartY.current = null; event.stopPropagation(); }} onTouchMove={(event) => event.stopPropagation()} onTouchEnd={(event) => { event.stopPropagation(); isQueueTouch.current = false; }} onWheel={(event) => event.stopPropagation()}>
+            <div data-lyrics-scroll className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-10 pb-[max(2rem,env(safe-area-inset-bottom))] text-center" onClick={() => { setShowLyrics(fullscreenReturnToLyrics); setIsLyricsFullscreen(false); }} onTouchStart={(event) => { isQueueTouch.current = true; touchStartY.current = null; event.stopPropagation(); }} onTouchMove={(event) => event.stopPropagation()} onTouchEnd={(event) => { event.stopPropagation(); isQueueTouch.current = false; }} onWheel={(event) => event.stopPropagation()}>
               {lyricsLoading ? (
                 <div className="h-full flex flex-col items-center justify-center gap-3 text-white/80"><LoaderCircle className="w-7 h-7 animate-spin" /><span className="text-sm">Loading synced lyrics…</span></div>
               ) : lyricsUnavailable ? (
