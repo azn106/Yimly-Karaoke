@@ -970,19 +970,34 @@ export default function Library() {
   };
 
   useEffect(() => {
-    if (search.trim()) {
-      fetch(`/api/search?q=${encodeURIComponent(search)}`)
-        .then(async res => {
-          if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
-            return await res.json();
-          }
-          return [];
-        })
-        .then(data => setSearchResults(Array.isArray(data) ? data : []))
-        .catch(err => console.error('Search failed:', err));
-    } else {
+    const query = search.trim();
+    let active = true;
+    if (!query) {
       setSearchResults([]);
+      return;
     }
+
+    // Debounce input and ignore responses belonging to an older query.
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) {
+          throw new Error(`Search failed (${res.status})`);
+        }
+        const data = await res.json();
+        if (active) setSearchResults(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (active) {
+          console.error('Search failed:', err);
+          setSearchResults([]);
+        }
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
   }, [search]);
 
   const triggerScan = async () => {
