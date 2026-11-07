@@ -75,6 +75,7 @@ export interface ActiveDownloadJob {
   id: string;
   playlistName?: string | null;
   playlistId?: number | null;
+  userId?: number | null;
   type: string;
   status: 'queued' | 'downloading' | 'completed' | 'failed' | 'cancelled';
   libraryId?: number | null;
@@ -452,6 +453,8 @@ export class DownloadQueueManager {
         const activeJob: ActiveDownloadJob = {
           id: jobRec.id,
           playlistName: jobRec.playlistName,
+          playlistId: jobRec.playlistId,
+          userId: jobRec.userId,
           type: jobRec.type,
           status: 'downloading',
           libraryId: jobRec.libraryId,
@@ -588,6 +591,7 @@ export class DownloadQueueManager {
       id: jobId,
       playlistName: params.playlistName || null,
       playlistId,
+      userId: params.userId || null,
       type: params.type || 'playlist',
       status: 'downloading',
       libraryId: params.libraryId || null,
@@ -613,6 +617,7 @@ export class DownloadQueueManager {
       id: activeJob.id,
       playlistName: activeJob.playlistName,
       playlistId: playlistId,
+      userId: params.userId,
       type: activeJob.type,
       status: 'downloading',
       libraryId: activeJob.libraryId,
@@ -687,6 +692,8 @@ export class DownloadQueueManager {
     const restored: ActiveDownloadJob = {
       id: dbJob[0].id,
       playlistName: dbJob[0].playlistName,
+      playlistId: dbJob[0].playlistId,
+      userId: dbJob[0].userId,
       type: dbJob[0].type,
       status: dbJob[0].status as any,
       libraryId: dbJob[0].libraryId,

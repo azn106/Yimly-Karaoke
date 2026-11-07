@@ -1307,6 +1307,7 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
             }
 
             const activeJob = await downloadQueue.addJob({
+              userId: userId ?? session[0].hostId,
               playlistName: 'Karaoke Room Queue',
               libraryId: targetLib.id,
               libraryPath: targetLib.path,

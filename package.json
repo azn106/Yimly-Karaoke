@@ -17,6 +17,7 @@
     "@libsql/client": "^0.17.4",
     "@tailwindcss/vite": "^4.1.14",
     "@types/qrcode": "^1.5.6",
+    "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "^5.0.4",
     "bcryptjs": "^3.0.3",
     "caniuse-lite": "^1.0.30001815",
@@ -33,6 +34,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-router-dom": "^7.18.2",
+    "supertest": "^7.3.1",
     "vite": "^6.2.3",
     "ws": "^8.21.3",
     "zod": "^4.4.3"

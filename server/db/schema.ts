@@ -162,6 +162,7 @@ export const downloadJobs = sqliteTable('download_jobs', {
   id: text('id').primaryKey(),
   playlistName: text('playlist_name'),
   playlistId: integer('playlist_id').references(() => playlists.id, { onDelete: 'set null' }),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
   type: text('type').notNull().default('playlist'),
   status: text('status', { enum: ['queued', 'downloading', 'completed', 'failed', 'cancelled'] }).notNull().default('queued'),
   libraryId: integer('library_id').references(() => libraries.id, { onDelete: 'cascade' }),

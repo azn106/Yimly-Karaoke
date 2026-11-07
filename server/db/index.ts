@@ -540,6 +540,9 @@ export async function setupDatabase(migrationsFolderOverride?: string) {
   try {
     await sqlite.execute('ALTER TABLE download_jobs ADD COLUMN playlist_id integer;');
   } catch (e) {}
+  try {
+    await sqlite.execute('ALTER TABLE download_jobs ADD COLUMN user_id integer;');
+  } catch (e) {}
 
   // Normalize multi-artist metadata, backfill song_artists, and cleanup orphaned records
   try {

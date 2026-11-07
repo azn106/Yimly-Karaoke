@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { settings, libraries } from '../db/schema.js';
+import { settings, libraries, downloadJobs } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import {
@@ -592,6 +592,21 @@ router.post('/start', async (req, res) => {
 
 router.get('/jobs/:jobId', async (req, res) => {
   try {
+    const jobRec = await db.select({ userId: downloadJobs.userId }).from(downloadJobs).where(eq(downloadJobs.id, req.params.jobId)).limit(1);
+    if (jobRec.length === 0) {
+      const rep = downloadQueue.getReplacementJob(req.params.jobId);
+      if (rep) {
+        if ((req as any).user?.role !== 'administrator') {
+          return res.status(403).json({ error: 'Forbidden' });
+        }
+        return res.json(rep);
+      }
+      return res.status(404).json({ error: 'Download job not found' });
+    }
+    if ((!jobRec[0].userId || jobRec[0].userId !== (req as any).user?.id) && (req as any).user?.role !== 'administrator') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const job = await downloadQueue.getJob(req.params.jobId);
     if (!job) {
       return res.status(404).json({ error: 'Download job not found' });
@@ -604,6 +619,22 @@ router.get('/jobs/:jobId', async (req, res) => {
 
 router.post('/cancel/:jobId', async (req, res) => {
   try {
+    const jobRec = await db.select({ userId: downloadJobs.userId }).from(downloadJobs).where(eq(downloadJobs.id, req.params.jobId)).limit(1);
+    if (jobRec.length === 0) {
+      const rep = downloadQueue.getReplacementJob(req.params.jobId);
+      if (rep) {
+        if ((req as any).user?.role !== 'administrator') {
+          return res.status(403).json({ error: 'Forbidden' });
+        }
+        const success = await downloadQueue.cancelJob(req.params.jobId);
+        return res.json({ message: 'Job cancelled' });
+      }
+      return res.status(404).json({ error: 'Download job not found' });
+    }
+    if ((!jobRec[0].userId || jobRec[0].userId !== (req as any).user?.id) && (req as any).user?.role !== 'administrator') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const success = await downloadQueue.cancelJob(req.params.jobId);
     if (!success) {
       return res.status(404).json({ error: 'Download job not found' });
@@ -616,6 +647,21 @@ router.post('/cancel/:jobId', async (req, res) => {
 
 router.post('/jobs/:jobId/retry-failed', async (req, res) => {
   try {
+    const jobRec = await db.select({ userId: downloadJobs.userId }).from(downloadJobs).where(eq(downloadJobs.id, req.params.jobId)).limit(1);
+    if (jobRec.length === 0) {
+      const rep = downloadQueue.getReplacementJob(req.params.jobId);
+      if (rep) {
+        if ((req as any).user?.role !== 'administrator') {
+          return res.status(403).json({ error: 'Forbidden' });
+        }
+        return res.status(400).json({ error: 'Retry not supported for replacement jobs' });
+      }
+      return res.status(404).json({ error: 'Download job not found' });
+    }
+    if ((!jobRec[0].userId || jobRec[0].userId !== (req as any).user?.id) && (req as any).user?.role !== 'administrator') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const success = await downloadQueue.retryFailedTracks(req.params.jobId);
     if (!success) {
       return res.status(404).json({ error: 'Download job not found' });
