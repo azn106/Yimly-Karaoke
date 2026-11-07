@@ -320,10 +320,13 @@ export default function Library() {
         throw new Error(data.error || data.details || 'Failed to replace recording source');
       }
 
+      // The replacement is queued; close the dialog and let the song-card badge show progress.
       setReplaceSourceModal(prev => ({
         ...prev,
+        isOpen: false,
         loading: false,
-        successMsg: 'Recording replaced and audio reprocessed successfully!',
+        error: null,
+        successMsg: null,
       }));
       refreshReplacements();
     } catch (err: any) {
