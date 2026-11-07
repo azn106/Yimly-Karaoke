@@ -1501,12 +1501,13 @@ export async function scanLibrary(libraryId: number, dirPath: string) {
     const instExists = dbSong.instrumentalAudioPath ? fsSync.existsSync(dbSong.instrumentalAudioPath) : false;
 
     if (!mainExists && !instExists) {
-      // The library root was validated and this scan discovered audio files, so a song
-      // with no remaining audio variants is genuinely absent from this library.
-      // Song foreign-key cascades clean up lyrics, playlists, favourites, queue items,
-      // and song/artist links without deleting any files from disk.
-      console.log(`[Scanner] Removing song ID ${dbSong.id} ("${dbSong.title}") because no audio variants remain in the scanned library.`);
-      await db.delete(songs).where(eq(songs.id, dbSong.id));
+      console.log(`[Scanner] Marking song ID ${dbSong.id} ("${dbSong.title}") as unavailable (preserving song record, playlists, favorites, lyrics, and relationships) because no audio variants remain on disk.`);
+      await db.update(songs).set({
+        mainAudioPath: null,
+        instrumentalAudioPath: null,
+        variant: 'original',
+        fileSize: null,
+      }).where(eq(songs.id, dbSong.id));
       continue;
     } else if (!mainExists && instExists) {
       // Main removed, instrumental remains

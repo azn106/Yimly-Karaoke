@@ -310,9 +310,12 @@ test('Playlist Data Loss Safeguards Regression Suite', async (t) => {
     await scanLibrary(manualLib.id, manualDir);
 
     const deletedRows = await db.select().from(songs).where(eq(songs.id, deletedSong.id));
-    assert.strictEqual(deletedRows.length, 0, 'Manual rescan should delete the missing song record');
+    assert.strictEqual(deletedRows.length, 1, 'Manual rescan should preserve song record when audio is missing');
+    assert.strictEqual(deletedRows[0].mainAudioPath, null);
+    assert.strictEqual(deletedRows[0].instrumentalAudioPath, null);
+
     const deletedPlaylistRows = await db.select().from(playlistSongs).where(eq(playlistSongs.playlistId, manualPlaylist.id));
-    assert.strictEqual(deletedPlaylistRows.length, 0, 'Manual rescan deletion should cascade playlist associations');
+    assert.strictEqual(deletedPlaylistRows.length, 1, 'Manual rescan should preserve playlist associations when audio is missing');
     const remainingRows = await db.select().from(songs).where(eq(songs.id, remainingSong.id));
     assert.strictEqual(remainingRows.length, 1, 'Manual rescan should preserve songs whose audio files still exist');
   });
