@@ -435,27 +435,19 @@ export async function findExistingSongRecord(
     }
   }
 
-  // 2. Query candidate songs by libraryId and normalized title match (optimized)
-  const normTargetTitle = normalizeSongTitle(cleanTitle);
+  // Fetch all candidates for library
   const candidates = await db.select().from(songs).where(
     eq(songs.libraryId, libraryId)
   );
 
+  // 2. Standard title + artist match
+  const normTargetTitle = normalizeSongTitle(cleanTitle);
   const titleMatches = candidates.filter(s => normalizeSongTitle(s.title) === normTargetTitle);
-  if (titleMatches.length === 0) {
-    return null;
-  }
-
-  const targetArtistIdSet = new Set(artistIds);
-
-  for (const candidate of titleMatches) {
-    // Fetch candidate's song_artists join entries
-    const candSongArtists = await db.select().from(songArtists).where(eq(songArtists.songId, candidate.id));
-
-    if (candSongArtists.length > 0) {
-      // Candidate has explicit song_artists entries.
-      // Artist sets must match exactly (set equality: same size and every artistId is in targetArtistIdSet)
-      const candArtistIdSet = new Set(candSongArtists.map(sa => sa.artistId));
+  if (titleMatches.length > 0) {
+    const targetArtistIdSet = new Set(artistIds);
+    for (const candidate of titleMatches) {
+      const candSongArtists = await db.select().from(songArtists).where(eq(songArtists.songId, candidate.id));
+      const candArtistIdSet = new Set(candSongArtists.length > 0 ? candSongArtists.map(sa => sa.artistId) : [candidate.artistId]);
       if (candArtistIdSet.size === targetArtistIdSet.size) {
         let allMatch = true;
         for (const id of targetArtistIdSet) {
@@ -468,21 +460,94 @@ export async function findExistingSongRecord(
           return candidate;
         }
       }
-    } else {
-      // Legacy fallback for records where song_artists is missing:
-      // Match if candidate.artistId matches the target when target is a single artist
-      const candArtistIdSet = new Set([candidate.artistId]);
-      if (candArtistIdSet.size === targetArtistIdSet.size) {
-        let allMatch = true;
-        for (const id of targetArtistIdSet) {
-          if (!candArtistIdSet.has(id)) {
-            allMatch = false;
-            break;
+    }
+  }
+
+  // 3. Stale / Missing Path Lookup (Rename / Move detection) with strict evidence and variant safety
+  if (audioFullPath) {
+    const missingPathSongs = candidates.filter(s => {
+      const mainMissing = s.mainAudioPath && !fsSync.existsSync(s.mainAudioPath);
+      const instMissing = s.instrumentalAudioPath && !fsSync.existsSync(s.instrumentalAudioPath);
+      return mainMissing || instMissing;
+    });
+
+    if (missingPathSongs.length > 0) {
+      const targetArtistIdSet = new Set(artistIds);
+      const newDir = path.dirname(audioFullPath);
+      const newBase = path.basename(audioFullPath).toLowerCase();
+      const newVariant = detectAudioVariant(newBase, cleanTitle);
+
+      let bestCandidate: any = null;
+      let bestScore = -1;
+
+      for (const candidate of missingPathSongs) {
+        const candidateIsInst = candidate.instrumentalAudioPath && !candidate.mainAudioPath;
+        const incomingIsInst = newVariant === 'instrumental';
+        if (candidateIsInst !== incomingIsInst && candidate.mainAudioPath && candidate.instrumentalAudioPath) {
+          // Song has both, can fit either
+        } else if (candidateIsInst && !incomingIsInst) {
+          continue; // Don't let main audio claim an instrumental-only missing path
+        } else if (!candidateIsInst && incomingIsInst) {
+          continue; // Don't let instrumental audio claim a main-only missing path
+        }
+
+        let score = 0;
+        const candSongArtists = await db.select().from(songArtists).where(eq(songArtists.songId, candidate.id));
+        const candArtistIdSet = new Set(candSongArtists.length > 0 ? candSongArtists.map(sa => sa.artistId) : [candidate.artistId]);
+
+        let artistMatch = (candArtistIdSet.size === targetArtistIdSet.size);
+        if (artistMatch) {
+          for (const id of targetArtistIdSet) {
+            if (!candArtistIdSet.has(id)) {
+              artistMatch = false;
+              break;
+            }
           }
         }
-        if (allMatch) {
-          return candidate;
+
+        if (!artistMatch) continue;
+        score += 10; // Artist match base score
+
+        const oldPath = candidate.mainAudioPath && !fsSync.existsSync(candidate.mainAudioPath) 
+          ? candidate.mainAudioPath 
+          : candidate.instrumentalAudioPath;
+
+        if (oldPath) {
+          const oldDir = path.dirname(oldPath);
+          const oldBase = path.basename(oldPath).toLowerCase();
+          const oldTitleNorm = normalizeSongTitle(candidate.title);
+
+          if (oldDir === newDir) {
+            score += 20; // Same directory (rename or move within same dir)
+          }
+
+          if (candidate.fileSize && candidate.fileSize > 0) {
+            score += 15; // Has recorded file size
+          }
+
+          if (oldBase === newBase) {
+            score += 30; // Same filename
+          }
+
+          const newTitleNorm = normTargetTitle;
+          if (oldTitleNorm === newTitleNorm || oldBase.includes(newTitleNorm) || newTitleNorm.includes(oldTitleNorm)) {
+            score += 25;
+          } else {
+            if (oldDir !== newDir && oldBase !== newBase) {
+              continue; // Insufficient title correlation / evidence
+            }
+          }
         }
+
+        // Deterministic tie-breaking: prefer lower candidate.id if scores are equal
+        if (score > bestScore || (score === bestScore && bestCandidate && candidate.id < bestCandidate.id)) {
+          bestScore = score;
+          bestCandidate = candidate;
+        }
+      }
+
+      if (bestCandidate && bestScore >= 45) {
+        return bestCandidate;
       }
     }
   }
