@@ -10,6 +10,7 @@ import { scanLibrary } from './scanner.js';
 import { fetchLyrics, saveLrcSidecar, stripLrcTimestamps } from './lyrics.js';
 import { matchSpotifyTrackToYouTube } from './youtube-matcher.js';
 import { isPreviewMode, simulateDownload } from './preview-mode.js';
+import { validateAndCanonicalizeYouTubeUrl, isValidArtworkUrl } from './url-validator.js';
 
 const execFilePromise = promisify(execFile);
 const execPromise = promisify(exec);
@@ -329,6 +330,12 @@ export class DownloadQueueManager {
     quality: string = '320k',
     maxAttempts: number = 3
   ): Promise<string> {
+    const val = validateAndCanonicalizeYouTubeUrl(targetUrl, { allowPlaylist: false });
+    if (!val.valid || !val.canonicalUrl) {
+      throw new Error(`Invalid or disallowed download URL: ${val.error || 'Only official YouTube watch URLs are supported'}`);
+    }
+    const canonicalTargetUrl = val.canonicalUrl;
+
     const ytDlpPath = await getYtDlpPath();
     const normalizedFormat = normalizeYtDlpAudioFormat(format);
     const tempFileBase = path.join(outputDir, `audio_${Date.now()}`);
@@ -356,7 +363,7 @@ export class DownloadQueueManager {
             '--max-filesize', '100M',
             '--js-runtimes', 'node',
             '-o', `${tempFileBase}.%(ext)s`,
-            targetUrl.trim(),
+            canonicalTargetUrl,
           ];
 
           await new Promise<void>((resolve, reject) => {
@@ -1161,8 +1168,20 @@ export class DownloadQueueManager {
 
         // Stage 2 (Downtify Architecture): YouTube Music audio matching
         let targetDownloadUrl = track.sourceUrl;
-        const isAlreadyYouTube = targetDownloadUrl && 
-          (targetDownloadUrl.includes('youtube.com/watch') || targetDownloadUrl.includes('youtu.be/') || targetDownloadUrl.includes('music.youtube.com/watch'));
+        let isAlreadyYouTube = false;
+
+        if (targetDownloadUrl) {
+          const val = validateAndCanonicalizeYouTubeUrl(targetDownloadUrl, { allowPlaylist: false });
+          if (val.valid && val.canonicalUrl) {
+            targetDownloadUrl = val.canonicalUrl;
+            track.sourceUrl = targetDownloadUrl;
+            isAlreadyYouTube = true;
+          } else {
+            targetDownloadUrl = undefined;
+            track.sourceUrl = null;
+            isAlreadyYouTube = false;
+          }
+        }
 
         if (!isAlreadyYouTube) {
           try {
@@ -1179,12 +1198,15 @@ export class DownloadQueueManager {
             .limit(1);
 
             if (verifiedMatch.length > 0 && verifiedMatch[0].youtubeUrl) {
-              targetDownloadUrl = verifiedMatch[0].youtubeUrl;
-              track.sourceUrl = targetDownloadUrl;
-              await db.update(downloadTrackJobs)
-                .set({ sourceUrl: targetDownloadUrl, updatedAt: new Date() })
-                .where(eq(downloadTrackJobs.id, track.id));
-              console.log(`[Downloader Queue] Using manually verified source for "${track.title}" by "${track.artist}" -> ${targetDownloadUrl}`);
+              const vVal = validateAndCanonicalizeYouTubeUrl(verifiedMatch[0].youtubeUrl, { allowPlaylist: false });
+              if (vVal.valid && vVal.canonicalUrl) {
+                targetDownloadUrl = vVal.canonicalUrl;
+                track.sourceUrl = targetDownloadUrl;
+                await db.update(downloadTrackJobs)
+                  .set({ sourceUrl: targetDownloadUrl, updatedAt: new Date() })
+                  .where(eq(downloadTrackJobs.id, track.id));
+                console.log(`[Downloader Queue] Using manually verified source for "${track.title}" by "${track.artist}" -> ${targetDownloadUrl}`);
+              }
             } else {
               const ytMatch = await matchSpotifyTrackToYouTube({
                 title: track.title,
@@ -1195,14 +1217,17 @@ export class DownloadQueueManager {
               });
 
               if (ytMatch && ytMatch.candidate?.url && ytMatch.score >= 40) {
-                targetDownloadUrl = ytMatch.candidate.url;
-                track.sourceUrl = targetDownloadUrl;
-                // Persist resolved YouTube URL to database
-                await db.update(downloadTrackJobs)
-                  .set({ sourceUrl: targetDownloadUrl, updatedAt: new Date() })
-                  .where(eq(downloadTrackJobs.id, track.id));
+                const mVal = validateAndCanonicalizeYouTubeUrl(ytMatch.candidate.url, { allowPlaylist: false });
+                if (mVal.valid && mVal.canonicalUrl) {
+                  targetDownloadUrl = mVal.canonicalUrl;
+                  track.sourceUrl = targetDownloadUrl;
+                  // Persist resolved YouTube URL to database
+                  await db.update(downloadTrackJobs)
+                    .set({ sourceUrl: targetDownloadUrl, updatedAt: new Date() })
+                    .where(eq(downloadTrackJobs.id, track.id));
 
-                console.log(`[Downloader Queue] Matched "${track.title}" -> ${targetDownloadUrl} (Spotify: ${track.duration || '?'}s, YT: ${ytMatch.candidate.duration}s, Diff: ${ytMatch.durationDiff}s, Score: ${ytMatch.score})`);
+                  console.log(`[Downloader Queue] Matched "${track.title}" -> ${targetDownloadUrl} (Spotify: ${track.duration || '?'}s, YT: ${ytMatch.candidate.duration}s, Diff: ${ytMatch.durationDiff}s, Score: ${ytMatch.score})`);
+                }
               } else {
                 console.warn(`[Downloader Queue] No credible YouTube Music match found for "${track.title}" by "${track.artist}" (score too low or rejected)`);
               }
@@ -1212,8 +1237,9 @@ export class DownloadQueueManager {
           }
         }
 
-        // If matching failed completely and no target URL available, fail this individual track cleanly
-        if (!targetDownloadUrl || targetDownloadUrl.includes('spotify.com/')) {
+        // Validate final download URL strictly before attempting download
+        const finalUrlCheck = targetDownloadUrl ? validateAndCanonicalizeYouTubeUrl(targetDownloadUrl, { allowPlaylist: false }) : null;
+        if (!finalUrlCheck || !finalUrlCheck.valid || !finalUrlCheck.canonicalUrl) {
           track.status = 'failed';
           track.error = 'No credible matching official audio stream found for track';
           track.progress = 0;
@@ -1221,6 +1247,8 @@ export class DownloadQueueManager {
           await this.checkJobCompletion(job);
           return;
         }
+
+        targetDownloadUrl = finalUrlCheck.canonicalUrl;
 
         const ytDlpPath = await getYtDlpPath();
         const tempFileBase = path.join(tmpJobDir, `audio_${Date.now()}`);
@@ -1316,7 +1344,7 @@ export class DownloadQueueManager {
             }
 
             // Artwork embedding if available
-            if (job.embedArtwork && track.artworkUrl) {
+            if (job.embedArtwork && track.artworkUrl && isValidArtworkUrl(track.artworkUrl)) {
               try {
                 const imgRes = await fetch(track.artworkUrl);
                 if (imgRes.ok) {
@@ -1560,6 +1588,9 @@ export class DownloadQueueManager {
   }
 
   public async downloadAndSavePlaylistCover(coverUrl: string): Promise<string | null> {
+    if (!coverUrl || !isValidArtworkUrl(coverUrl)) {
+      return null;
+    }
     try {
       const res = await fetch(coverUrl);
       if (res.ok) {

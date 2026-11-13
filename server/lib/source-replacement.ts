@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { downloadQueue, sanitizeFilename } from './download-queue.js';
 import { separateAndCreateInstrumental } from './audio-separation.js';
 import { importSingleAudioFile } from './scanner.js';
+import { validateAndCanonicalizeYouTubeUrl } from './url-validator.js';
 
 const activeSongReplacements = new Set<number>();
 
@@ -114,34 +115,14 @@ export function getActiveSongReplacements(songId?: number): ReplacementProgress[
 
 export function extractYouTubeVideoId(url: string): string | null {
   if (!url || typeof url !== 'string') return null;
-  const trimmed = url.trim();
-  const regExp = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?.*?[&?]v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:[?&#].*)?$/;
-  const match = trimmed.match(regExp);
-  if (match && match[1]) {
-    return match[1];
-  }
-  try {
-    const parsed = new URL(trimmed.startsWith('http://') || trimmed.startsWith('https://') ? trimmed : `https://${trimmed}`);
-    const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
-    if (host === 'youtu.be') {
-      const id = parsed.pathname.slice(1).split('/')[0];
-      if (/^[a-zA-Z0-9_-]{11}$/.test(id)) return id;
-    }
-    if (host === 'youtube.com' || host === 'music.youtube.com' || host === 'm.youtube.com') {
-      const v = parsed.searchParams.get('v');
-      if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
-      const parts = parsed.pathname.split('/').filter(Boolean);
-      if ((parts[0] === 'embed' || parts[0] === 'v' || parts[0] === 'shorts') && parts[1] && /^[a-zA-Z0-9_-]{11}$/.test(parts[1])) {
-        return parts[1];
-      }
-    }
-  } catch {}
-  return null;
+  const res = validateAndCanonicalizeYouTubeUrl(url, { allowPlaylist: true });
+  return (res.valid && res.videoId) ? res.videoId : null;
 }
 
 export function isValidYouTubeUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
-  return extractYouTubeVideoId(url.trim()) !== null;
+  const res = validateAndCanonicalizeYouTubeUrl(url, { allowPlaylist: true });
+  return Boolean(res.valid && res.videoId);
 }
 
 /**
@@ -155,15 +136,18 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
     throw new Error('A valid YouTube URL is required to replace the recording source.');
   }
 
-  const videoId = extractYouTubeVideoId(trimmedUrl);
-  if (!videoId) {
+  const validation = validateAndCanonicalizeYouTubeUrl(trimmedUrl, { allowPlaylist: false });
+  if (!validation.valid || !validation.videoId || !validation.canonicalUrl) {
     return {
       success: false,
       message: 'Invalid YouTube URL provided.',
       songId,
-      error: 'The provided URL is not a recognized YouTube video URL.',
+      error: validation.error || 'The provided URL is not a recognized YouTube video URL.',
     };
   }
+
+  const videoId = validation.videoId;
+  const canonicalUrl = validation.canonicalUrl;
 
   if (activeSongReplacements.has(songId)) {
     return {
@@ -232,7 +216,7 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
 
         // 4. Download using established download pipeline
         const downloadedFile = await downloadQueue.downloadSingleTrackAudio(
-          trimmedUrl,
+          canonicalUrl,
           stagingDir,
           formatExt,
           '320k',

@@ -7,6 +7,7 @@ import { db } from '../db/index.js';
 import { sessions, controllers, queueItems, songs, artists, albums, songArtists, users, settings, lyrics, libraries, playlistSongs } from '../db/schema.js';
 import { downloadQueue } from '../lib/download-queue.js';
 import { resolveUrlOrQuery } from './downloader.js';
+import { validateAndCanonicalizeYouTubeUrl } from '../lib/url-validator.js';
 import { eq, and, asc, or, inArray, like, sql } from 'drizzle-orm';
 import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import crypto from 'crypto';
@@ -1306,6 +1307,14 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
               } catch (e) {}
             }
 
+            let safeSourceUrl: string | null = null;
+            if (track.sourceUrl && typeof track.sourceUrl === 'string') {
+              const val = validateAndCanonicalizeYouTubeUrl(track.sourceUrl, { allowPlaylist: false });
+              if (val.valid && val.canonicalUrl) {
+                safeSourceUrl = val.canonicalUrl;
+              }
+            }
+
             const activeJob = await downloadQueue.addJob({
               userId: userId ?? session[0].hostId,
               playlistName: 'Karaoke Room Queue',
@@ -1325,7 +1334,7 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
                 album: track.album || 'Single',
                 duration: track.duration,
                 artworkUrl: track.artworkUrl,
-                sourceUrl: track.sourceUrl || null,
+                sourceUrl: safeSourceUrl,
               }],
             });
 

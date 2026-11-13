@@ -14,6 +14,12 @@ import { resolveSpotifyEntity } from '../lib/spotify-resolver.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { sanitizeLeadInMs, setCachedLeadInMs } from '../karaoke-sync-config.js';
+import {
+  validateAndCanonicalizeYouTubeUrl,
+  validateSpotifyUrl,
+  isUrlOrUri,
+  isValidArtworkUrl,
+} from '../lib/url-validator.js';
 
 const execFilePromise = promisify(execFile);
 
@@ -153,147 +159,167 @@ export async function resolveUrlOrQuery(urlOrQuery: string, requestedOffset = 0)
   const offset = Math.max(0, Math.min(200, Math.floor(Number(requestedOffset) || 0)));
   const trimmed = urlOrQuery.trim();
 
-  // 1. Check if Spotify URL
-  if (trimmed.includes('spotify.com/')) {
-    const spotifyEntity = await resolveSpotifyEntity(trimmed);
-    return spotifyEntity;
-  }
+  // If input is an attempt to supply a URL or URI rather than a text query:
+  if (isUrlOrUri(trimmed)) {
+    // 1. Check if Spotify URL or URI
+    const spotifyVal = validateSpotifyUrl(trimmed);
+    if (spotifyVal.valid && spotifyVal.canonicalUrl) {
+      const spotifyEntity = await resolveSpotifyEntity(spotifyVal.canonicalUrl);
+      return spotifyEntity;
+    }
+    if (trimmed.includes('spotify.com') || trimmed.startsWith('spotify:')) {
+      throw new Error(`Invalid Spotify URL: ${spotifyVal.error || 'Only official Spotify tracks, albums, and playlists are supported.'}`);
+    }
 
-  // 2. Check if YouTube / YouTube Music URL
-  if (trimmed.includes('youtube.com/') || trimmed.includes('youtu.be/')) {
-    const ytDlpPath = await getYtDlpPath();
-    const isPlaylist = trimmed.includes('list=');
+    // 2. Check if YouTube / YouTube Music URL
+    const ytVal = validateAndCanonicalizeYouTubeUrl(trimmed, { allowPlaylist: true });
+    if (ytVal.valid && ytVal.canonicalUrl) {
+      const ytDlpPath = await getYtDlpPath();
+      const isPlaylist = Boolean(ytVal.isPlaylist);
+      const canonicalTargetUrl = ytVal.canonicalUrl;
 
-    if (isPlaylist) {
-      const { stdout } = await execFilePromise(ytDlpPath, [
-        '--ignore-errors',
-        '--dump-json',
-        '--js-runtimes',
-        'node',
-        trimmed,
-      ]);
+      if (isPlaylist) {
+        const { stdout } = await execFilePromise(ytDlpPath, [
+          '--ignore-errors',
+          '--dump-json',
+          '--js-runtimes',
+          'node',
+          canonicalTargetUrl,
+        ]);
 
-      const lines = stdout.trim().split('\n').filter(Boolean);
-      const tracks = lines.map((line, idx) => {
-        try {
-          const parsed = JSON.parse(line);
-          const rawTitle = typeof parsed.track === 'string' ? parsed.track.trim() : '';
-          const rawArtist = typeof parsed.artist === 'string' ? parsed.artist.trim() : '';
-          const channelName = typeof parsed.channel === 'string' ? parsed.channel : (typeof parsed.uploader === 'string' ? parsed.uploader : '');
+        const lines = stdout.trim().split('\n').filter(Boolean);
+        const tracks = lines.map((line, idx) => {
+          try {
+            const parsed = JSON.parse(line);
+            const rawTitle = typeof parsed.track === 'string' ? parsed.track.trim() : '';
+            const rawArtist = typeof parsed.artist === 'string' ? parsed.artist.trim() : '';
+            const channelName = typeof parsed.channel === 'string' ? parsed.channel : (typeof parsed.uploader === 'string' ? parsed.uploader : '');
 
-          // Reject entries that rely on a generic video title or uploader-as-artist.
-          if (!rawTitle || !rawArtist || !matchesYouTubeArtistToChannel(rawArtist, channelName)) {
-            console.info('[Downloader] Skipping YouTube playlist entry with missing or mismatched music metadata:', parsed.id || parsed.url || 'unknown video');
+            // Reject entries that rely on a generic video title or uploader-as-artist.
+            if (!rawTitle || !rawArtist || !matchesYouTubeArtistToChannel(rawArtist, channelName)) {
+              console.info('[Downloader] Skipping YouTube playlist entry with missing or mismatched music metadata:', parsed.id || parsed.url || 'unknown video');
+              return null;
+            }
+
+            const intent = detectTrackIntent(rawTitle, rawArtist);
+            const entryId = typeof parsed.id === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(parsed.id) ? parsed.id : undefined;
+
+            return {
+              title: intent.coreTitle,
+              artist: intent.mainArtist,
+              album: typeof parsed.album === 'string' ? parsed.album.trim() : '',
+              trackNumber: idx + 1,
+              sourceUrl: entryId ? `https://www.youtube.com/watch?v=${entryId}` : undefined,
+              artworkUrl: (parsed.thumbnails?.[0]?.url && isValidArtworkUrl(parsed.thumbnails[0].url)) ? parsed.thumbnails[0].url : '',
+              duration: Math.round(parsed.duration || 0),
+            };
+          } catch (e) {
             return null;
           }
+        }).filter(Boolean);
 
-          const intent = detectTrackIntent(rawTitle, rawArtist);
+        return {
+          type: 'playlist',
+          title: 'YouTube Playlist',
+          tracks,
+        };
+      } else {
+        const { stdout } = await execFilePromise(ytDlpPath, [
+          '--dump-json',
+          '--js-runtimes',
+          'node',
+          canonicalTargetUrl,
+        ]);
 
-          return {
-            title: intent.coreTitle,
-            artist: intent.mainArtist,
-            album: typeof parsed.album === 'string' ? parsed.album.trim() : '',
-            trackNumber: idx + 1,
-            sourceUrl: parsed.url || (parsed.id ? `https://www.youtube.com/watch?v=${parsed.id}` : undefined),
-            artworkUrl: parsed.thumbnails?.[0]?.url || '',
-            duration: Math.round(parsed.duration || 0),
-          };
-        } catch (e) {
-          return null;
+        const parsed = JSON.parse(stdout);
+        const rawTitle = typeof parsed.track === 'string' ? parsed.track.trim() : '';
+        const rawArtist = typeof parsed.artist === 'string' ? parsed.artist.trim() : '';
+        const channelName = typeof parsed.channel === 'string' ? parsed.channel : (typeof parsed.uploader === 'string' ? parsed.uploader : '');
+
+        // Only accept explicit music metadata tied to the artist's own channel.
+        // Album metadata is optional; catalogue enrichment below can supply it.
+        if (!rawTitle || !rawArtist || !matchesYouTubeArtistToChannel(rawArtist, channelName)) {
+          throw new Error('This YouTube video does not provide reliable track and artist metadata matching its channel. Try an official artist upload or search by song name.');
         }
-      }).filter(Boolean);
 
-      return {
-        type: 'playlist',
-        title: 'YouTube Playlist',
-        tracks,
-      };
-    } else {
-      const { stdout } = await execFilePromise(ytDlpPath, [
-        '--dump-json',
-        '--js-runtimes',
-        'node',
-        trimmed,
-      ]);
+        const intent = detectTrackIntent(rawTitle, rawArtist);
 
-      const parsed = JSON.parse(stdout);
-      const rawTitle = typeof parsed.track === 'string' ? parsed.track.trim() : '';
-      const rawArtist = typeof parsed.artist === 'string' ? parsed.artist.trim() : '';
-      const channelName = typeof parsed.channel === 'string' ? parsed.channel : (typeof parsed.uploader === 'string' ? parsed.uploader : '');
+        let canonicalTitle = intent.coreTitle;
+        let canonicalArtist = intent.mainArtist;
+        let canonicalAlbum = typeof parsed.album === 'string' ? parsed.album.trim() : '';
+        let canonicalArtwork = parsed.thumbnail || (parsed.thumbnails?.[0]?.url || '');
+        if (canonicalArtwork && !isValidArtworkUrl(canonicalArtwork)) {
+          canonicalArtwork = '';
+        }
+        let duration = Math.round(parsed.duration || 0);
+        let releaseYear: number | undefined = undefined;
 
-      // Only accept explicit music metadata tied to the artist's own channel.
-      // Album metadata is optional; catalogue enrichment below can supply it.
-      if (!rawTitle || !rawArtist || !matchesYouTubeArtistToChannel(rawArtist, channelName)) {
-        throw new Error('This YouTube video does not provide reliable track and artist metadata matching its channel. Try an official artist upload or search by song name.');
-      }
+        // Attempt catalogue enrichment to find square album artwork and canonical album name
+        // without changing the audio source URL (which remains the canonical YouTube URL)
+        try {
+          const queryTerm = `${canonicalArtist} ${canonicalTitle}`;
+          const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&entity=song&limit=5`);
+          if (itunesRes.ok) {
+            const itunesData = await itunesRes.json();
+            const cleanTargetTitle = cleanString(canonicalTitle);
+            const cleanTargetArtist = cleanString(canonicalArtist);
 
-      const intent = detectTrackIntent(rawTitle, rawArtist);
+            const match = itunesData.results?.find((r: any) => {
+              const rTitle = cleanString(r.trackName);
+              const rArtist = cleanString(r.artistName);
+              const titleMatches = rTitle.includes(cleanTargetTitle) || cleanTargetTitle.includes(rTitle);
+              const artistMatches = rArtist.includes(cleanTargetArtist) || cleanTargetArtist.includes(rArtist);
+              const itunesDur = Math.round((r.trackTimeMillis || 0) / 1000);
+              const durationMatches = duration > 0 ? Math.abs(itunesDur - duration) <= 25 : true;
+              return titleMatches && artistMatches && durationMatches;
+            });
 
-      let canonicalTitle = intent.coreTitle;
-      let canonicalArtist = intent.mainArtist;
-      let canonicalAlbum = typeof parsed.album === 'string' ? parsed.album.trim() : '';
-      let canonicalArtwork = parsed.thumbnail || (parsed.thumbnails?.[0]?.url || '');
-      let duration = Math.round(parsed.duration || 0);
-      let releaseYear: number | undefined = undefined;
-
-      // Attempt catalogue enrichment to find square album artwork and canonical album name
-      // without changing the audio source URL (which remains the user's supplied YouTube URL)
-      try {
-        const queryTerm = `${canonicalArtist} ${canonicalTitle}`;
-        const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&entity=song&limit=5`);
-        if (itunesRes.ok) {
-          const itunesData = await itunesRes.json();
-          const cleanTargetTitle = cleanString(canonicalTitle);
-          const cleanTargetArtist = cleanString(canonicalArtist);
-
-          const match = itunesData.results?.find((r: any) => {
-            const rTitle = cleanString(r.trackName);
-            const rArtist = cleanString(r.artistName);
-            const titleMatches = rTitle.includes(cleanTargetTitle) || cleanTargetTitle.includes(rTitle);
-            const artistMatches = rArtist.includes(cleanTargetArtist) || cleanTargetArtist.includes(rArtist);
-            const itunesDur = Math.round((r.trackTimeMillis || 0) / 1000);
-            const durationMatches = duration > 0 ? Math.abs(itunesDur - duration) <= 25 : true;
-            return titleMatches && artistMatches && durationMatches;
-          });
-
-          if (match) {
-            canonicalTitle = match.trackName || canonicalTitle;
-            canonicalArtist = match.artistName || canonicalArtist;
-            canonicalAlbum = match.collectionName || canonicalAlbum;
-            if (match.artworkUrl100) {
-              canonicalArtwork = match.artworkUrl100.replace('100x100bb', '600x600bb');
-            }
-            if (match.releaseDate) {
-              releaseYear = new Date(match.releaseDate).getFullYear();
-            }
-            if (!duration && match.trackTimeMillis) {
-              duration = Math.round(match.trackTimeMillis / 1000);
+            if (match) {
+              canonicalTitle = match.trackName || canonicalTitle;
+              canonicalArtist = match.artistName || canonicalArtist;
+              canonicalAlbum = match.collectionName || canonicalAlbum;
+              if (match.artworkUrl100 && isValidArtworkUrl(match.artworkUrl100)) {
+                canonicalArtwork = match.artworkUrl100.replace('100x100bb', '600x600bb');
+              }
+              if (match.releaseDate) {
+                releaseYear = new Date(match.releaseDate).getFullYear();
+              }
+              if (!duration && match.trackTimeMillis) {
+                duration = Math.round(match.trackTimeMillis / 1000);
+              }
             }
           }
+        } catch (err) {
+          console.warn('[Downloader] YouTube catalogue resolution notice:', err);
         }
-      } catch (err) {
-        console.warn('[Downloader] YouTube catalogue resolution notice:', err);
+
+        const track = {
+          title: canonicalTitle,
+          artist: canonicalArtist,
+          album: canonicalAlbum,
+          duration,
+          artworkUrl: canonicalArtwork,
+          releaseYear,
+          sourceUrl: canonicalTargetUrl, // Pass canonical YouTube URL
+        };
+
+        return {
+          type: 'track',
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          artworkUrl: track.artworkUrl,
+          tracks: [track],
+        };
       }
-
-      const track = {
-        title: canonicalTitle,
-        artist: canonicalArtist,
-        album: canonicalAlbum,
-        duration,
-        artworkUrl: canonicalArtwork,
-        releaseYear,
-        sourceUrl: trimmed, // Preserve user's supplied YouTube URL as audio source!
-      };
-
-      return {
-        type: 'track',
-        title: track.title,
-        artist: track.artist,
-        album: track.album,
-        artworkUrl: track.artworkUrl,
-        tracks: [track],
-      };
     }
+
+    // Input was identified as a URL or URI, but is neither valid Spotify nor valid YouTube
+    throw new Error(
+      ytVal.error
+        ? `Invalid YouTube URL: ${ytVal.error}`
+        : 'Unsupported or unsafe URL. Only official YouTube and Spotify URLs are supported.'
+    );
   }
 
   // 3. Multi-Query Text Search with intelligent expansion & provider fallbacks
@@ -541,20 +567,39 @@ router.post('/start', async (req, res) => {
       }
     }
 
-    const trackMetadataList: TrackMetadata[] = tracks.map((t: any) => ({
-      title: t.title || 'Unknown Title',
-      artist: t.artist || 'Unknown Artist',
-      album: t.album || 'Unknown Album',
-      trackNumber: t.trackNumber,
-      discNumber: t.discNumber,
-      releaseYear: t.releaseYear,
-      duration: t.duration,
-      artworkUrl: t.artworkUrl,
-      sourceUrl: t.sourceUrl,
-      spotifyId: t.spotifyId,
-    }));
+    const trackMetadataList: TrackMetadata[] = [];
+    for (const [idx, t] of tracks.entries()) {
+      let safeSourceUrl: string | undefined = undefined;
+      if (t.sourceUrl && typeof t.sourceUrl === 'string' && t.sourceUrl.trim()) {
+        const val = validateAndCanonicalizeYouTubeUrl(t.sourceUrl, { allowPlaylist: false });
+        if (!val.valid || !val.canonicalUrl) {
+          return res.status(400).json({
+            error: `Invalid or unsafe audio sourceUrl for track "${t.title || idx + 1}": ${val.error || 'Only official YouTube watch URLs are supported.'}`,
+          });
+        }
+        safeSourceUrl = val.canonicalUrl;
+      }
 
-    const resolvedCover = playlistCoverUrl || artworkUrl || coverUrl;
+      let safeArtworkUrl = t.artworkUrl;
+      if (safeArtworkUrl && !isValidArtworkUrl(safeArtworkUrl)) {
+        safeArtworkUrl = undefined;
+      }
+
+      trackMetadataList.push({
+        title: t.title || 'Unknown Title',
+        artist: t.artist || 'Unknown Artist',
+        album: t.album || 'Unknown Album',
+        trackNumber: t.trackNumber,
+        discNumber: t.discNumber,
+        releaseYear: t.releaseYear,
+        duration: t.duration,
+        artworkUrl: safeArtworkUrl,
+        sourceUrl: safeSourceUrl,
+      });
+    }
+
+    const rawResolvedCover = playlistCoverUrl || artworkUrl || coverUrl;
+    const resolvedCover = (rawResolvedCover && isValidArtworkUrl(rawResolvedCover)) ? rawResolvedCover : undefined;
     const resolvedSourceId = spotifyPlaylistId || sourceId || spotifyId;
 
     // Add to persistent queue
