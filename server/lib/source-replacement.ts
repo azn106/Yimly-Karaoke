@@ -4,11 +4,36 @@ import { db } from '../db/index.js';
 import { songs, artists, albums, songVerifiedSources } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { downloadQueue, sanitizeFilename } from './download-queue.js';
-import { separateAndCreateInstrumental } from './audio-separation.js';
-import { importSingleAudioFile } from './scanner.js';
+import {
+  generateInstrumentalFromOriginal,
+  GeneratedInstrumentalResult,
+  getCanonicalSongArtists,
+  getDataTempBaseDir,
+  installInstrumentalForSong,
+  installRecordingBundleForSong,
+  releaseSongReplacementLock,
+  tryAcquireSongReplacementLockWithToken,
+  validateOriginalRecordingFile,
+} from './instrumental-pipeline.js';
 import { validateAndCanonicalizeYouTubeUrl } from './url-validator.js';
 
-const activeSongReplacements = new Set<number>();
+/**
+ * Resolves a yt-dlp-compatible audio format for Replace Audio downloads
+ * without breaking on container labels like "M4A/isom/iso2" or "MPEG".
+ */
+function resolveReplacementDownloadFormat(dbFormat?: string | null, mainAudioPath?: string | null): string {
+  const pathExt = mainAudioPath ? path.extname(mainAudioPath).replace('.', '').trim().toLowerCase() : '';
+  if (pathExt && /^[a-z0-9]{2,5}$/.test(pathExt)) {
+    return pathExt;
+  }
+  const raw = (dbFormat || '').trim().toLowerCase();
+  if (!raw) return 'mp3';
+  if (raw.includes('mpeg')) return 'mp3';
+  if (raw.startsWith('m4a') || raw.startsWith('mp4')) return 'm4a';
+  if (raw.startsWith('ogg') || raw === 'oga') return 'ogg';
+  const beforeSlash = raw.split('/')[0].trim();
+  return /^[a-z0-9]{2,5}$/.test(beforeSlash) ? beforeSlash : 'mp3';
+}
 
 export interface ReplaceSourceResult {
   success: boolean;
@@ -127,8 +152,8 @@ export function isValidYouTubeUrl(url: string): boolean {
 
 /**
  * Replace song recording source using a verified YouTube URL.
- * Reuses the existing download queue pipeline and instrumental separation pipeline.
- * Atomic file replacement with rollback on any failure.
+ * Reuses the download queue pipeline and the shared instrumental generation & installation services.
+ * Atomic file replacement with full rollback on any failure.
  */
 export async function replaceSongRecordingSource(songId: number, youtubeUrl: string): Promise<ReplaceSourceResult> {
   const trimmedUrl = (youtubeUrl || '').trim();
@@ -149,7 +174,8 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
   const videoId = validation.videoId;
   const canonicalUrl = validation.canonicalUrl;
 
-  if (activeSongReplacements.has(songId)) {
+  const lockToken = tryAcquireSongReplacementLockWithToken(songId);
+  if (!lockToken) {
     return {
       success: false,
       message: 'A replacement or reprocessing job is already running for this song.',
@@ -159,15 +185,26 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
   }
 
   const jobId = `rep_aud_${songId}_${Date.now()}`;
-  activeSongReplacements.add(songId);
+  const abortController = new AbortController();
+  let executionStarted = false;
 
   return downloadQueue.enqueueReplacementJob({
     id: jobId,
     songId,
     type: 'replace_audio',
+    cancel: () => {
+      abortController.abort();
+      if (!executionStarted) {
+        releaseSongReplacementLock(songId, lockToken);
+      }
+    },
     execute: async (jobState) => {
-      // Generate unique staging directory using template literal
-      const stagingDir = path.join(process.cwd(), 'data', `tmp_replace_${songId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+      executionStarted = true;
+      const stagingDir = path.join(
+        getDataTempBaseDir(),
+        `tmp_replace_${songId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+      );
+      let generated: GeneratedInstrumentalResult | null = null;
 
       try {
         // 1. Fetch existing song record
@@ -184,6 +221,10 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
           variant: songs.variant,
           format: songs.format,
           fileSize: songs.fileSize,
+          duration: songs.duration,
+          trackNumber: songs.trackNumber,
+          discNumber: songs.discNumber,
+          year: songs.year,
         })
         .from(songs)
         .leftJoin(artists, eq(songs.artistId, artists.id))
@@ -196,8 +237,9 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
         }
 
         const song = songRec[0];
+        const songArtistNames = await getCanonicalSongArtists(songId, song.artist);
+        const primaryArtistName = song.artist || songArtistNames[0] || 'Unknown Artist';
 
-        // 2. Staging directory creation
         if (!fs.existsSync(stagingDir)) {
           fs.mkdirSync(stagingDir, { recursive: true });
         }
@@ -209,12 +251,12 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
 
         console.log(`[SourceReplacement] Downloading replacement audio for song #${songId} ("${song.title}") via download pipeline...`);
 
-        const formatExt = song.format || 'mp3';
-        const safeArtist = sanitizeFilename(song.artist || 'Unknown Artist');
+        const formatExt = resolveReplacementDownloadFormat(song.format, song.mainAudioPath);
+        const safeArtist = sanitizeFilename(primaryArtistName);
         const safeTitle = sanitizeFilename(song.title || 'Unknown Title');
         const baseFilename = `${safeArtist} - ${safeTitle}`;
 
-        // 4. Download using established download pipeline
+        // 2. Download using established download pipeline
         const downloadedFile = await downloadQueue.downloadSingleTrackAudio(
           canonicalUrl,
           stagingDir,
@@ -223,172 +265,118 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
           3
         );
 
-        // 5. Validate downloaded file
-        if (!fs.existsSync(downloadedFile) || fs.statSync(downloadedFile).size <= 1024) {
-          throw new Error('Downloaded audio validation failed: output file is missing or empty.');
-        }
-
-        const actualExt = path.extname(downloadedFile).replace('.', '') || formatExt;
+        const actualExt = (path.extname(downloadedFile).replace('.', '') || formatExt).toLowerCase();
         const stagedMainAudio = path.join(stagingDir, `${baseFilename}.${actualExt}`);
         if (downloadedFile !== stagedMainAudio) {
           fs.copyFileSync(downloadedFile, stagedMainAudio);
         }
 
-        // 6. Execute instrumental separation using existing pipeline
+        // 3. Validate downloaded original recording
+        await validateOriginalRecordingFile(stagedMainAudio);
+
+        const targetDir = song.mainAudioPath
+          ? path.dirname(song.mainAudioPath)
+          : path.join(getDataTempBaseDir(), 'library', safeArtist);
+
+        // 4. Generate instrumental MP3 via the exact same shared pipeline used by New Song
         jobState.status = 'separating';
-        jobState.progress = 60;
+        jobState.progress = 55;
         jobState.message = `Separating instrumental for "${song.title}"...`;
         jobState.updatedAt = new Date();
 
-        console.log(`[SourceReplacement] Executing instrumental separation for song #${songId}...`);
-        const stagedInstrumental = path.join(stagingDir, `${baseFilename} (Instrumental).${actualExt}`);
+        console.log(`[SourceReplacement] Executing shared instrumental pipeline for song #${songId}...`);
+        generated = await generateInstrumentalFromOriginal({
+          originalAudioPath: stagedMainAudio,
+          targetDir,
+          baseFilename,
+          stagingDir,
+          metadata: {
+            title: song.title,
+            artist: primaryArtistName,
+            artists: songArtistNames,
+            album: song.album || undefined,
+            duration: song.duration || undefined,
+            trackNumber: song.trackNumber || undefined,
+            discNumber: song.discNumber || undefined,
+            year: song.year || undefined,
+          },
+          signal: abortController.signal,
+          isCancelled: () => jobState.status === 'cancelled',
+          onProgress: (pct, msg) => {
+            jobState.progress = Math.min(84, 55 + Math.round(pct * 0.28));
+            jobState.message = msg || jobState.message;
+            jobState.updatedAt = new Date();
+          },
+        });
 
-        let sepResult: { ok: boolean; error?: string } = { ok: true };
-        if (!fs.existsSync(stagedInstrumental) || fs.statSync(stagedInstrumental).size <= 1024) {
-          sepResult = await separateAndCreateInstrumental(
-            stagedMainAudio,
-            stagedInstrumental,
-            { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' }
-          );
-        }
-
-        if (!sepResult.ok || !fs.existsSync(stagedInstrumental) || fs.statSync(stagedInstrumental).size <= 1024) {
-          throw new Error(sepResult.error || 'Instrumental separation failed or produced invalid file.');
-        }
-
-        // 7. Validate both staged files before touching originals
-        const origStats = fs.statSync(stagedMainAudio);
-        const instStats = fs.statSync(stagedInstrumental);
-        if (origStats.size <= 1024 || instStats.size <= 1024) {
-          throw new Error('Validation failed: Staged replacement files are invalid or empty.');
-        }
-
-        // 8. Safe atomic file replacement with rollback protection
+        // 5. Shared atomic installation + scanner verification + verified source update with rollback
         jobState.status = 'finalising';
         jobState.progress = 85;
         jobState.message = `Finalising replacement audio for "${song.title}"...`;
         jobState.updatedAt = new Date();
 
-        const oldMainPath = song.mainAudioPath;
-        const oldInstPath = song.instrumentalAudioPath;
+        const canonicalMeta = {
+          title: song.title,
+          artist: primaryArtistName,
+          artists: songArtistNames,
+          album: song.album || undefined,
+          duration: song.duration || undefined,
+          trackNumber: song.trackNumber || undefined,
+          discNumber: song.discNumber || undefined,
+          year: song.year || undefined,
+        };
 
-        const targetDir = oldMainPath ? path.dirname(oldMainPath) : path.join(process.cwd(), 'data', 'library', safeArtist);
-        if (!fs.existsSync(targetDir)) {
-          fs.mkdirSync(targetDir, { recursive: true });
-        }
-
-        const finalMainPath = path.join(targetDir, `${baseFilename}.${actualExt}`);
-        const finalInstPath = path.join(targetDir, `${baseFilename} (Instrumental).${actualExt}`);
-
-        // Create backups of old files in case of write error
-        const backupMain = oldMainPath && fs.existsSync(oldMainPath) ? `${oldMainPath}.bak_${Date.now()}` : null;
-        const backupInst = oldInstPath && fs.existsSync(oldInstPath) ? `${oldInstPath}.bak_${Date.now()}` : null;
-
-        try {
-          if (backupMain && oldMainPath) fs.copyFileSync(oldMainPath, backupMain);
-          if (backupInst && oldInstPath) fs.copyFileSync(oldInstPath, backupInst);
-
-          // Copy staged files to final destination
-          fs.copyFileSync(stagedMainAudio, finalMainPath);
-          fs.copyFileSync(stagedInstrumental, finalInstPath);
-
-          // Verify final files
-          if (!fs.existsSync(finalMainPath) || !fs.existsSync(finalInstPath)) {
-            throw new Error('Failed to commit replacement files to destination path.');
-          }
-
-          // Update database atomically
-          await db.update(songs).set({
-            mainAudioPath: finalMainPath,
-            instrumentalAudioPath: finalInstPath,
-            fileSize: origStats.size,
-            format: actualExt,
-          }).where(eq(songs.id, songId));
-
-          // Persist the new verified source ONLY after replacement download, instrumental separation, and file commit have succeeded
-          const commitTime = new Date();
-          await db.insert(songVerifiedSources).values({
-            songId,
-            youtubeUrl: trimmedUrl,
-            videoId,
-            sourceTitle: song.title,
-            sourceArtist: song.artist || 'Unknown Artist',
-            verified: 1,
-            verifiedAt: commitTime,
-            processedAt: commitTime,
-          })
-          .onConflictDoUpdate({
-            target: songVerifiedSources.songId,
-            set: {
+        const bundleResult = await installRecordingBundleForSong({
+          songId,
+          stagedMainPath: stagedMainAudio,
+          stagedInstrumentalPath: generated.stagedInstrumentalPath,
+          targetDir,
+          baseFilename,
+          mainExtension: actualExt,
+          canonicalMeta,
+          afterDbAndScannerCommit: async () => {
+            const commitTime = new Date();
+            await db.insert(songVerifiedSources).values({
+              songId,
               youtubeUrl: trimmedUrl,
               videoId,
               sourceTitle: song.title,
-              sourceArtist: song.artist || 'Unknown Artist',
+              sourceArtist: primaryArtistName,
               verified: 1,
               verifiedAt: commitTime,
               processedAt: commitTime,
-            }
-          });
+            })
+            .onConflictDoUpdate({
+              target: songVerifiedSources.songId,
+              set: {
+                youtubeUrl: trimmedUrl,
+                videoId,
+                sourceTitle: song.title,
+                sourceArtist: primaryArtistName,
+                verified: 1,
+                verifiedAt: commitTime,
+                processedAt: commitTime,
+              },
+            });
+          },
+        });
 
-          // Re-index metadata tags
-          const canonicalMeta = {
-            title: song.title,
-            artist: song.artist || 'Unknown Artist',
-            album: song.album || undefined,
-          };
-          await importSingleAudioFile(song.libraryId, finalMainPath, canonicalMeta);
-          await importSingleAudioFile(song.libraryId, finalInstPath, canonicalMeta);
+        const result: ReplaceSourceResult = {
+          success: true,
+          message: 'Recording source replaced and audio reprocessed successfully.',
+          songId,
+          jobId,
+          originalPath: bundleResult.mainAudioPath,
+          instrumentalPath: bundleResult.instrumentalAudioPath,
+        };
 
-          // Clean up backups
-          if (backupMain && fs.existsSync(backupMain)) try { fs.unlinkSync(backupMain); } catch {}
-          if (backupInst && fs.existsSync(backupInst)) try { fs.unlinkSync(backupInst); } catch {}
+        jobState.status = 'completed';
+        jobState.progress = 100;
+        jobState.message = 'Replacement completed successfully.';
+        jobState.result = result;
+        jobState.updatedAt = new Date();
 
-          // Clean up old files if paths changed
-          if (oldMainPath && oldMainPath !== finalMainPath && fs.existsSync(oldMainPath)) {
-            try { fs.unlinkSync(oldMainPath); } catch {}
-          }
-          if (oldInstPath && oldInstPath !== finalInstPath && fs.existsSync(oldInstPath)) {
-            try { fs.unlinkSync(oldInstPath); } catch {}
-          }
-
-          const result: ReplaceSourceResult = {
-            success: true,
-            message: 'Recording source replaced and audio reprocessed successfully.',
-            songId,
-            jobId,
-            originalPath: finalMainPath,
-            instrumentalPath: finalInstPath,
-          };
-
-          jobState.status = 'completed';
-          jobState.progress = 100;
-          jobState.message = 'Replacement completed successfully.';
-          jobState.result = result;
-          jobState.updatedAt = new Date();
-
-          return result;
-
-        } catch (commitErr: any) {
-          // Rollback files from backups
-          console.error('[SourceReplacement] Error during commit, rolling back:', commitErr);
-          if (backupMain && fs.existsSync(backupMain) && oldMainPath) {
-            try { fs.copyFileSync(backupMain, oldMainPath); fs.unlinkSync(backupMain); } catch {}
-          }
-          if (backupInst && fs.existsSync(backupInst) && oldInstPath) {
-            try { fs.copyFileSync(backupInst, oldInstPath); fs.unlinkSync(backupInst); } catch {}
-          }
-          // Rollback songs database update if it occurred
-          try {
-            await db.update(songs).set({
-              mainAudioPath: oldMainPath,
-              instrumentalAudioPath: oldInstPath,
-              fileSize: song.fileSize,
-              format: song.format,
-            }).where(eq(songs.id, songId));
-          } catch {}
-          throw commitErr;
-        }
-
+        return result;
       } catch (err: any) {
         console.error(`[SourceReplacement] Error replacing source for song #${songId}:`, err);
 
@@ -400,7 +388,9 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
           error: err.message,
         };
 
-        jobState.status = 'failed';
+        if (jobState.status !== 'cancelled') {
+          jobState.status = 'failed';
+        }
         jobState.progress = 0;
         jobState.message = err.message || 'Replacement failed.';
         jobState.error = err.message;
@@ -409,13 +399,13 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
 
         return failResult;
       } finally {
-        // Clean up temporary staging directory safely
+        generated?.cleanup();
         try {
           if (fs.existsSync(stagingDir)) {
             fs.rmSync(stagingDir, { recursive: true, force: true });
           }
         } catch {}
-        activeSongReplacements.delete(songId);
+        releaseSongReplacementLock(songId, lockToken);
       }
     }
   });
@@ -424,9 +414,12 @@ export async function replaceSongRecordingSource(songId: number, youtubeUrl: str
 /**
  * Replace only the instrumental audio for an existing song using the existing original audio.
  * Does not download from YouTube or alter the original audio file.
+ * Reuses the exact same shared instrumental generation, validation, installation, and rollback
+ * pipeline used across Yimly Karaoke.
  */
 export async function replaceSongInstrumental(songId: number): Promise<ReplaceSourceResult> {
-  if (activeSongReplacements.has(songId)) {
+  const lockToken = tryAcquireSongReplacementLockWithToken(songId);
+  if (!lockToken) {
     return {
       success: false,
       message: 'A replacement or reprocessing job is already running for this song.',
@@ -436,14 +429,26 @@ export async function replaceSongInstrumental(songId: number): Promise<ReplaceSo
   }
 
   const jobId = `rep_inst_${songId}_${Date.now()}`;
-  activeSongReplacements.add(songId);
+  const abortController = new AbortController();
+  let executionStarted = false;
 
   return downloadQueue.enqueueReplacementJob({
     id: jobId,
     songId,
     type: 'replace_instrumental',
+    cancel: () => {
+      abortController.abort();
+      if (!executionStarted) {
+        releaseSongReplacementLock(songId, lockToken);
+      }
+    },
     execute: async (jobState) => {
-      const stagingDir = path.join(process.cwd(), 'data', `tmp_inst_${songId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+      executionStarted = true;
+      const stagingDir = path.join(
+        getDataTempBaseDir(),
+        `tmp_inst_${songId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+      );
+      let generated: GeneratedInstrumentalResult | null = null;
 
       try {
         const songRec = await db.select({
@@ -458,6 +463,10 @@ export async function replaceSongInstrumental(songId: number): Promise<ReplaceSo
           instrumentalAudioPath: songs.instrumentalAudioPath,
           variant: songs.variant,
           format: songs.format,
+          duration: songs.duration,
+          trackNumber: songs.trackNumber,
+          discNumber: songs.discNumber,
+          year: songs.year,
         })
         .from(songs)
         .leftJoin(artists, eq(songs.artistId, artists.id))
@@ -474,94 +483,90 @@ export async function replaceSongInstrumental(songId: number): Promise<ReplaceSo
           throw new Error('Original main audio file not found on disk. Cannot regenerate instrumental.');
         }
 
+        const songArtistNames = await getCanonicalSongArtists(songId, song.artist);
+        const primaryArtistName = song.artist || songArtistNames[0] || 'Unknown Artist';
+
         if (!fs.existsSync(stagingDir)) {
           fs.mkdirSync(stagingDir, { recursive: true });
         }
 
-        const formatExt = song.format || path.extname(song.mainAudioPath).replace('.', '') || 'mp3';
-        const safeArtist = sanitizeFilename(song.artist || 'Unknown Artist');
+        const safeArtist = sanitizeFilename(primaryArtistName);
         const safeTitle = sanitizeFilename(song.title || 'Unknown Title');
         const baseFilename = `${safeArtist} - ${safeTitle}`;
-        const stagingInstrumentalPath = path.join(stagingDir, `${baseFilename} (Instrumental).${formatExt}`);
+        const targetDir = path.dirname(song.mainAudioPath);
 
         jobState.status = 'separating';
-        jobState.progress = 50;
+        jobState.progress = 25;
         jobState.message = `Regenerating instrumental track for "${song.title}"...`;
         jobState.updatedAt = new Date();
 
-        console.log(`[SourceReplacement] Regenerating instrumental for song #${songId} ("${song.title}")...`);
-        const sepResult = await separateAndCreateInstrumental(
-          song.mainAudioPath,
-          stagingInstrumentalPath,
-          { title: song.title, artist: song.artist || 'Unknown Artist', album: song.album || '' }
-        );
+        console.log(`[SourceReplacement] Regenerating instrumental for song #${songId} ("${song.title}") via shared pipeline...`);
 
-        if (!sepResult.ok || !fs.existsSync(stagingInstrumentalPath) || fs.statSync(stagingInstrumentalPath).size <= 1024) {
-          throw new Error(sepResult.error || 'Instrumental separation failed or produced invalid file.');
-        }
+        // 1. Run shared AI instrumental-generation pipeline on the existing original recording (no download)
+        generated = await generateInstrumentalFromOriginal({
+          originalAudioPath: song.mainAudioPath,
+          targetDir,
+          baseFilename,
+          stagingDir,
+          metadata: {
+            title: song.title,
+            artist: primaryArtistName,
+            artists: songArtistNames,
+            album: song.album || undefined,
+            duration: song.duration || undefined,
+            trackNumber: song.trackNumber || undefined,
+            discNumber: song.discNumber || undefined,
+            year: song.year || undefined,
+          },
+          signal: abortController.signal,
+          isCancelled: () => jobState.status === 'cancelled',
+          onProgress: (pct, msg) => {
+            jobState.progress = Math.min(84, 20 + Math.round(pct * 0.64));
+            jobState.message = msg || jobState.message;
+            jobState.updatedAt = new Date();
+          },
+        });
 
+        // 2. Install via shared atomic installation + rollback service
         jobState.status = 'finalising';
         jobState.progress = 85;
         jobState.message = `Finalising instrumental file...`;
         jobState.updatedAt = new Date();
 
-        const targetDir = path.dirname(song.mainAudioPath);
-        const finalInstPath = path.join(targetDir, `${baseFilename} (Instrumental).${formatExt}`);
-        const oldInstPath = song.instrumentalAudioPath;
+        const canonicalMeta = {
+          title: song.title,
+          artist: primaryArtistName,
+          artists: songArtistNames,
+          album: song.album || undefined,
+          duration: song.duration || undefined,
+          trackNumber: song.trackNumber || undefined,
+          discNumber: song.discNumber || undefined,
+          year: song.year || undefined,
+        };
 
-        const backupInst = oldInstPath && fs.existsSync(oldInstPath) ? `${oldInstPath}.bak_${Date.now()}` : null;
+        const installResult = await installInstrumentalForSong({
+          songId,
+          stagedInstrumentalPath: generated.stagedInstrumentalPath,
+          targetDir,
+          targetFilename: `${baseFilename} (Instrumental).mp3`,
+          canonicalMeta,
+        });
 
-        try {
-          if (backupInst && oldInstPath) {
-            fs.copyFileSync(oldInstPath, backupInst);
-          }
+        const result: ReplaceSourceResult = {
+          success: true,
+          message: 'Instrumental audio regenerated and replaced successfully.',
+          songId,
+          jobId,
+          instrumentalPath: installResult.instrumentalPath,
+        };
 
-          fs.copyFileSync(stagingInstrumentalPath, finalInstPath);
-          if (!fs.existsSync(finalInstPath)) {
-            throw new Error('Failed to commit regenerated instrumental file.');
-          }
+        jobState.status = 'completed';
+        jobState.progress = 100;
+        jobState.message = 'Instrumental regenerated successfully.';
+        jobState.result = result;
+        jobState.updatedAt = new Date();
 
-          await db.update(songs).set({
-            instrumentalAudioPath: finalInstPath,
-          }).where(eq(songs.id, songId));
-
-          const canonicalMeta = {
-            title: song.title,
-            artist: song.artist || 'Unknown Artist',
-            album: song.album || undefined,
-          };
-          await importSingleAudioFile(song.libraryId, finalInstPath, canonicalMeta);
-
-          if (backupInst && fs.existsSync(backupInst)) {
-            try { fs.unlinkSync(backupInst); } catch {}
-          }
-          if (oldInstPath && oldInstPath !== finalInstPath && fs.existsSync(oldInstPath)) {
-            try { fs.unlinkSync(oldInstPath); } catch {}
-          }
-
-          const result: ReplaceSourceResult = {
-            success: true,
-            message: 'Instrumental audio regenerated and replaced successfully.',
-            songId,
-            jobId,
-            instrumentalPath: finalInstPath,
-          };
-
-          jobState.status = 'completed';
-          jobState.progress = 100;
-          jobState.message = 'Instrumental regenerated successfully.';
-          jobState.result = result;
-          jobState.updatedAt = new Date();
-
-          return result;
-
-        } catch (commitErr: any) {
-          if (backupInst && fs.existsSync(backupInst) && oldInstPath) {
-            try { fs.copyFileSync(backupInst, oldInstPath); fs.unlinkSync(backupInst); } catch {}
-          }
-          throw commitErr;
-        }
-
+        return result;
       } catch (err: any) {
         console.error(`[SourceReplacement] Error replacing instrumental for song #${songId}:`, err);
         const failResult: ReplaceSourceResult = {
@@ -572,7 +577,9 @@ export async function replaceSongInstrumental(songId: number): Promise<ReplaceSo
           error: err.message,
         };
 
-        jobState.status = 'failed';
+        if (jobState.status !== 'cancelled') {
+          jobState.status = 'failed';
+        }
         jobState.progress = 0;
         jobState.message = err.message || 'Failed to regenerate instrumental.';
         jobState.error = err.message;
@@ -581,12 +588,13 @@ export async function replaceSongInstrumental(songId: number): Promise<ReplaceSo
 
         return failResult;
       } finally {
+        generated?.cleanup();
         try {
           if (fs.existsSync(stagingDir)) {
             fs.rmSync(stagingDir, { recursive: true, force: true });
           }
         } catch {}
-        activeSongReplacements.delete(songId);
+        releaseSongReplacementLock(songId, lockToken);
       }
     }
   });

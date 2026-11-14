@@ -48,6 +48,7 @@ export interface CreateJobParams {
   lyricsProviders?: string[];
   folderStructure?: string;
   playlistFolder?: boolean;
+  deferStart?: boolean;
   tracks: TrackMetadata[];
 }
 
@@ -594,13 +595,15 @@ export class DownloadQueueManager {
       }
     }
 
+    const initialStatus: ActiveDownloadJob['status'] = params.deferStart ? 'queued' : 'downloading';
+
     const activeJob: ActiveDownloadJob = {
       id: jobId,
       playlistName: params.playlistName || null,
       playlistId,
       userId: params.userId || null,
       type: params.type || 'playlist',
-      status: 'downloading',
+      status: initialStatus,
       libraryId: params.libraryId || null,
       libraryPath: params.libraryPath,
       format: params.format || 'mp3',
@@ -626,7 +629,7 @@ export class DownloadQueueManager {
       playlistId: playlistId,
       userId: params.userId,
       type: activeJob.type,
-      status: 'downloading',
+      status: initialStatus,
       libraryId: activeJob.libraryId,
       libraryPath: activeJob.libraryPath,
       format: activeJob.format,
@@ -676,12 +679,69 @@ export class DownloadQueueManager {
     }
 
     this.memoryJobs.set(activeJob.id, activeJob);
-    for (const t of activeTracks) {
-      this.fifoQueue.push({ kind: 'download_track', jobId: activeJob.id, trackId: t.id });
+    if (!params.deferStart) {
+      for (const t of activeTracks) {
+        this.fifoQueue.push({ kind: 'download_track', jobId: activeJob.id, trackId: t.id });
+      }
+      this.pumpQueue();
     }
-    this.pumpQueue();
 
     return activeJob;
+  }
+
+  public async startJob(jobId: string): Promise<boolean> {
+    await this.init();
+    const job = await this.getJob(jobId);
+    if (!job) return false;
+    if (job.status === 'cancelled' || job.status === 'completed' || job.status === 'failed') {
+      return false;
+    }
+
+    if (job.status === 'queued') {
+      const now = new Date();
+      job.status = 'downloading';
+      job.updatedAt = now;
+      await db.update(downloadJobs).set({
+        status: 'downloading',
+        updatedAt: now,
+      }).where(and(eq(downloadJobs.id, jobId), eq(downloadJobs.status, 'queued')));
+    }
+
+    for (const t of job.tracks) {
+      if (t.status === 'queued') {
+        const alreadyQueued = this.fifoQueue.some(
+          item => item.kind === 'download_track' && item.jobId === jobId && item.trackId === t.id
+        );
+        if (!alreadyQueued) {
+          this.fifoQueue.push({ kind: 'download_track', jobId, trackId: t.id });
+        }
+      }
+    }
+
+    this.pumpQueue();
+    return true;
+  }
+
+  public async discardUnstartedJob(jobId: string): Promise<boolean> {
+    const job = this.memoryJobs.get(jobId);
+    if (job && job.status !== 'queued') {
+      return false;
+    }
+
+    if (job) {
+      this.memoryJobs.delete(jobId);
+    }
+    this.fifoQueue = this.fifoQueue.filter(
+      item => !(item.kind === 'download_track' && item.jobId === jobId)
+    );
+
+    const deleted = await db.delete(downloadJobs)
+      .where(and(eq(downloadJobs.id, jobId), eq(downloadJobs.status, 'queued')))
+      .returning({ id: downloadJobs.id });
+    if (deleted.length > 0) {
+      await db.delete(downloadTrackJobs).where(eq(downloadTrackJobs.jobId, jobId));
+    }
+    return true;
   }
 
   public async getJob(jobId: string): Promise<ActiveDownloadJob | null> {
@@ -859,7 +919,7 @@ export class DownloadQueueManager {
           const item = this.fifoQueue[i];
           if (item.kind === 'download_track') {
             const job = this.memoryJobs.get(item.jobId);
-            if (!job || job.status === 'cancelled' || job.status === 'failed') continue;
+            if (!job || job.status !== 'downloading') continue;
             const track = job.tracks.find(t => t.id === item.trackId);
             if (track && track.status === 'queued') {
               nextIndex = i;

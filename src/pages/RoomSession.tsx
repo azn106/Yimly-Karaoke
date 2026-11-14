@@ -211,8 +211,9 @@ export default function RoomSession() {
   const [librarySearchResults, setLibrarySearchResults] = useState<SongItem[]>([]);
   const [externalSearchResults, setExternalSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [addingSongId, setAddingSongId] = useState<number | null>(null);
-  const [addedSongId, setAddedSongId] = useState<number | null>(null);
+  const [addingQueueKeys, setAddingQueueKeys] = useState<Set<string | number>>(() => new Set());
+  const [addedQueueKeys, setAddedQueueKeys] = useState<Set<string | number>>(() => new Set());
+  const inFlightQueueAddsRef = useRef<Set<string | number>>(new Set());
   const [audioAutoplayBlocked, setAudioAutoplayBlocked] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
 
@@ -1231,9 +1232,14 @@ export default function RoomSession() {
       return;
     }
 
+    let cancelled = false;
+    const controller = new AbortController();
     setIsSearching(true);
+
     const handler = setTimeout(() => {
-      fetch(`/api/karaoke/search?q=${encodeURIComponent(searchQuery)}`)
+      fetch(`/api/karaoke/search?q=${encodeURIComponent(searchQuery)}`, {
+        signal: controller.signal,
+      })
         .then(async res => {
           if (res.ok) {
             return await res.json();
@@ -1241,22 +1247,41 @@ export default function RoomSession() {
           return { library: [], external: [] };
         })
         .then(data => {
+          if (cancelled) return;
           setLibrarySearchResults(data.library || []);
           setExternalSearchResults(data.external || []);
         })
-        .catch(err => console.error('Failed to search songs:', err))
-        .finally(() => setIsSearching(false));
+        .catch(err => {
+          if (cancelled || err?.name === 'AbortError') return;
+          console.error('Failed to search songs:', err);
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsSearching(false);
+          }
+        });
     }, 400);
 
-    return () => clearTimeout(handler);
+    return () => {
+      cancelled = true;
+      clearTimeout(handler);
+      controller.abort();
+    };
   }, [searchQuery]);
 
   const handleAddTrackToQueue = async (track: any) => {
     if (!sessionId) return;
-    try {
-      const trackId = `dl_${track.title}_${track.artist}`;
-      setAddingSongId(trackId as any);
+    const trackId = `dl_${track.title}_${track.artist}`;
+    if (inFlightQueueAddsRef.current.has(trackId)) return;
 
+    inFlightQueueAddsRef.current.add(trackId);
+    setAddingQueueKeys(prev => {
+      const next = new Set(prev);
+      next.add(trackId);
+      return next;
+    });
+
+    try {
       // Send the signed-in user's token when available. Guest requests still use
       // their room-scoped controllerId, while authenticated hosts must not be
       // accidentally treated as unauthenticated guests.
@@ -1284,8 +1309,18 @@ export default function RoomSession() {
       }
 
       if (res.ok) {
-        setAddedSongId(trackId as any);
-        setTimeout(() => setAddedSongId(null), 2000);
+        setAddedQueueKeys(prev => {
+          const next = new Set(prev);
+          next.add(trackId);
+          return next;
+        });
+        setTimeout(() => {
+          setAddedQueueKeys(prev => {
+            const next = new Set(prev);
+            next.delete(trackId);
+            return next;
+          });
+        }, 2000);
         fetchState();
         setShowLibrary(false);
       } else {
@@ -1303,7 +1338,12 @@ export default function RoomSession() {
       console.error(e);
       alert('Failed to add song to queue');
     } finally {
-      setAddingSongId(null);
+      inFlightQueueAddsRef.current.delete(trackId);
+      setAddingQueueKeys(prev => {
+        const next = new Set(prev);
+        next.delete(trackId);
+        return next;
+      });
     }
   };
 
@@ -2237,9 +2277,15 @@ export default function RoomSession() {
 
   // Add song to queue from picker modal (Guests only)
   const handleAddSongToQueue = async (songId: number) => {
-    if (!sessionId) return;
+    if (!sessionId || inFlightQueueAddsRef.current.has(songId)) return;
+    inFlightQueueAddsRef.current.add(songId);
+    setAddingQueueKeys(prev => {
+      const next = new Set(prev);
+      next.add(songId);
+      return next;
+    });
+
     try {
-      setAddingSongId(songId);
       const res = await fetch(`/api/karaoke/sessions/${sessionId}/queue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2250,8 +2296,18 @@ export default function RoomSession() {
       });
 
       if (res.ok) {
-        setAddedSongId(songId);
-        setTimeout(() => setAddedSongId(null), 2000);
+        setAddedQueueKeys(prev => {
+          const next = new Set(prev);
+          next.add(songId);
+          return next;
+        });
+        setTimeout(() => {
+          setAddedQueueKeys(prev => {
+            const next = new Set(prev);
+            next.delete(songId);
+            return next;
+          });
+        }, 2000);
         fetchState();
         setShowLibrary(false);
       } else {
@@ -2261,7 +2317,12 @@ export default function RoomSession() {
       console.error(e);
       alert('Failed to add song to queue');
     } finally {
-      setAddingSongId(null);
+      inFlightQueueAddsRef.current.delete(songId);
+      setAddingQueueKeys(prev => {
+        const next = new Set(prev);
+        next.delete(songId);
+        return next;
+      });
     }
   };
 
@@ -2535,8 +2596,8 @@ export default function RoomSession() {
             <div data-tv-scroll-container="library" className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-2">
               {!searchQuery.trim() ? (
                 availableSongs.map((song) => {
-                  const isAdding = addingSongId === song.id;
-                  const isAdded = addedSongId === song.id;
+                  const isAdding = addingQueueKeys.has(song.id);
+                  const isAdded = addedQueueKeys.has(song.id);
                   const durationMin = song.duration ? Math.floor(song.duration / 60) : 0;
                   const durationSec = song.duration ? song.duration % 60 : 0;
                   const durationStr = song.duration ? `${durationMin}:${durationSec < 10 ? '0' : ''}${durationSec}` : '';
@@ -2597,8 +2658,8 @@ export default function RoomSession() {
                     </div>
                   )}
                   {librarySearchResults.map((song) => {
-                    const isAdding = addingSongId === song.id;
-                    const isAdded = addedSongId === song.id;
+                    const isAdding = addingQueueKeys.has(song.id);
+                    const isAdded = addedQueueKeys.has(song.id);
                     const durationMin = song.duration ? Math.floor(song.duration / 60) : 0;
                     const durationSec = song.duration ? song.duration % 60 : 0;
                     const durationStr = song.duration ? `${durationMin}:${durationSec < 10 ? '0' : ''}${durationSec}` : '';
@@ -2659,8 +2720,8 @@ export default function RoomSession() {
                   )}
                   {externalSearchResults.map((track) => {
                     const trackId = `dl_${track.title}_${track.artist}`;
-                    const isAdding = addingSongId === (trackId as any);
-                    const isAdded = addedSongId === (trackId as any);
+                    const isAdding = addingQueueKeys.has(trackId);
+                    const isAdded = addedQueueKeys.has(trackId);
                     const durationMin = track.duration ? Math.floor(track.duration / 60) : 0;
                     const durationSec = track.duration ? track.duration % 60 : 0;
                     const durationStr = track.duration ? `${durationMin}:${durationSec < 10 ? '0' : ''}${durationSec}` : '';

@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'path';
 
 export interface DemucsWorkerMetrics {
@@ -6,6 +7,17 @@ export interface DemucsWorkerMetrics {
   modelInitCount: number;
   jobsHandledCount: number;
   isRunning: boolean;
+}
+
+export interface DemucsRunOptions {
+  signal?: AbortSignal;
+  isCancelled?: () => boolean;
+}
+
+interface LockWaiter {
+  resolve: () => void;
+  reject: (err: Error) => void;
+  cleanup?: () => void;
 }
 
 export class DemucsWorkerManager {
@@ -16,12 +28,17 @@ export class DemucsWorkerManager {
   private modelInitCount = 0;
   private jobsHandledCount = 0;
   private jobTimeoutMs = 600000; // 10 minutes default timeout per stem separation job
+  private lockHeld = false;
+  private lockWaiters: LockWaiter[] = [];
+  private readonly lockContext = new AsyncLocalStorage<symbol>();
+  private readonly lockToken = Symbol('demucs-execution-lock');
   private currentJob: {
     resolve: () => void;
     reject: (err: Error) => void;
     onProgress: (pct: number, msg: string) => void;
     onLog: (level: 'INFO' | 'WARN' | 'ERR', msg: string) => void;
     watchdogTimer?: NodeJS.Timeout;
+    abortCleanup?: () => void;
   } | null = null;
 
   public getMetrics(): DemucsWorkerMetrics {
@@ -31,6 +48,87 @@ export class DemucsWorkerManager {
       jobsHandledCount: this.jobsHandledCount,
       isRunning: this.child !== null && !this.child.killed,
     };
+  }
+
+  public getLockStatus(): { locked: boolean; queuedCount: number } {
+    return {
+      locked: this.lockHeld,
+      queuedCount: this.lockWaiters.length,
+    };
+  }
+
+  public isLockHeldByCurrentContext(): boolean {
+    return this.lockContext.getStore() === this.lockToken;
+  }
+
+  private acquireLock(options?: DemucsRunOptions): Promise<void> {
+    if (options?.signal?.aborted || options?.isCancelled?.()) {
+      return Promise.reject(new Error('Demucs job cancelled before acquiring lock'));
+    }
+
+    if (!this.lockHeld) {
+      this.lockHeld = true;
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const waiter: LockWaiter = { resolve, reject };
+
+      if (options?.signal) {
+        const onAbort = () => {
+          const idx = this.lockWaiters.indexOf(waiter);
+          if (idx !== -1) {
+            this.lockWaiters.splice(idx, 1);
+            waiter.cleanup?.();
+            reject(new Error('Demucs job cancelled while waiting in queue'));
+          }
+        };
+        options.signal.addEventListener('abort', onAbort, { once: true });
+        waiter.cleanup = () => {
+          options.signal?.removeEventListener('abort', onAbort);
+        };
+      }
+
+      this.lockWaiters.push(waiter);
+    });
+  }
+
+  private releaseLock(): void {
+    while (this.lockWaiters.length > 0) {
+      const next = this.lockWaiters.shift()!;
+      next.cleanup?.();
+      next.resolve();
+      return;
+    }
+    this.lockHeld = false;
+  }
+
+  /**
+   * Executes a Demucs separation step under one shared FIFO lock across all queues
+   * and direct callers. Re-entrant inside the same async job scope so wrapper callers
+   * (e.g. separateAndCreateInstrumental) and runJob() do not deadlock.
+   */
+  public async runWithLock<T>(
+    task: () => Promise<T>,
+    options?: DemucsRunOptions
+  ): Promise<T> {
+    if (options?.signal?.aborted || options?.isCancelled?.()) {
+      throw new Error('Demucs job cancelled before acquiring lock');
+    }
+
+    if (this.isLockHeldByCurrentContext()) {
+      return await task();
+    }
+
+    await this.acquireLock(options);
+    try {
+      if (options?.signal?.aborted || options?.isCancelled?.()) {
+        throw new Error('Demucs job cancelled before execution');
+      }
+      return await this.lockContext.run(this.lockToken, task);
+    } finally {
+      this.releaseLock();
+    }
   }
 
   public resetMetrics() {
@@ -44,6 +142,7 @@ export class DemucsWorkerManager {
     if (this.currentJob?.watchdogTimer) {
       clearTimeout(this.currentJob.watchdogTimer);
     }
+    this.currentJob?.abortCleanup?.();
     if (this.child) {
       const proc = this.child;
       this.child = null;
@@ -114,6 +213,7 @@ export class DemucsWorkerManager {
               const jobRef = this.currentJob;
               this.currentJob = null;
               if (jobRef.watchdogTimer) clearTimeout(jobRef.watchdogTimer);
+              jobRef.abortCleanup?.();
               this.jobsHandledCount++;
               try {
                 const res = JSON.parse(jsonStr);
@@ -170,6 +270,7 @@ export class DemucsWorkerManager {
           const jobRef = this.currentJob;
           this.currentJob = null;
           if (jobRef.watchdogTimer) clearTimeout(jobRef.watchdogTimer);
+          jobRef.abortCleanup?.();
           jobRef.reject(new Error(`Demucs worker error: ${err.message}`));
         }
       });
@@ -183,6 +284,7 @@ export class DemucsWorkerManager {
           const jobRef = this.currentJob;
           this.currentJob = null;
           if (jobRef.watchdogTimer) clearTimeout(jobRef.watchdogTimer);
+          jobRef.abortCleanup?.();
           jobRef.reject(new Error(`Demucs persistent worker terminated unexpectedly (code ${code}, signal ${signal})`));
         }
       });
@@ -197,36 +299,68 @@ export class DemucsWorkerManager {
     splitStatusPath: string,
     modelsDir: string,
     onProgress: (pct: number, msg: string) => void,
-    onLog: (level: 'INFO' | 'WARN' | 'ERR', msg: string) => void
+    onLog: (level: 'INFO' | 'WARN' | 'ERR', msg: string) => void,
+    options?: DemucsRunOptions
   ): Promise<void> {
-    await this.ensureWorker(pythonBin, modelsDir);
-    if (!this.child || !this.child.stdin || this.child.killed) {
-      throw new Error('Demucs worker process is not active');
-    }
+    return this.runWithLock(async () => {
+      if (this.currentJob) {
+        throw new Error('Demucs worker already has an active job in progress');
+      }
 
-    return new Promise((resolve, reject) => {
-      const watchdogTimer = setTimeout(() => {
-        if (this.currentJob) {
-          onLog('ERR', `Demucs worker job timed out after ${this.jobTimeoutMs / 1000}s. Terminating hung worker...`);
-          this.stopWorker();
-          reject(new Error(`Demucs worker separation timed out after ${this.jobTimeoutMs / 1000}s`));
+      await this.ensureWorker(pythonBin, modelsDir);
+      if (!this.child || !this.child.stdin || this.child.killed) {
+        throw new Error('Demucs worker process is not active');
+      }
+      if (options?.signal?.aborted || options?.isCancelled?.()) {
+        throw new Error('Demucs job cancelled');
+      }
+
+      return new Promise<void>((resolve, reject) => {
+        const watchdogTimer = setTimeout(() => {
+          if (this.currentJob) {
+            onLog('ERR', `Demucs worker job timed out after ${this.jobTimeoutMs / 1000}s. Terminating hung worker...`);
+            const jobRef = this.currentJob;
+            this.currentJob = null;
+            jobRef.abortCleanup?.();
+            this.stopWorker();
+            jobRef.reject(new Error(`Demucs worker separation timed out after ${this.jobTimeoutMs / 1000}s`));
+          }
+        }, this.jobTimeoutMs);
+
+        let abortCleanup: (() => void) | undefined;
+        if (options?.signal) {
+          const onAbort = () => {
+            if (this.currentJob) {
+              clearTimeout(watchdogTimer);
+              const jobRef = this.currentJob;
+              this.currentJob = null;
+              this.stopWorker();
+              jobRef.reject(new Error('Demucs job cancelled'));
+            }
+          };
+          options.signal.addEventListener('abort', onAbort, { once: true });
+          abortCleanup = () => {
+            options.signal?.removeEventListener('abort', onAbort);
+          };
         }
-      }, this.jobTimeoutMs);
 
-      this.currentJob = { resolve, reject, onProgress, onLog, watchdogTimer };
+        this.currentJob = { resolve, reject, onProgress, onLog, watchdogTimer, abortCleanup };
 
-      const cmdLine = JSON.stringify({ request_file: splitReqPath, status_file: splitStatusPath }) + '\n';
-      this.child!.stdin!.write(cmdLine, 'utf-8', (err) => {
-        if (err && this.currentJob) {
-          clearTimeout(watchdogTimer);
-          const jobRef = this.currentJob;
-          this.currentJob = null;
-          this.stopWorker();
-          jobRef.reject(new Error(`Failed to send request to Demucs worker: ${err.message}`));
-        }
+        const cmdLine = JSON.stringify({ request_file: splitReqPath, status_file: splitStatusPath }) + '\n';
+        this.child!.stdin!.write(cmdLine, 'utf-8', (err) => {
+          if (err && this.currentJob) {
+            clearTimeout(watchdogTimer);
+            abortCleanup?.();
+            const jobRef = this.currentJob;
+            this.currentJob = null;
+            this.stopWorker();
+            jobRef.reject(new Error(`Failed to send request to Demucs worker: ${err.message}`));
+          }
+        });
       });
-    });
+    }, options);
   }
 }
 
 export const demucsWorkerManager = new DemucsWorkerManager();
+

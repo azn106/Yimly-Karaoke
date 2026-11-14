@@ -6,20 +6,49 @@ import express from 'express';
 import http from 'http';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 const testDataDir = path.resolve(process.cwd(), 'data', 'test_verified_recording');
 process.env.DATA_DIR = testDataDir;
 
 import { setupDatabase, db } from '../db/index.js';
 import { users, libraries, artists, albums, songs, songVerifiedSources, playlistSongs, playlists, favorites } from '../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { replaceSongRecordingSource, replaceSongInstrumental, isValidYouTubeUrl, extractYouTubeVideoId } from '../lib/source-replacement.js';
 import songsRoutes from '../routes/songs.js';
 import playlistsRoutes from '../routes/playlists.js';
 import favoritesRoutes from '../routes/favorites.js';
 import { downloadQueue, sanitizeErrorMessage, normalizeYtDlpAudioFormat } from '../lib/download-queue.js';
+import { audioSeparationHooks, verifyValidMp3File } from '../lib/audio-separation.js';
+import { demucsWorkerManager } from '../lib/demucs-worker.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe';
+
+async function generateValidTestMp3(filePath: string, freq = 440) {
+  await execFileAsync('ffmpeg', [
+    '-y',
+    '-f', 'lavfi',
+    '-t', '1',
+    '-i', `sine=frequency=${freq}:sample_rate=44100`,
+    '-c:a', 'libmp3lame',
+    '-b:a', '192k',
+    filePath,
+  ]);
+}
+
+async function generateValidTestWav(filePath: string, freq = 330) {
+  await execFileAsync('ffmpeg', [
+    '-y',
+    '-f', 'lavfi',
+    '-t', '1',
+    '-i', `sine=frequency=${freq}:sample_rate=44100`,
+    '-c:a', 'pcm_s16le',
+    filePath,
+  ]);
+}
 
 test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', async (t) => {
   await t.test('legacy MPEG database format is normalized for yt-dlp', () => {
@@ -99,8 +128,8 @@ test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', a
   fs.mkdirSync(testDataDir, { recursive: true });
   const dummyAudioPath = path.join(testDataDir, 'adele_rolling.mp3');
   const dummyInstPath = path.join(testDataDir, 'adele_rolling (Instrumental).mp3');
-  fs.writeFileSync(dummyAudioPath, Buffer.alloc(2048, 'a'));
-  fs.writeFileSync(dummyInstPath, Buffer.alloc(2048, 'b'));
+  await generateValidTestMp3(dummyAudioPath, 440);
+  await generateValidTestMp3(dummyInstPath, 330);
 
   const songRes = await db.insert(songs).values({
     libraryId: libId,
@@ -118,8 +147,8 @@ test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', a
   // Duplicate title/artist song with different ID to test exact ID isolation
   const dummyAudioPath2 = path.join(testDataDir, 'adele_rolling_2.mp3');
   const dummyInstPath2 = path.join(testDataDir, 'adele_rolling_2 (Instrumental).mp3');
-  fs.writeFileSync(dummyAudioPath2, Buffer.alloc(2048, 'c'));
-  fs.writeFileSync(dummyInstPath2, Buffer.alloc(2048, 'd'));
+  await generateValidTestMp3(dummyAudioPath2, 440);
+  await generateValidTestMp3(dummyInstPath2, 330);
 
   const songRes2 = await db.insert(songs).values({
     libraryId: libId,
@@ -262,27 +291,44 @@ test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', a
 
   await t.test('Replace Audio: Successful replacement updates audio paths, file size, and verified source atomically', async () => {
     const originalDownload = downloadQueue.downloadSingleTrackAudio;
+    const origCheckCuda = audioSeparationHooks.checkCudaAvailability;
+    const origRunJob = demucsWorkerManager.runJob.bind(demucsWorkerManager);
     const testUrl = 'https://youtu.be/CWG-GDfejmY?si=K1vetd6tzVTYb9DB';
 
-    // Mock download to produce valid staged main and instrumental files
+    const stagedSourceFixture = path.join(testDataDir, 'fixture_new_main.mp3');
+    await generateValidTestMp3(stagedSourceFixture, 587);
+    const stagedMainBytes = fs.readFileSync(stagedSourceFixture);
+
+    audioSeparationHooks.checkCudaAvailability = async () => ({
+      available: true,
+      deviceName: 'Mock-NVIDIA-GPU',
+    });
+    demucsWorkerManager.runJob = async (_py, splitReqPath) => {
+      const req = JSON.parse(fs.readFileSync(splitReqPath, 'utf-8'));
+      const baseAudioName = path.basename(req.audio, path.extname(req.audio));
+      const stemDir = path.join(req.out_dir, 'htdemucs', baseAudioName);
+      fs.mkdirSync(stemDir, { recursive: true });
+      await generateValidTestWav(path.join(stemDir, 'no_vocals.wav'), 392);
+    };
+
+    // Mock download to produce valid staged original audio
     downloadQueue.downloadSingleTrackAudio = async (_url: string, outDir: string, format: string) => {
       const mainFile = path.join(outDir, `audio_${Date.now()}.${format}`);
-      const instFile = path.join(outDir, `Adele - Rolling in the Deep (Instrumental).${format}`);
-      fs.writeFileSync(mainFile, Buffer.alloc(2048, 'new_main_content'));
-      fs.writeFileSync(instFile, Buffer.alloc(2048, 'new_inst_content'));
+      fs.copyFileSync(stagedSourceFixture, mainFile);
       return mainFile;
     };
 
     try {
       const result = await replaceSongRecordingSource(songId, testUrl);
-      assert.strictEqual(result.success, true, 'Replacement must succeed when pipeline produces valid files');
+      assert.strictEqual(result.success, true, `Replacement must succeed when pipeline produces valid files: ${result.error}`);
       assert.strictEqual(result.songId, songId);
 
       // Verify files updated
       const updatedSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
       assert.ok(fs.existsSync(updatedSong.mainAudioPath!), 'Main audio exists');
       assert.ok(fs.existsSync(updatedSong.instrumentalAudioPath!), 'Instrumental audio exists');
-      assert.strictEqual(fs.readFileSync(updatedSong.mainAudioPath!).toString(), Buffer.alloc(2048, 'new_main_content').toString());
+      assert.strictEqual(Buffer.compare(fs.readFileSync(updatedSong.mainAudioPath!), stagedMainBytes), 0);
+      await verifyValidMp3File(updatedSong.instrumentalAudioPath!);
 
       // Verify verified source record saved AFTER successful commit
       const verified = await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId));
@@ -298,66 +344,142 @@ test('Verified Recording, Reprocess Pipeline & Songs Page Card Options Suite', a
 
     } finally {
       downloadQueue.downloadSingleTrackAudio = originalDownload;
+      audioSeparationHooks.checkCudaAvailability = origCheckCuda;
+      demucsWorkerManager.runJob = origRunJob;
     }
   });
 
   await t.test('Replace Audio: Rollback restores previous files and database records if file commit fails', async () => {
     const preSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
     const preAudioContent = fs.readFileSync(preSong.mainAudioPath!);
+    const preInstContent = fs.readFileSync(preSong.instrumentalAudioPath!);
     const preVerified = (await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId)))[0];
 
     const originalDownload = downloadQueue.downloadSingleTrackAudio;
+    const origCheckCuda = audioSeparationHooks.checkCudaAvailability;
+    const origRunJob = demucsWorkerManager.runJob.bind(demucsWorkerManager);
 
-    // Simulate download succeeding in staging, but make final target directory write trigger an error
+    const validDownloadedFixture = path.join(testDataDir, 'fixture_rollback_main.mp3');
+    await generateValidTestMp3(validDownloadedFixture, 660);
+
+    // Download produces valid main audio, but instrumental stem generation fails (corrupt stem)
     downloadQueue.downloadSingleTrackAudio = async (_url: string, outDir: string, format: string) => {
       const mainFile = path.join(outDir, `audio_${Date.now()}.${format}`);
-      const instFile = path.join(outDir, `Adele - Rolling in the Deep (Instrumental).${format}`);
-      // Write corrupted empty instrumental file to trigger validation / commit failure
-      fs.writeFileSync(mainFile, Buffer.alloc(2048, 'main'));
-      fs.writeFileSync(instFile, Buffer.alloc(10, 'empty'));
+      fs.copyFileSync(validDownloadedFixture, mainFile);
       return mainFile;
+    };
+    audioSeparationHooks.checkCudaAvailability = async () => ({
+      available: true,
+      deviceName: 'Mock-NVIDIA-GPU',
+    });
+    demucsWorkerManager.runJob = async (_py, splitReqPath) => {
+      const req = JSON.parse(fs.readFileSync(splitReqPath, 'utf-8'));
+      const baseAudioName = path.basename(req.audio, path.extname(req.audio));
+      const stemDir = path.join(req.out_dir, 'htdemucs', baseAudioName);
+      fs.mkdirSync(stemDir, { recursive: true });
+      // Write corrupt tiny stem so shared instrumental pipeline fails validation/encoding
+      fs.writeFileSync(path.join(stemDir, 'no_vocals.wav'), Buffer.alloc(10, 'empty'));
     };
 
     try {
       const failRes = await replaceSongRecordingSource(songId, 'https://youtu.be/CWG-GDfejmY?si=K1vetd6tzVTYb9DB');
-      assert.strictEqual(failRes.success, false, 'Should fail and abort commit when staged file validation fails');
+      assert.strictEqual(failRes.success, false, 'Should fail and abort commit when instrumental pipeline fails');
 
       // Previous audio content and paths preserved
       const postSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
       assert.strictEqual(postSong.mainAudioPath, preSong.mainAudioPath);
-      assert.strictEqual(fs.readFileSync(postSong.mainAudioPath!).toString(), preAudioContent.toString(), 'Original audio preserved after rollback');
+      assert.strictEqual(postSong.instrumentalAudioPath, preSong.instrumentalAudioPath);
+      assert.strictEqual(Buffer.compare(fs.readFileSync(postSong.mainAudioPath!), preAudioContent), 0, 'Original audio preserved after rollback');
+      assert.strictEqual(Buffer.compare(fs.readFileSync(postSong.instrumentalAudioPath!), preInstContent), 0, 'Original instrumental preserved after rollback');
 
       // Verified source unchanged
       const postVerified = (await db.select().from(songVerifiedSources).where(eq(songVerifiedSources.songId, songId)))[0];
       assert.strictEqual(postVerified.youtubeUrl, preVerified.youtubeUrl);
     } finally {
       downloadQueue.downloadSingleTrackAudio = originalDownload;
+      audioSeparationHooks.checkCudaAvailability = origCheckCuda;
+      demucsWorkerManager.runJob = origRunJob;
     }
   });
 
   await t.test('Replace Audio: Concurrency protection blocks simultaneous replacements for same song', async () => {
-    // Start two concurrent replacements
-    const p1 = replaceSongRecordingSource(songId, 'https://www.youtube.com/watch?v=12345678901');
-    const p2 = replaceSongRecordingSource(songId, 'https://www.youtube.com/watch?v=12345678901');
+    const originalDownload = downloadQueue.downloadSingleTrackAudio;
+    const origCheckCuda = audioSeparationHooks.checkCudaAvailability;
+    const origRunJob = demucsWorkerManager.runJob.bind(demucsWorkerManager);
 
-    const [r1, r2] = await Promise.all([p1, p2]);
-    // One of them must report conflict
-    const hasConflict = !r1.success || !r2.success;
-    assert.ok(hasConflict, 'Concurrent replacements for same song ID are blocked');
+    const fixture = path.join(testDataDir, 'fixture_concurrent_main.mp3');
+    await generateValidTestMp3(fixture, 520);
+
+    downloadQueue.downloadSingleTrackAudio = async (_url: string, outDir: string, format: string) => {
+      await new Promise((r) => setTimeout(r, 80));
+      const mainFile = path.join(outDir, `audio_${Date.now()}.${format}`);
+      fs.copyFileSync(fixture, mainFile);
+      return mainFile;
+    };
+    audioSeparationHooks.checkCudaAvailability = async () => ({
+      available: true,
+      deviceName: 'Mock-NVIDIA-GPU',
+    });
+    demucsWorkerManager.runJob = async (_py, splitReqPath) => {
+      const req = JSON.parse(fs.readFileSync(splitReqPath, 'utf-8'));
+      const baseAudioName = path.basename(req.audio, path.extname(req.audio));
+      const stemDir = path.join(req.out_dir, 'htdemucs', baseAudioName);
+      fs.mkdirSync(stemDir, { recursive: true });
+      await generateValidTestWav(path.join(stemDir, 'no_vocals.wav'), 340);
+    };
+
+    try {
+      // Start two concurrent replacements
+      const p1 = replaceSongRecordingSource(songId, 'https://www.youtube.com/watch?v=12345678901');
+      const p2 = replaceSongRecordingSource(songId, 'https://www.youtube.com/watch?v=12345678901');
+
+      const [r1, r2] = await Promise.all([p1, p2]);
+      // One succeeds, the second must report conflict
+      const hasConflict = !r1.success || !r2.success;
+      assert.ok(hasConflict, 'Concurrent replacements for same song ID are blocked');
+      assert.ok(r1.success || r2.success, 'First replacement completes while duplicate concurrent one is rejected');
+    } finally {
+      downloadQueue.downloadSingleTrackAudio = originalDownload;
+      audioSeparationHooks.checkCudaAvailability = origCheckCuda;
+      demucsWorkerManager.runJob = origRunJob;
+    }
   });
 
   // --- SECTION 3: REPLACE INSTRUMENTAL ---
   await t.test('Replace Instrumental: regenerates instrumental from original audio without downloading', async () => {
-    const preSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
-    const originalMainPath = preSong.mainAudioPath;
+    const origCheckCuda = audioSeparationHooks.checkCudaAvailability;
+    const origRunJob = demucsWorkerManager.runJob.bind(demucsWorkerManager);
+    audioSeparationHooks.checkCudaAvailability = async () => ({
+      available: true,
+      deviceName: 'Mock-NVIDIA-GPU',
+    });
+    demucsWorkerManager.runJob = async (_py, splitReqPath) => {
+      const req = JSON.parse(fs.readFileSync(splitReqPath, 'utf-8'));
+      const baseAudioName = path.basename(req.audio, path.extname(req.audio));
+      const stemDir = path.join(req.out_dir, 'htdemucs', baseAudioName);
+      fs.mkdirSync(stemDir, { recursive: true });
+      await generateValidTestWav(path.join(stemDir, 'no_vocals.wav'), 415);
+    };
 
-    const res = await replaceSongInstrumental(songId);
-    assert.ok(res.songId === songId);
+    try {
+      const preSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
+      const originalMainPath = preSong.mainAudioPath;
+      const preMainBytes = fs.readFileSync(originalMainPath!);
 
-    const postSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
-    assert.strictEqual(postSong.mainAudioPath, originalMainPath, 'Original main audio path left completely unchanged');
-    assert.ok(postSong.instrumentalAudioPath, 'Instrumental audio path exists');
-    assert.strictEqual(postSong.title, preSong.title, 'Song metadata preserved');
+      const res = await replaceSongInstrumental(songId);
+      assert.strictEqual(res.success, true, `Expected replaceSongInstrumental to succeed, got: ${res.error}`);
+      assert.strictEqual(res.songId, songId);
+
+      const postSong = (await db.select().from(songs).where(eq(songs.id, songId)))[0];
+      assert.strictEqual(postSong.mainAudioPath, originalMainPath, 'Original main audio path left completely unchanged');
+      assert.strictEqual(Buffer.compare(fs.readFileSync(postSong.mainAudioPath!), preMainBytes), 0, 'Original main bytes unchanged');
+      assert.ok(postSong.instrumentalAudioPath, 'Instrumental audio path exists');
+      await verifyValidMp3File(postSong.instrumentalAudioPath!);
+      assert.strictEqual(postSong.title, preSong.title, 'Song metadata preserved');
+    } finally {
+      audioSeparationHooks.checkCudaAvailability = origCheckCuda;
+      demucsWorkerManager.runJob = origRunJob;
+    }
   });
 
   // --- SECTION 4: PERMISSIONS & API ENDPOINTS ---

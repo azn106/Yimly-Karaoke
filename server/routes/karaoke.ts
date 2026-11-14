@@ -4,11 +4,11 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { db } from '../db/index.js';
-import { sessions, controllers, queueItems, songs, artists, albums, songArtists, users, settings, lyrics, libraries, playlistSongs } from '../db/schema.js';
+import { sessions, controllers, queueItems, songs, artists, albums, songArtists, users, settings, lyrics, libraries, playlistSongs, downloadTrackJobs } from '../db/schema.js';
 import { downloadQueue } from '../lib/download-queue.js';
 import { resolveUrlOrQuery } from './downloader.js';
 import { validateAndCanonicalizeYouTubeUrl } from '../lib/url-validator.js';
-import { eq, and, asc, or, inArray, like, sql } from 'drizzle-orm';
+import { eq, and, asc, or, inArray, like, sql, ne, isNotNull } from 'drizzle-orm';
 import { requireAuth, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import crypto from 'crypto';
 import { 
@@ -1221,6 +1221,8 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
       let downloadTrackId: string | null = null;
       let downloadStatus: string | null = null;
 
+      let deferredJobId: string | null = null;
+
       if (songId) {
         const song = await db.select().from(songs).where(eq(songs.id, Number(songId))).limit(1);
         if (song.length === 0) {
@@ -1229,10 +1231,15 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
         finalSongId = Number(songId);
       } else if (req.body.track) {
         const { track } = req.body;
+        const normalizedTrackTitle = typeof track.title === 'string' ? track.title.trim() : String(track.title ?? '').trim();
+        const normalizedTrackArtist = typeof track.artist === 'string' ? track.artist.trim() : String(track.artist ?? '').trim();
+        if (!normalizedTrackTitle) {
+          return res.status(400).json({ error: 'Track title is required' });
+        }
 
         let existingLocalSong: any = null;
         try {
-          const parsedArtistNames = parseArtists(track.artist);
+          const parsedArtistNames = parseArtists(normalizedTrackArtist || track.artist);
           const artistIds: number[] = [];
           for (const aName of parsedArtistNames) {
             const trimmed = aName.trim();
@@ -1249,7 +1256,7 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
           if (artistIds.length > 0 && artistIds.length === parsedArtistNames.length) {
             const allLibs = await db.select({ id: libraries.id }).from(libraries);
             for (const lib of allLibs) {
-              const found = await findExistingSongRecord(lib.id, track.title, artistIds);
+              const found = await findExistingSongRecord(lib.id, normalizedTrackTitle, artistIds);
               if (found) {
                 existingLocalSong = found;
                 break;
@@ -1269,23 +1276,88 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
           downloadTrackId = null;
           downloadStatus = null;
         } else {
-          tempTitle = track.title;
-          tempArtist = track.artist;
+          tempTitle = normalizedTrackTitle;
+          tempArtist = normalizedTrackArtist;
           tempArtworkUrl = track.artworkUrl || null;
-          
+
+          // Prevent duplicate active queue entries from repeated submissions by the same requester in the same session
+          const requesterCondition = userId !== null
+            ? eq(queueItems.userId, userId)
+            : ownerControllerId !== null
+              ? eq(queueItems.controllerId, ownerControllerId)
+              : undefined;
+
+          if (requesterCondition) {
+            const existingSameRequester = await db.select().from(queueItems).where(
+              and(
+                eq(queueItems.sessionId, sessionId),
+                ne(queueItems.status, 'finished'),
+                sql`(${queueItems.downloadStatus} = 'downloading' OR ${queueItems.downloadStatus} = 'processing')`,
+                sql`LOWER(TRIM(COALESCE(${queueItems.tempTitle}, ''))) = LOWER(TRIM(${tempTitle}))`,
+                sql`LOWER(TRIM(COALESCE(${queueItems.tempArtist}, ''))) = LOWER(TRIM(${tempArtist}))`,
+                requesterCondition
+              )
+            ).limit(1);
+
+            if (existingSameRequester.length > 0) {
+              return res.json(existingSameRequester[0]);
+            }
+          }
+
           const dup = await db.select().from(queueItems).where(
             and(
               sql`(${queueItems.downloadStatus} = 'downloading' OR ${queueItems.downloadStatus} = 'processing')`,
-              eq(queueItems.tempTitle, track.title),
-              eq(queueItems.tempArtist, track.artist)
+              sql`LOWER(TRIM(COALESCE(${queueItems.tempTitle}, ''))) = LOWER(TRIM(${tempTitle}))`,
+              sql`LOWER(TRIM(COALESCE(${queueItems.tempArtist}, ''))) = LOWER(TRIM(${tempArtist}))`
             )
           ).limit(1);
 
+          let reusedActiveDownload = false;
           if (dup.length > 0 && dup[0].downloadJobId && dup[0].downloadTrackId) {
-            downloadJobId = dup[0].downloadJobId;
-            downloadTrackId = dup[0].downloadTrackId;
-            downloadStatus = dup[0].downloadStatus || 'downloading';
-          } else {
+            const dupTrackJob = await db.select().from(downloadTrackJobs)
+              .where(eq(downloadTrackJobs.id, dup[0].downloadTrackId))
+              .limit(1);
+
+            if (dupTrackJob[0]?.status === 'failed') {
+              // Do not attach a new queue entry to an already-failed track job
+              reusedActiveDownload = false;
+            } else if (dupTrackJob[0]?.status === 'completed') {
+              let resolvedSongId: number | null = null;
+              const readySibling = await db.select({ songId: queueItems.songId })
+                .from(queueItems)
+                .where(and(eq(queueItems.downloadTrackId, dup[0].downloadTrackId), isNotNull(queueItems.songId)))
+                .limit(1);
+              if (readySibling[0]?.songId) {
+                resolvedSongId = readySibling[0].songId;
+              } else if (dupTrackJob[0].outputPath) {
+                const byOutputPath = await db.select({ id: songs.id })
+                  .from(songs)
+                  .where(eq(songs.mainAudioPath, dupTrackJob[0].outputPath))
+                  .limit(1);
+                if (byOutputPath[0]?.id) {
+                  resolvedSongId = byOutputPath[0].id;
+                }
+              }
+
+              if (resolvedSongId) {
+                finalSongId = resolvedSongId;
+                tempTitle = null;
+                tempArtist = null;
+                tempArtworkUrl = null;
+                downloadJobId = null;
+                downloadTrackId = null;
+                downloadStatus = null;
+                reusedActiveDownload = true;
+              }
+            } else {
+              downloadJobId = dup[0].downloadJobId;
+              downloadTrackId = dup[0].downloadTrackId;
+              downloadStatus = dup[0].downloadStatus || 'downloading';
+              reusedActiveDownload = true;
+            }
+          }
+
+          if (!reusedActiveDownload) {
             let targetLib;
             const allLibs = await db.select().from(libraries).limit(1);
             if (allLibs.length > 0) {
@@ -1307,7 +1379,7 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
               } catch (e) {}
             }
 
-            let safeSourceUrl: string | null = null;
+            let safeSourceUrl: string | undefined = undefined;
             if (track.sourceUrl && typeof track.sourceUrl === 'string') {
               const val = validateAndCanonicalizeYouTubeUrl(track.sourceUrl, { allowPlaylist: false });
               if (val.valid && val.canonicalUrl) {
@@ -1328,9 +1400,10 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
               lyricsProviders: finalProviders,
               folderStructure: settingsMap.get('downloader_folder_structure') || '{artist}/{artist} - {title}',
               playlistFolder: false,
+              deferStart: true,
               tracks: [{
-                title: track.title,
-                artist: track.artist,
+                title: tempTitle,
+                artist: tempArtist,
                 album: track.album || 'Single',
                 duration: track.duration,
                 artworkUrl: track.artworkUrl,
@@ -1338,6 +1411,7 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
               }],
             });
 
+            deferredJobId = activeJob.id;
             downloadJobId = activeJob.id;
             downloadTrackId = activeJob.tracks[0].id;
             downloadStatus = 'downloading';
@@ -1350,25 +1424,81 @@ router.post('/sessions/:sessionId/queue', async (req: AuthenticatedRequest, res)
       const existingQueue = await db.select({ position: queueItems.position }).from(queueItems).where(eq(queueItems.sessionId, sessionId));
       const nextPosition = existingQueue.length > 0 ? Math.max(...existingQueue.map(q => q.position)) + 1 : 1;
 
-      const inserted = await db.insert(queueItems).values({
-        sessionId,
-        songId: finalSongId,
-        userId,
-        guestName,
-        controllerId: ownerControllerId,
-        addedAt: new Date(),
-        position: nextPosition,
-        tempTitle,
-        tempArtist,
-        tempArtworkUrl,
-        downloadJobId,
-        downloadTrackId,
-        downloadStatus,
-      }).returning();
+      let inserted: (typeof queueItems.$inferSelect)[];
+      try {
+        inserted = await db.insert(queueItems).values({
+          sessionId,
+          songId: finalSongId,
+          userId,
+          guestName,
+          controllerId: ownerControllerId,
+          addedAt: new Date(),
+          position: nextPosition,
+          tempTitle,
+          tempArtist,
+          tempArtworkUrl,
+          downloadJobId,
+          downloadTrackId,
+          downloadStatus,
+        }).returning();
+      } catch (insertErr) {
+        if (deferredJobId) {
+          await downloadQueue.discardUnstartedJob(deferredJobId).catch(() => {});
+        }
+        throw insertErr;
+      }
+
+      if (deferredJobId) {
+        try {
+          await downloadQueue.startJob(deferredJobId);
+        } catch (startErr) {
+          await db.update(queueItems)
+            .set({ downloadStatus: 'failed' })
+            .where(eq(queueItems.id, inserted[0].id));
+          await downloadQueue.cancelJob(deferredJobId).catch(() => {});
+          notifyQueueUpdate(sessionId);
+          throw startErr;
+        }
+      } else if (downloadTrackId) {
+        // Reconcile against any state transition that completed while inserting this reused queue entry
+        const trackJob = await db.select().from(downloadTrackJobs)
+          .where(eq(downloadTrackJobs.id, downloadTrackId))
+          .limit(1);
+        const siblingQueues = await db.select().from(queueItems)
+          .where(and(eq(queueItems.downloadTrackId, downloadTrackId), ne(queueItems.id, inserted[0].id)));
+
+        const readySibling = siblingQueues.find(q => q.songId !== null && q.downloadStatus === 'ready');
+        const failedSibling = siblingQueues.find(q => q.downloadStatus === 'failed');
+        const processingSibling = siblingQueues.find(q => q.downloadStatus === 'processing');
+
+        let reconciledSongId: number | null = readySibling?.songId ?? null;
+        if (!reconciledSongId && trackJob[0]?.status === 'completed' && trackJob[0].outputPath) {
+          const byOutputPath = await db.select({ id: songs.id })
+            .from(songs)
+            .where(eq(songs.mainAudioPath, trackJob[0].outputPath))
+            .limit(1);
+          reconciledSongId = byOutputPath[0]?.id ?? null;
+        }
+
+        if (reconciledSongId) {
+          await db.update(queueItems)
+            .set({ songId: reconciledSongId, downloadStatus: 'ready' })
+            .where(eq(queueItems.id, inserted[0].id));
+        } else if (trackJob[0]?.status === 'failed' || failedSibling) {
+          await db.update(queueItems)
+            .set({ downloadStatus: 'failed' })
+            .where(eq(queueItems.id, inserted[0].id));
+        } else if (processingSibling && inserted[0].downloadStatus !== 'processing') {
+          await db.update(queueItems)
+            .set({ downloadStatus: 'processing' })
+            .where(eq(queueItems.id, inserted[0].id));
+        }
+      }
 
       notifyQueueUpdate(sessionId);
-      
-      res.json(inserted[0]);
+
+      const latestRow = await db.select().from(queueItems).where(eq(queueItems.id, inserted[0].id)).limit(1);
+      res.json(latestRow[0] || inserted[0]);
     });
   } catch (error) {
     console.error('[QUEUE] Failed to add to queue:', error);
