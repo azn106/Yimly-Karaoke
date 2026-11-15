@@ -247,9 +247,21 @@ export async function getYtDlpPath(): Promise<string> {
     return targetPath;
   } catch (linuxErr) {
     console.warn('Failed downloading yt-dlp_linux, falling back to python zipapp release...', linuxErr);
-    await execPromise(`curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ${targetPath} && chmod +x ${targetPath}`);
-    cachedYtDlpPath = targetPath;
-    return targetPath;
+    try {
+      await execPromise(`curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ${targetPath} && chmod +x ${targetPath}`);
+      await execFilePromise(targetPath, ['--version']);
+      cachedYtDlpPath = targetPath;
+      return targetPath;
+    } catch (zipappErr: any) {
+      try {
+        if (fs.existsSync(targetPath)) {
+          fs.unlinkSync(targetPath);
+        }
+      } catch {
+        // Ignore cleanup failure
+      }
+      throw new Error(`Failed to install and verify yt-dlp binary at ${targetPath}: ${zipappErr?.message || zipappErr}`);
+    }
   }
 }
 

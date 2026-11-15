@@ -184,6 +184,8 @@ export async function resolveUrlOrQuery(urlOrQuery: string, requestedOffset = 0)
           '--dump-json',
           '--js-runtimes',
           'node',
+          '--extractor-args',
+          'youtube:player_client=android,web',
           canonicalTargetUrl,
         ]);
 
@@ -228,6 +230,8 @@ export async function resolveUrlOrQuery(urlOrQuery: string, requestedOffset = 0)
           '--dump-json',
           '--js-runtimes',
           'node',
+          '--extractor-args',
+          'youtube:player_client=android,web',
           canonicalTargetUrl,
         ]);
 
