@@ -22,6 +22,12 @@ import {
   ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { filterSongs, SearchableSong } from '../lib/search-utils';
+import {
+  selectCurrentPlayingSong,
+  getUpcomingQueueItems,
+  getQueueItemDisplayState,
+  hasPreparingQueueItems,
+} from '../lib/karaoke-queue-utils';
 import { getAuthToken } from '../lib/auth';
 import {
   getBackgroundMusicSettings,
@@ -932,7 +938,11 @@ export default function RoomSession() {
               fetchState();
               break;
             case 'QUEUE_UPDATED':
+              fetchState();
+              break;
             case 'QUEUE_EMPTY':
+              setPlaying(false);
+              setCurrentTime(0);
               fetchState();
               break;
             case 'PLAYING':
@@ -980,7 +990,7 @@ export default function RoomSession() {
                 setElrcOffset(msg.payload.elrcOffset);
               }
               fetchState();
-              setPlaying(true);
+              setPlaying(Boolean(msg.payload?.songId && msg.payload?.playing !== false));
               break;
             case 'VARIANT_CHANGED':
               setVariant(msg.payload.variant);
@@ -1120,18 +1130,8 @@ export default function RoomSession() {
     };
   }, [isHost, validationStatus, sessionId, ws]);
 
-  // Determine current song: only select an item that has a valid songId and is eligible to play.
-  // Prefer an item with status === 'playing', followed by an eligible pending item.
-  // Do not select items that are downloading, processing, or failed, and do not fall back to queue[0].
-  const currentSong = queue.find(q => q.status === 'playing' && q.songId !== null && q.songId !== undefined) ||
-    queue.find(q => 
-      q.status === 'pending' && 
-      q.songId !== null && 
-      q.songId !== undefined && 
-      q.downloadStatus !== 'downloading' && 
-      q.downloadStatus !== 'processing' && 
-      q.downloadStatus !== 'failed'
-    );
+  // Determine current song: backend is authoritative — only select an item with status === 'playing' and a valid songId.
+  const currentSong = selectCurrentPlayingSong(queue);
 
   // Fetch song details and lyrics whenever currentSong changes
   useEffect(() => {
@@ -1573,7 +1573,7 @@ export default function RoomSession() {
 
   // Host Control actions
   const togglePlay = () => {
-    if (!isHost) return;
+    if (!isHost || !currentSong) return;
     const nextPlaying = !playing;
     setPlaying(nextPlaying);
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -2836,15 +2836,20 @@ export default function RoomSession() {
 
           <div className="hidden md:flex items-center gap-2 overflow-x-auto py-1 scrollbar-none flex-1 min-w-0">
             {(() => {
-              const currentIndex = currentSong ? queue.findIndex(q => q.id === currentSong.id || q.songId === currentSong.songId) : -1;
-              const upcomingQueue = currentIndex >= 0 ? queue.slice(currentIndex + 1) : queue;
+              const upcomingQueue = getUpcomingQueueItems(queue, currentSong);
               if (upcomingQueue.length === 0) return <span className="text-xs text-zinc-500 italic px-2">No upcoming songs in queue</span>;
               return upcomingQueue.map((item, index) => {
                 const singerName = item.userName || (item.userId ? `Singer ${item.userId}` : 'Guest');
+                const itemState = getQueueItemDisplayState(item);
                 return (
                   <div key={item.id || index} className="bg-[#12131D]/70 backdrop-blur-md border border-white/10 hover:border-white/20 rounded-xl px-3 py-1 flex flex-col justify-center shrink-0 min-w-[150px] max-w-[200px] transition-colors">
                     <div className="text-xs font-bold text-white truncate">{item.songTitle} - {item.artistName || item.artist || 'Unknown Artist'}</div>
-                    <div className="text-[10px] text-zinc-400 truncate">{singerName}</div>
+                    <div className="text-[10px] text-zinc-400 truncate flex items-center gap-1">
+                      <span className="truncate">{singerName}</span>
+                      {itemState === 'downloading' && <span className="text-amber-400 font-semibold shrink-0">• Downloading</span>}
+                      {itemState === 'processing' && <span className="text-purple-400 font-semibold shrink-0">• Processing</span>}
+                      {itemState === 'failed' && <span className="text-red-400 font-semibold shrink-0">• Failed</span>}
+                    </div>
                   </div>
                 );
               });
@@ -3024,7 +3029,7 @@ export default function RoomSession() {
                 </div>
               )
             ) : (
-              /* Queue is Empty State (Clean & Centered) */
+              /* Queue is Empty or Waiting on Downloads/Processing State */
               <div className="text-center z-10 py-12 px-6 max-w-md mx-auto flex flex-col items-center justify-center">
                 <div className="w-full max-w-[320px] aspect-square rounded-3xl bg-[#12131D] border border-white/10 overflow-hidden flex items-center justify-center mx-auto mb-5 shadow-xl">
                   {bgmSettings.enabled && bgmCurrentSong ? (
@@ -3037,10 +3042,28 @@ export default function RoomSession() {
                     <Music className="w-12 h-12 text-[#F472B6]" />
                   )}
                 </div>
-                <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-2">Queue is Empty</h2>
-                <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">
-                  Waiting for someone to choose a song...
-                </p>
+                {queue.length === 0 ? (
+                  <>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-2">Queue is Empty</h2>
+                    <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">
+                      Waiting for someone to choose a song...
+                    </p>
+                  </>
+                ) : hasPreparingQueueItems(queue) ? (
+                  <>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-2">Preparing Next Song</h2>
+                    <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">
+                      Downloading and processing queued songs. Playback will begin automatically once ready.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-2">No Playable Songs</h2>
+                    <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">
+                      Queued songs failed to prepare. Add another song to continue.
+                    </p>
+                  </>
+                )}
 
                 {bgmSettings.enabled && bgmCurrentSong && (
                   <div className="mt-6 w-full max-w-[320px] px-4 py-2 rounded-2xl bg-[#141622]/80 border border-white/10 flex items-center gap-3 text-xs text-zinc-300 shadow-lg box-border">

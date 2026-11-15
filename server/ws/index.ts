@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { db } from '../db/index.js';
 import { sessions, queueItems, songs, artists, settings, users, controllers } from '../db/schema.js';
-import { eq, asc, and } from 'drizzle-orm';
+import { eq, asc, and, isNotNull } from 'drizzle-orm';
 import { withSessionLock } from '../lib/session-lock.js';
 import { LyricsAppearanceSettings, DEFAULT_LYRICS_SETTINGS, resolveLyricsSettings } from '../lib/lyrics-settings.js';
 import jwt from 'jsonwebtoken';
@@ -94,32 +94,18 @@ export async function getOrCreateRoom(sessionId: string): Promise<RoomState> {
         }
       }
 
-      // 2. Find currently playing or next pending item in DB
+      // 2. Find currently playing item in DB (only hydrate active playing items with a valid songId)
       const playingItem = await db.select({
         id: queueItems.id,
         songId: queueItems.songId
       })
       .from(queueItems)
-      .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing')))
+      .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing'), isNotNull(queueItems.songId)))
       .limit(1);
 
       if (playingItem.length > 0) {
         initialQueueItemId = playingItem[0].id;
         initialSongId = playingItem[0].songId;
-      } else {
-        const pendingItem = await db.select({
-          id: queueItems.id,
-          songId: queueItems.songId
-        })
-        .from(queueItems)
-        .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
-        .orderBy(asc(queueItems.position))
-        .limit(1);
-
-        if (pendingItem.length > 0) {
-          initialQueueItemId = pendingItem[0].id;
-          initialSongId = pendingItem[0].songId;
-        }
       }
 
       // 3. If there is a song, load its saved lyric offsets
@@ -336,8 +322,31 @@ export function setupWebSockets(wss: WebSocketServer) {
               console.warn(`[WS] Unauthorized non-host attempted PLAY on session ${sessionId}`);
               break;
             }
-            room.playing = true;
-            broadcastToRoom(sessionId, { type: 'PLAYING', payload: { position: room.position } });
+            {
+              const activePlaying = await db.select({
+                id: queueItems.id,
+                songId: queueItems.songId,
+              })
+                .from(queueItems)
+                .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing'), isNotNull(queueItems.songId)))
+                .limit(1);
+
+              if (activePlaying.length === 0) {
+                room.playing = false;
+                room.currentSongId = null;
+                room.currentQueueItemId = null;
+                room.position = 0;
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: 'PAUSED', payload: { position: 0 } }));
+                }
+                break;
+              }
+
+              room.currentQueueItemId = activePlaying[0].id;
+              room.currentSongId = activePlaying[0].songId;
+              room.playing = true;
+              broadcastToRoom(sessionId, { type: 'PLAYING', payload: { position: room.position } });
+            }
             break;
 
           case 'PAUSE':
@@ -370,6 +379,23 @@ export function setupWebSockets(wss: WebSocketServer) {
             {
               const position = Number(data.payload?.position);
               if (!Number.isFinite(position) || position < 0 || typeof data.payload?.playing !== 'boolean') break;
+              if (data.payload.playing && room.currentSongId === null) {
+                const activePlaying = await db.select({
+                  id: queueItems.id,
+                  songId: queueItems.songId,
+                })
+                  .from(queueItems)
+                  .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing'), isNotNull(queueItems.songId)))
+                  .limit(1);
+
+                if (activePlaying.length === 0) {
+                  room.playing = false;
+                  room.position = 0;
+                  break;
+                }
+                room.currentQueueItemId = activePlaying[0].id;
+                room.currentSongId = activePlaying[0].songId;
+              }
               room.position = position;
               room.playing = data.payload.playing;
             }
@@ -719,6 +745,77 @@ export function closeSessionWS(sessionId: string) {
   }
 }
 
+export function isQueueItemReady(item: {
+  songId: number | null | undefined;
+  downloadStatus?: string | null;
+}): boolean {
+  return (
+    item.songId !== null &&
+    item.songId !== undefined &&
+    item.downloadStatus !== 'downloading' &&
+    item.downloadStatus !== 'processing' &&
+    item.downloadStatus !== 'failed'
+  );
+}
+
+async function findAndPromoteNextEligibleItem(sessionId: string) {
+  const pendingItems = await db.select().from(queueItems)
+    .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
+    .orderBy(asc(queueItems.position), asc(queueItems.id));
+
+  const readyIndex = pendingItems.findIndex(isQueueItemReady);
+  if (readyIndex === -1) {
+    return undefined;
+  }
+
+  const nextItem = pendingItems[readyIndex];
+
+  if (readyIndex === 0) {
+    await db.update(queueItems)
+      .set({ status: 'playing' })
+      .where(eq(queueItems.id, nextItem.id));
+    return { ...nextItem, status: 'playing' };
+  }
+
+  // Move unready/bypassed items behind the next ready song while preserving their relative order
+  const bypassed = pendingItems.slice(0, readyIndex);
+  const prefixPositions = pendingItems.slice(0, readyIndex + 1).map((item) => item.position);
+  const hasStrictlyIncreasingPositions = prefixPositions.every(
+    (pos, idx) => idx === 0 || pos > prefixPositions[idx - 1]
+  );
+
+  if (hasStrictlyIncreasingPositions) {
+    const reorderedPrefix = [nextItem, ...bypassed];
+    for (let i = 0; i < reorderedPrefix.length; i++) {
+      const updateFields: { position: number; status?: 'pending' | 'playing' | 'finished' } = {
+        position: prefixPositions[i],
+      };
+      if (i === 0) {
+        updateFields.status = 'playing';
+      }
+      await db.update(queueItems)
+        .set(updateFields)
+        .where(eq(queueItems.id, reorderedPrefix[i].id));
+    }
+    return { ...nextItem, position: prefixPositions[0], status: 'playing' };
+  }
+
+  const basePos = pendingItems[0].position;
+  const reorderedAll = [nextItem, ...bypassed, ...pendingItems.slice(readyIndex + 1)];
+  for (let i = 0; i < reorderedAll.length; i++) {
+    const updateFields: { position: number; status?: 'pending' | 'playing' | 'finished' } = {
+      position: basePos + i,
+    };
+    if (i === 0) {
+      updateFields.status = 'playing';
+    }
+    await db.update(queueItems)
+      .set(updateFields)
+      .where(eq(queueItems.id, reorderedAll[i].id));
+  }
+  return { ...nextItem, position: basePos, status: 'playing' };
+}
+
 export async function advanceQueueBySessionId(sessionId: string) {
   const room = await getOrCreateRoom(sessionId);
   return await advanceQueue(sessionId, room);
@@ -734,128 +831,109 @@ export async function advanceQueue(sessionId: string, room: RoomState) {
     room.lastAdvanceTime = now;
 
     try {
-      // 1. Remove current playing or first pending from the queue in DB
-    if (room.currentQueueItemId) {
-      await db.delete(queueItems)
-        .where(eq(queueItems.id, room.currentQueueItemId));
-    } else {
-      // Find current playing in DB and delete it
-      const currentPlaying = await db.select().from(queueItems)
-        .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing')))
-        .limit(1);
-      if (currentPlaying.length > 0) {
+      // 1. Remove current playing item from the queue in DB
+      if (room.currentQueueItemId) {
         await db.delete(queueItems)
-          .where(eq(queueItems.id, currentPlaying[0].id));
-      }
-    }
-
-    // 2. Find next pending queue item
-    const pendingItems = await db.select().from(queueItems)
-      .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
-      .orderBy(asc(queueItems.position));
-
-    // Find next eligible item in queue while strictly preserving queue order:
-    // If the top pending item is currently downloading or processing, we must wait for it rather than jumping over it.
-    let nextItem: typeof pendingItems[0] | undefined = undefined;
-    if (pendingItems.length > 0) {
-      const topPending = pendingItems[0];
-      const isTopProcessing = topPending.downloadStatus === 'downloading' || 
-                              topPending.downloadStatus === 'processing' || 
-                              (!topPending.songId && topPending.downloadStatus !== 'failed');
-      if (isTopProcessing) {
-        // Wait for top item to finish processing; keep room idle/BGM active
-        nextItem = undefined;
-      } else if (topPending.songId !== null && topPending.downloadStatus !== 'failed') {
-        nextItem = topPending;
+          .where(and(eq(queueItems.id, room.currentQueueItemId), eq(queueItems.sessionId, sessionId)));
       } else {
-        // Top pending item failed: advance to next eligible item in queue
-        nextItem = pendingItems.find(item => 
-          item.songId !== null && 
-          item.downloadStatus !== 'downloading' && 
-          item.downloadStatus !== 'processing' && 
-          item.downloadStatus !== 'failed'
-        );
+        const currentPlaying = await db.select().from(queueItems)
+          .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing')))
+          .limit(1);
+        if (currentPlaying.length > 0) {
+          await db.delete(queueItems)
+            .where(eq(queueItems.id, currentPlaying[0].id));
+        }
       }
-    }
 
-    if (nextItem) {
-      await db.update(queueItems)
-        .set({ status: 'playing' })
-        .where(eq(queueItems.id, nextItem.id));
+      // 2. Select next ready song (moving any unready items ahead of it behind it)
+      const nextItem = await findAndPromoteNextEligibleItem(sessionId);
 
-      room.currentSongId = nextItem.songId;
-      room.currentQueueItemId = nextItem.id;
-      room.position = 0;
-      room.playing = true;
+      if (nextItem) {
+        room.currentSongId = nextItem.songId;
+        room.currentQueueItemId = nextItem.id;
+        room.position = 0;
+        room.playing = true;
 
-      // Load song's saved lyricOffset
-      try {
-        if (nextItem.songId) {
-          const songRec = await db.select({ lyricOffset: songs.lyricOffset }).from(songs).where(eq(songs.id, nextItem.songId)).limit(1);
-          room.lyricOffset = songRec[0]?.lyricOffset ?? 0;
-        } else {
+        try {
+          if (nextItem.songId) {
+            const songRec = await db.select({
+              lyricOffset: songs.lyricOffset,
+              lrcOffset: songs.lrcOffset,
+              elrcOffset: songs.elrcOffset,
+            }).from(songs).where(eq(songs.id, nextItem.songId)).limit(1);
+            room.lyricOffset = songRec[0]?.lyricOffset ?? 0;
+            room.lrcOffset = typeof songRec[0]?.lrcOffset === 'number' ? songRec[0].lrcOffset : room.lyricOffset;
+            room.elrcOffset = typeof songRec[0]?.elrcOffset === 'number' ? songRec[0].elrcOffset : room.lyricOffset;
+          } else {
+            room.lyricOffset = 0;
+            room.lrcOffset = 0;
+            room.elrcOffset = 0;
+          }
+        } catch (e) {
           room.lyricOffset = 0;
+          room.lrcOffset = 0;
+          room.elrcOffset = 0;
         }
-      } catch (e) {
+
+        broadcastToRoom(sessionId, {
+          type: 'SONG_CHANGED',
+          payload: {
+            songId: room.currentSongId,
+            queueItemId: room.currentQueueItemId,
+            playing: true,
+            position: 0,
+            lyricOffset: room.lyricOffset,
+            lrcOffset: room.lrcOffset,
+            elrcOffset: room.elrcOffset,
+          }
+        });
+
+        broadcastToRoom(sessionId, {
+          type: 'OFFSET_CHANGED',
+          payload: {
+            offset: room.lyricOffset,
+            lrcOffset: room.lrcOffset,
+            elrcOffset: room.elrcOffset,
+            songId: room.currentSongId
+          }
+        });
+
+        broadcastToRoom(sessionId, {
+          type: 'PLAYING',
+          payload: { position: 0 }
+        });
+      } else {
+        // Queue has no ready songs available
+        room.currentSongId = null;
+        room.currentQueueItemId = null;
+        room.playing = false;
+        room.position = 0;
         room.lyricOffset = 0;
+
+        broadcastToRoom(sessionId, {
+          type: 'QUEUE_EMPTY',
+          payload: {}
+        });
+
+        broadcastToRoom(sessionId, {
+          type: 'PAUSED',
+          payload: { position: 0 }
+        });
       }
 
-      broadcastToRoom(sessionId, {
-        type: 'SONG_CHANGED',
-        payload: {
-          songId: room.currentSongId,
-          queueItemId: room.currentQueueItemId,
-          playing: true,
-          position: 0,
-          lyricOffset: room.lyricOffset
-        }
-      });
-
-      broadcastToRoom(sessionId, {
-        type: 'OFFSET_CHANGED',
-        payload: {
-          offset: room.lyricOffset,
-          songId: room.currentSongId
-        }
-      });
-
-      broadcastToRoom(sessionId, {
-        type: 'PLAYING',
-        payload: { position: 0 }
-      });
-    } else {
-      // Queue is completely empty of ready songs
-      room.currentSongId = null;
-      room.currentQueueItemId = null;
-      room.playing = false;
-      room.position = 0;
-      room.lyricOffset = 0;
-
-      broadcastToRoom(sessionId, {
-        type: 'QUEUE_EMPTY',
-        payload: {}
-      });
-
-      broadcastToRoom(sessionId, {
-        type: 'PAUSED',
-        payload: { position: 0 }
-      });
+      // Broadcast updated queue to all connected hosts and guests
+      broadcastToRoom(sessionId, { type: 'QUEUE_UPDATED' });
+    } catch (err) {
+      console.error('[WS] Error advancing queue:', err);
+    } finally {
+      room.isAdvancing = false;
     }
-
-    // Broadcast updated queue to all connected hosts and guests
-    broadcastToRoom(sessionId, { type: 'QUEUE_UPDATED' });
-  } catch (err) {
-    console.error('[WS] Error advancing queue:', err);
-  } finally {
-    room.isAdvancing = false;
-  }
   });
 }
 
 /**
- * Checks if the queue has pending items and nothing is currently playing.
- * If so, automatically starts playing the first item.
- * Otherwise, broadcasts QUEUE_UPDATED.
+ * Checks if the queue has an eligible ready pending item and nothing is currently playing.
+ * Never interrupts an actively playing song; otherwise promotes the next ready item.
  */
 export async function checkAndAutoPlay(sessionId: string) {
   return await withSessionLock(sessionId, async () => {
@@ -864,55 +942,44 @@ export async function checkAndAutoPlay(sessionId: string) {
 
       // Check if there is already a song actively playing in memory or DB
       const currentlyPlayingInDB = await db.select().from(queueItems)
-        .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing')))
+        .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'playing'), isNotNull(queueItems.songId)))
         .limit(1);
+
+      if (currentlyPlayingInDB.length > 0) {
+        room.currentQueueItemId = currentlyPlayingInDB[0].id;
+        room.currentSongId = currentlyPlayingInDB[0].songId;
+      }
 
       const isCurrentlyPlaying = (room.playing && room.currentSongId !== null) || currentlyPlayingInDB.length > 0;
 
       if (!isCurrentlyPlaying) {
-        // Look for first pending queue item in DB that is eligible to play:
-        // must have real songId, and not downloading/processing/failed (mirrors advanceQueue eligibility logic)
-        const pendingItems = await db.select().from(queueItems)
-          .where(and(eq(queueItems.sessionId, sessionId), eq(queueItems.status, 'pending')))
-          .orderBy(asc(queueItems.position));
-
-        // Check queue order: wait if top pending item is currently downloading or processing
-        let itemToPlay: typeof pendingItems[0] | undefined = undefined;
-        if (pendingItems.length > 0) {
-          const topPending = pendingItems[0];
-          const isTopProcessing = topPending.downloadStatus === 'downloading' || 
-                                  topPending.downloadStatus === 'processing' || 
-                                  (!topPending.songId && topPending.downloadStatus !== 'failed');
-          if (isTopProcessing) {
-            itemToPlay = undefined;
-          } else if (topPending.songId !== null && topPending.downloadStatus !== 'failed') {
-            itemToPlay = topPending;
-          } else {
-            itemToPlay = pendingItems.find(item => 
-              item.songId !== null && 
-              item.downloadStatus !== 'downloading' && 
-              item.downloadStatus !== 'processing' && 
-              item.downloadStatus !== 'failed'
-            );
-          }
-        }
+        const itemToPlay = await findAndPromoteNextEligibleItem(sessionId);
 
         if (itemToPlay) {
-          await db.update(queueItems)
-            .set({ status: 'playing' })
-            .where(eq(queueItems.id, itemToPlay.id));
-
           room.currentSongId = itemToPlay.songId;
           room.currentQueueItemId = itemToPlay.id;
           room.position = 0;
           room.playing = true;
 
-          // Load song's saved lyricOffset
           try {
-            const songRec = await db.select({ lyricOffset: songs.lyricOffset }).from(songs).where(eq(songs.id, itemToPlay.songId)).limit(1);
-            room.lyricOffset = songRec[0]?.lyricOffset ?? 0;
+            if (itemToPlay.songId) {
+              const songRec = await db.select({
+                lyricOffset: songs.lyricOffset,
+                lrcOffset: songs.lrcOffset,
+                elrcOffset: songs.elrcOffset,
+              }).from(songs).where(eq(songs.id, itemToPlay.songId)).limit(1);
+              room.lyricOffset = songRec[0]?.lyricOffset ?? 0;
+              room.lrcOffset = typeof songRec[0]?.lrcOffset === 'number' ? songRec[0].lrcOffset : room.lyricOffset;
+              room.elrcOffset = typeof songRec[0]?.elrcOffset === 'number' ? songRec[0].elrcOffset : room.lyricOffset;
+            } else {
+              room.lyricOffset = 0;
+              room.lrcOffset = 0;
+              room.elrcOffset = 0;
+            }
           } catch (e) {
             room.lyricOffset = 0;
+            room.lrcOffset = 0;
+            room.elrcOffset = 0;
           }
 
           broadcastToRoom(sessionId, {
@@ -922,7 +989,9 @@ export async function checkAndAutoPlay(sessionId: string) {
               queueItemId: room.currentQueueItemId,
               playing: true,
               position: 0,
-              lyricOffset: room.lyricOffset
+              lyricOffset: room.lyricOffset,
+              lrcOffset: room.lrcOffset,
+              elrcOffset: room.elrcOffset,
             }
           });
 
@@ -930,6 +999,8 @@ export async function checkAndAutoPlay(sessionId: string) {
             type: 'OFFSET_CHANGED',
             payload: {
               offset: room.lyricOffset,
+              lrcOffset: room.lrcOffset,
+              elrcOffset: room.elrcOffset,
               songId: room.currentSongId
             }
           });

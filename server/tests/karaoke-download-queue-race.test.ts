@@ -27,7 +27,13 @@ import karaokeRoutes from '../routes/karaoke.js';
 import { downloadQueue, DownloadQueueManager } from '../lib/download-queue.js';
 import { processingQueue } from '../lib/processing-queue.js';
 import type { ProcessSongRequest } from '../lib/song-processor.js';
-import { setupWebSockets, advanceQueueBySessionId, checkAndAutoPlay, notifyQueueUpdate } from '../ws/index.js';
+import { setupWebSockets, advanceQueueBySessionId, checkAndAutoPlay, notifyQueueUpdate, getRoomState } from '../ws/index.js';
+import {
+  selectCurrentPlayingSong,
+  getUpcomingQueueItems,
+  getQueueItemDisplayState,
+  hasPreparingQueueItems,
+} from '../../src/lib/karaoke-queue-utils.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'yimly_deterministic_test_jwt_secret_ci_only_32_bytes_safe';
 
@@ -726,7 +732,7 @@ test('7. Cross-session duplicate reuse handles already-completed or already-fail
   }
 });
 
-test('8. Queue ordering & advancement: waits while downloading, advances cleanly after ready or failed', async () => {
+test('8. Queue ordering & advancement: ready item moves ahead of downloading item, failed item stays non-blocking', async () => {
   const session = await createTestSession('OrderingAndAdvancement');
   const title = `Order Track ${Date.now()}`;
   const artistName = 'Order Artist';
@@ -770,17 +776,18 @@ test('8. Queue ordering & advancement: waits while downloading, advances cleanly
     const libItem = await libRes.json();
 
     assert.equal(dlItem.position, 1);
-    assert.equal(libItem.position, 2);
 
-    // While position 1 is downloading, position 2 must NOT jump ahead
+    // Ready song at position 2 must move ahead of downloading item and start playing
     await checkAndAutoPlay(session.id);
     const midRows = await db.select().from(queueItems)
       .where(eq(queueItems.sessionId, session.id))
       .orderBy(asc(queueItems.position));
-    assert.equal(midRows[0].status, 'pending');
-    assert.equal(midRows[1].status, 'pending', 'Ready position 2 must wait while position 1 is still downloading');
+    assert.equal(midRows[0].id, libItem.id, 'Ready item must move ahead of downloading item');
+    assert.equal(midRows[0].status, 'playing', 'Ready item must be promoted to playing');
+    assert.equal(midRows[1].id, dlItem.id, 'Downloading item must move behind ready item');
+    assert.equal(midRows[1].status, 'pending', 'Downloading item must remain pending');
 
-    // Release failure -> position 1 becomes 'failed', and queue auto-advances to position 2
+    // Release failure -> downloading item becomes failed without interrupting playing item
     releaseFailure();
 
     let afterRows: any[] = [];
@@ -788,20 +795,576 @@ test('8. Queue ordering & advancement: waits while downloading, advances cleanly
       afterRows = await db.select().from(queueItems)
         .where(eq(queueItems.sessionId, session.id))
         .orderBy(asc(queueItems.position));
-      if (afterRows[0]?.downloadStatus === 'failed' && afterRows[1]?.status === 'playing') break;
+      if (afterRows.some((r) => r.id === dlItem.id && r.downloadStatus === 'failed')) break;
       await new Promise((r) => setTimeout(r, 25));
     }
 
-    assert.equal(afterRows[0].downloadStatus, 'failed', 'Position 1 must be marked failed');
-    assert.equal(afterRows[1].status, 'playing', 'Room must advance to position 2 once position 1 fails');
+    const playingRow = afterRows.find((r) => r.id === libItem.id);
+    const failedRow = afterRows.find((r) => r.id === dlItem.id);
+    assert.equal(playingRow?.status, 'playing', 'Failure of downloading item must not interrupt active playing song');
+    assert.equal(failedRow?.downloadStatus, 'failed', 'Failed download item must be marked failed');
 
-    // Advancing once more cleans up position 2 and leaves failed item or empty queue without error
+    // Advancing cleans up playing item and leaves failed item non-playing without error
     await advanceQueueBySessionId(session.id);
     const remaining = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id));
     assert.equal(remaining.some((r) => r.id === libItem.id), false, 'Played song should be removed on advance');
+    assert.equal(remaining.every((r) => r.status !== 'playing'), true, 'Failed item must not start playing');
   } finally {
     (downloadQueue as any).processTrack = originalProcessTrack;
   }
+});
+
+test('A. Processing completion does NOT interrupt active playing song (playing or paused)', async () => {
+  const session = await createTestSession('TestA_NoInterrupt');
+  const songAId = await createLibrarySong(
+    `Song A ${Date.now()}`,
+    'Artist A',
+    path.join(libDir, 'Artist A', `Artist A - Song A ${Date.now()}.mp3`)
+  );
+  const songBPath = path.join(libDir, 'Artist B', `Artist B - Song B ${Date.now()}.mp3`);
+
+  const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/karaoke?sessionId=${session.id}&isHost=true&token=${hostToken}`;
+  const wsClient = new WebSocket(wsUrl);
+  const wsMessages: Array<{ type: string; payload?: any }> = [];
+
+  await new Promise<void>((resolve, reject) => {
+    wsClient.on('open', () => resolve());
+    wsClient.on('error', reject);
+  });
+  wsClient.on('message', (raw) => {
+    try {
+      wsMessages.push(JSON.parse(raw.toString()));
+    } catch {}
+  });
+
+  try {
+    // Song A is actively playing at position 1
+    const [itemA] = await db.insert(queueItems).values({
+      sessionId: session.id,
+      songId: songAId,
+      userId: hostUserId,
+      position: 1,
+      status: 'playing',
+      addedAt: new Date(),
+    }).returning();
+
+    // Song B is processing at position 2
+    const trackIdB = `tr_testA_${Date.now()}`;
+    const [itemB] = await db.insert(queueItems).values({
+      sessionId: session.id,
+      songId: null,
+      userId: hostUserId,
+      position: 2,
+      status: 'pending',
+      tempTitle: 'Song B',
+      tempArtist: 'Artist B',
+      downloadJobId: `job_testA_${Date.now()}`,
+      downloadTrackId: trackIdB,
+      downloadStatus: 'processing',
+      addedAt: new Date(),
+    }).returning();
+
+    const room = getRoomState(session.id)!;
+    room.currentSongId = songAId;
+    room.currentQueueItemId = itemA.id;
+    room.playing = true;
+
+    wsMessages.length = 0;
+
+    // Song B finishes processing while Song A is actively playing
+    const songBId = await createLibrarySong(`Song B ${Date.now()}`, 'Artist B', songBPath);
+    await db.update(queueItems)
+      .set({ songId: songBId, downloadStatus: 'ready' })
+      .where(eq(queueItems.id, itemB.id));
+
+    await checkAndAutoPlay(session.id);
+    await new Promise((r) => setTimeout(r, 40));
+
+    assert.equal(
+      wsMessages.some((m) => m.type === 'SONG_CHANGED'),
+      false,
+      'SONG_CHANGED must NOT be emitted when Song B finishes processing during Song A'
+    );
+    assert.equal(
+      wsMessages.some((m) => m.type === 'QUEUE_UPDATED'),
+      true,
+      'QUEUE_UPDATED must be emitted'
+    );
+
+    const rows = await db.select().from(queueItems)
+      .where(eq(queueItems.sessionId, session.id))
+      .orderBy(asc(queueItems.position));
+    assert.equal(rows[0].id, itemA.id);
+    assert.equal(rows[0].status, 'playing', 'Song A must remain playing');
+    assert.equal(rows[1].id, itemB.id);
+    assert.equal(rows[1].status, 'pending', 'Song B must remain pending behind Song A');
+    assert.equal(room.currentSongId, songAId);
+    assert.equal(room.currentQueueItemId, itemA.id);
+    assert.equal(room.playing, true);
+
+    // Even if host temporarily pauses Song A, newly ready Song C must still NOT replace Song A
+    room.playing = false;
+    const [itemC] = await db.insert(queueItems).values({
+      sessionId: session.id,
+      songId: readyLibSongId,
+      userId: hostUserId,
+      position: 3,
+      status: 'pending',
+      downloadStatus: 'ready',
+      addedAt: new Date(),
+    }).returning();
+
+    wsMessages.length = 0;
+    await checkAndAutoPlay(session.id);
+    await new Promise((r) => setTimeout(r, 40));
+
+    assert.equal(wsMessages.some((m) => m.type === 'SONG_CHANGED'), false, 'Paused active song A must not be interrupted');
+    assert.equal(room.currentQueueItemId, itemA.id);
+    const rowC = (await db.select().from(queueItems).where(eq(queueItems.id, itemC.id)))[0];
+    assert.equal(rowC.status, 'pending');
+  } finally {
+    wsClient.close();
+  }
+});
+
+test('B. Ready song moves ahead of downloading/processing song when turn arrives', async () => {
+  const session = await createTestSession('TestB_ReadyAhead');
+  const songXId = await createLibrarySong(
+    `Song X ${Date.now()}`,
+    'Artist X',
+    path.join(libDir, 'Artist X', `Artist X - Song X ${Date.now()}.mp3`)
+  );
+  const songAId = await createLibrarySong(
+    `Song A ${Date.now()}`,
+    'Artist A',
+    path.join(libDir, 'Artist A', `Artist A - Song A B ${Date.now()}.mp3`)
+  );
+
+  const [itemX] = await db.insert(queueItems).values({
+    sessionId: session.id,
+    songId: songXId,
+    userId: hostUserId,
+    position: 1,
+    status: 'playing',
+    addedAt: new Date(),
+  }).returning();
+
+  const [itemB] = await db.insert(queueItems).values({
+    sessionId: session.id,
+    songId: null,
+    userId: hostUserId,
+    position: 2,
+    status: 'pending',
+    tempTitle: 'Song B',
+    tempArtist: 'Artist B',
+    downloadStatus: 'downloading',
+    addedAt: new Date(),
+  }).returning();
+
+  const [itemA] = await db.insert(queueItems).values({
+    sessionId: session.id,
+    songId: songAId,
+    userId: hostUserId,
+    position: 3,
+    status: 'pending',
+    addedAt: new Date(),
+  }).returning();
+
+  const room = await (await import('../ws/index.js')).getOrCreateRoom(session.id);
+  room.currentSongId = songXId;
+  room.currentQueueItemId = itemX.id;
+  room.playing = true;
+
+  // Song X finishes while Song B is still downloading and Song A is ready
+  await advanceQueueBySessionId(session.id);
+
+  const rows = await db.select().from(queueItems)
+    .where(eq(queueItems.sessionId, session.id))
+    .orderBy(asc(queueItems.position));
+
+  assert.equal(rows.length, 2, 'Song X should be removed leaving Song A and Song B');
+  assert.equal(rows[0].id, itemA.id, 'Ready Song A must move ahead of downloading Song B');
+  assert.equal(rows[0].status, 'playing', 'Song A must become playing');
+  assert.equal(rows[1].id, itemB.id, 'Downloading Song B must move behind Song A');
+  assert.equal(rows[1].status, 'pending', 'Song B must remain pending');
+  assert.equal(rows[1].downloadStatus, 'downloading');
+  assert.ok(rows[0].position < rows[1].position, 'DB position of Song A must be less than Song B');
+  assert.equal(room.currentSongId, songAId);
+  assert.equal(room.playing, true);
+});
+
+test('C. Delayed song remains queued behind ready song and eventually plays once ready', async () => {
+  const session = await createTestSession('TestC_DelayedPlaysLater');
+  const songXId = await createLibrarySong(
+    `Song X C ${Date.now()}`,
+    'Artist XC',
+    path.join(libDir, 'Artist XC', `Artist XC - Song X ${Date.now()}.mp3`)
+  );
+  const songAId = await createLibrarySong(
+    `Song A C ${Date.now()}`,
+    'Artist AC',
+    path.join(libDir, 'Artist AC', `Artist AC - Song A ${Date.now()}.mp3`)
+  );
+  const songBPath = path.join(libDir, 'Artist BC', `Artist BC - Song B ${Date.now()}.mp3`);
+
+  const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/karaoke?sessionId=${session.id}&isHost=true&token=${hostToken}`;
+  const wsClient = new WebSocket(wsUrl);
+  const wsEvents: Array<{ type: string; payload?: any }> = [];
+
+  await new Promise<void>((resolve, reject) => {
+    wsClient.on('open', () => resolve());
+    wsClient.on('error', reject);
+  });
+  wsClient.on('message', (raw) => {
+    try { wsEvents.push(JSON.parse(raw.toString())); } catch {}
+  });
+
+  try {
+    const [itemX] = await db.insert(queueItems).values({
+      sessionId: session.id,
+      songId: songXId,
+      userId: hostUserId,
+      position: 1,
+      status: 'playing',
+      addedAt: new Date(),
+    }).returning();
+
+    const [itemB] = await db.insert(queueItems).values({
+      sessionId: session.id,
+      songId: null,
+      userId: hostUserId,
+      position: 2,
+      status: 'pending',
+      tempTitle: 'Delayed Song B',
+      tempArtist: 'Artist BC',
+      downloadStatus: 'processing',
+      addedAt: new Date(),
+    }).returning();
+
+    const [itemA] = await db.insert(queueItems).values({
+      sessionId: session.id,
+      songId: songAId,
+      userId: hostUserId,
+      position: 3,
+      status: 'pending',
+      addedAt: new Date(),
+    }).returning();
+
+    const room = getRoomState(session.id)!;
+    room.currentSongId = songXId;
+    room.currentQueueItemId = itemX.id;
+    room.playing = true;
+
+    // 1. Song X finishes -> Song A plays, Song B stays pending
+    await advanceQueueBySessionId(session.id);
+    assert.equal(room.currentSongId, songAId);
+    assert.equal(room.playing, true);
+
+    // 2. Song A finishes while Song B is still processing -> room enters waiting state
+    await new Promise((r) => setTimeout(r, 420));
+    wsEvents.length = 0;
+    await advanceQueueBySessionId(session.id);
+    await new Promise((r) => setTimeout(r, 40));
+
+    assert.equal(room.currentSongId, null, 'Room must clear active song when only unready song remains');
+    assert.equal(room.playing, false, 'Room must not stay playing while waiting');
+    assert.equal(wsEvents.some((e) => e.type === 'QUEUE_EMPTY'), true, 'QUEUE_EMPTY must be emitted while waiting');
+
+    const waitingRows = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id));
+    assert.equal(waitingRows.length, 1);
+    assert.equal(waitingRows[0].id, itemB.id);
+    assert.equal(waitingRows[0].status, 'pending');
+
+    // 3. Delayed Song B finishes processing and becomes ready -> checkAndAutoPlay starts Song B
+    const songBId = await createLibrarySong(`Delayed Song B ${Date.now()}`, 'Artist BC', songBPath);
+    await db.update(queueItems)
+      .set({ songId: songBId, downloadStatus: 'ready' })
+      .where(eq(queueItems.id, itemB.id));
+
+    wsEvents.length = 0;
+    await checkAndAutoPlay(session.id);
+    await new Promise((r) => setTimeout(r, 40));
+
+    assert.equal(room.currentSongId, songBId, 'Delayed Song B must play once ready');
+    assert.equal(room.currentQueueItemId, itemB.id);
+    assert.equal(room.playing, true);
+    assert.equal(wsEvents.some((e) => e.type === 'SONG_CHANGED' && e.payload?.songId === songBId), true);
+
+    const finalRows = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id));
+    assert.equal(finalRows[0].status, 'playing');
+  } finally {
+    wsClient.close();
+  }
+});
+
+test('D. Multiple unready songs and multiple ready songs maintain predictable order without loss or duplication', async () => {
+  const session = await createTestSession('TestD_MultiUnready');
+  const songXId = await createLibrarySong(`Multi X ${Date.now()}`, 'Artist MX', path.join(libDir, 'Artist MX', `MX-${Date.now()}.mp3`));
+  const songAId = await createLibrarySong(`Multi A ${Date.now()}`, 'Artist MA', path.join(libDir, 'Artist MA', `MA-${Date.now()}.mp3`));
+  const songDId = await createLibrarySong(`Multi D ${Date.now()}`, 'Artist MD', path.join(libDir, 'Artist MD', `MD-${Date.now()}.mp3`));
+
+  const [itemX] = await db.insert(queueItems).values({
+    sessionId: session.id, songId: songXId, userId: hostUserId, position: 1, status: 'playing', addedAt: new Date(),
+  }).returning();
+  const [itemB] = await db.insert(queueItems).values({
+    sessionId: session.id, songId: null, userId: hostUserId, position: 2, status: 'pending', tempTitle: 'Song B', tempArtist: 'Artist MB', downloadStatus: 'processing', addedAt: new Date(),
+  }).returning();
+  const [itemC] = await db.insert(queueItems).values({
+    sessionId: session.id, songId: null, userId: hostUserId, position: 3, status: 'pending', tempTitle: 'Song C', tempArtist: 'Artist MC', downloadStatus: 'downloading', addedAt: new Date(),
+  }).returning();
+  const [itemA] = await db.insert(queueItems).values({
+    sessionId: session.id, songId: songAId, userId: hostUserId, position: 4, status: 'pending', addedAt: new Date(),
+  }).returning();
+  const [itemD] = await db.insert(queueItems).values({
+    sessionId: session.id, songId: songDId, userId: hostUserId, position: 5, status: 'pending', addedAt: new Date(),
+  }).returning();
+
+  const room = await (await import('../ws/index.js')).getOrCreateRoom(session.id);
+  room.currentSongId = songXId;
+  room.currentQueueItemId = itemX.id;
+  room.playing = true;
+
+  // 1. Song X finishes -> Song A plays; [B, C] preserve relative order ahead of D
+  await advanceQueueBySessionId(session.id);
+  let rows = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id)).orderBy(asc(queueItems.position));
+  assert.deepEqual(rows.map((r) => r.id), [itemA.id, itemB.id, itemC.id, itemD.id]);
+  assert.equal(rows[0].status, 'playing');
+  assert.equal(room.currentSongId, songAId);
+
+  // 2. Song A finishes while B & C are still unready -> Song D plays; [B, C] remain in retained order behind D
+  await new Promise((r) => setTimeout(r, 420));
+  await advanceQueueBySessionId(session.id);
+  rows = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id)).orderBy(asc(queueItems.position));
+  assert.deepEqual(rows.map((r) => r.id), [itemD.id, itemB.id, itemC.id]);
+  assert.equal(rows[0].status, 'playing');
+  assert.equal(room.currentSongId, songDId);
+
+  // 3. Song D finishes while B & C still unready -> room waits with [B, C] in retained order
+  await new Promise((r) => setTimeout(r, 420));
+  await advanceQueueBySessionId(session.id);
+  rows = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id)).orderBy(asc(queueItems.position));
+  assert.deepEqual(rows.map((r) => r.id), [itemB.id, itemC.id]);
+  assert.equal(room.currentSongId, null);
+  assert.equal(room.playing, false);
+
+  // 4. Song C becomes ready first while Song B is still processing -> Song C plays, Song B stays queued behind C
+  const songCId = await createLibrarySong(`Multi C ${Date.now()}`, 'Artist MC', path.join(libDir, 'Artist MC', `MC-${Date.now()}.mp3`));
+  await db.update(queueItems).set({ songId: songCId, downloadStatus: 'ready' }).where(eq(queueItems.id, itemC.id));
+  await checkAndAutoPlay(session.id);
+  rows = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id)).orderBy(asc(queueItems.position));
+  assert.deepEqual(rows.map((r) => r.id), [itemC.id, itemB.id]);
+  assert.equal(rows[0].status, 'playing');
+  assert.equal(room.currentSongId, songCId);
+
+  // 5. Song B becomes ready while Song C is playing -> no interruption, then Song B plays after C finishes
+  const songBId = await createLibrarySong(`Multi B ${Date.now()}`, 'Artist MB', path.join(libDir, 'Artist MB', `MB-${Date.now()}.mp3`));
+  await db.update(queueItems).set({ songId: songBId, downloadStatus: 'ready' }).where(eq(queueItems.id, itemB.id));
+  await checkAndAutoPlay(session.id);
+  assert.equal(room.currentSongId, songCId, 'Song B becoming ready must not interrupt Song C');
+
+  await new Promise((r) => setTimeout(r, 420));
+  await advanceQueueBySessionId(session.id);
+  rows = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id)).orderBy(asc(queueItems.position));
+  assert.deepEqual(rows.map((r) => r.id), [itemB.id]);
+  assert.equal(rows[0].status, 'playing');
+  assert.equal(room.currentSongId, songBId);
+});
+
+test('E. No ready songs when current song finishes clears active song safely and resumes when ready', async () => {
+  const session = await createTestSession('TestE_NoReadyWaiting');
+  const songAId = await createLibrarySong(`Wait A ${Date.now()}`, 'Artist WA', path.join(libDir, 'Artist WA', `WA-${Date.now()}.mp3`));
+
+  const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/karaoke?sessionId=${session.id}&isHost=true&token=${hostToken}`;
+  const wsClient = new WebSocket(wsUrl);
+  const wsEvents: string[] = [];
+
+  await new Promise<void>((resolve, reject) => {
+    wsClient.on('open', () => resolve());
+    wsClient.on('error', reject);
+  });
+  wsClient.on('message', (raw) => {
+    try {
+      const parsed = JSON.parse(raw.toString());
+      if (parsed?.type) wsEvents.push(parsed.type);
+    } catch {}
+  });
+
+  try {
+    const [itemA] = await db.insert(queueItems).values({
+      sessionId: session.id, songId: songAId, userId: hostUserId, position: 1, status: 'playing', addedAt: new Date(),
+    }).returning();
+    const [itemB] = await db.insert(queueItems).values({
+      sessionId: session.id, songId: null, userId: hostUserId, position: 2, status: 'pending', tempTitle: 'Wait B', tempArtist: 'Artist WB', downloadStatus: 'downloading', addedAt: new Date(),
+    }).returning();
+    const [itemC] = await db.insert(queueItems).values({
+      sessionId: session.id, songId: null, userId: hostUserId, position: 3, status: 'pending', tempTitle: 'Wait C', tempArtist: 'Artist WC', downloadStatus: 'processing', addedAt: new Date(),
+    }).returning();
+
+    const room = getRoomState(session.id)!;
+    room.currentSongId = songAId;
+    room.currentQueueItemId = itemA.id;
+    room.playing = true;
+
+    wsEvents.length = 0;
+    await advanceQueueBySessionId(session.id);
+    await new Promise((r) => setTimeout(r, 40));
+
+    assert.equal(room.playing, false, 'room.playing must be false when no ready song exists');
+    assert.equal(room.currentSongId, null, 'room.currentSongId must be null when no ready song exists');
+    assert.equal(room.currentQueueItemId, null, 'room.currentQueueItemId must be null when no ready song exists');
+    assert.ok(wsEvents.includes('QUEUE_EMPTY'));
+    assert.ok(wsEvents.includes('PAUSED'));
+
+    const pending = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id)).orderBy(asc(queueItems.position));
+    assert.deepEqual(pending.map((r) => r.id), [itemB.id, itemC.id]);
+    assert.ok(pending.every((r) => r.status === 'pending'));
+
+    // Later Song B becomes ready -> resumes playback cleanly
+    const songBId = await createLibrarySong(`Wait B ${Date.now()}`, 'Artist WB', path.join(libDir, 'Artist WB', `WB-${Date.now()}.mp3`));
+    await db.update(queueItems).set({ songId: songBId, downloadStatus: 'ready' }).where(eq(queueItems.id, itemB.id));
+    await checkAndAutoPlay(session.id);
+
+    assert.equal(room.playing, true);
+    assert.equal(room.currentSongId, songBId);
+    assert.equal(room.currentQueueItemId, itemB.id);
+  } finally {
+    wsClient.close();
+  }
+});
+
+test('F. Failed song at top of queue does not block ready song behind it', async () => {
+  const session = await createTestSession('TestF_FailedNonBlocking');
+  const [failedItem] = await db.insert(queueItems).values({
+    sessionId: session.id,
+    songId: null,
+    userId: hostUserId,
+    position: 1,
+    status: 'pending',
+    tempTitle: 'Failed Song',
+    tempArtist: 'Failed Artist',
+    downloadStatus: 'failed',
+    addedAt: new Date(),
+  }).returning();
+
+  const [readyItem] = await db.insert(queueItems).values({
+    sessionId: session.id,
+    songId: readyLibSongId,
+    userId: hostUserId,
+    position: 2,
+    status: 'pending',
+    addedAt: new Date(),
+  }).returning();
+
+  await checkAndAutoPlay(session.id);
+
+  const room = getRoomState(session.id)!;
+  assert.equal(room.playing, true);
+  assert.equal(room.currentSongId, readyLibSongId);
+  assert.equal(room.currentQueueItemId, readyItem.id);
+
+  const rows = await db.select().from(queueItems).where(eq(queueItems.sessionId, session.id)).orderBy(asc(queueItems.position));
+  const dbReady = rows.find((r) => r.id === readyItem.id);
+  const dbFailed = rows.find((r) => r.id === failedItem.id);
+  assert.equal(dbReady?.status, 'playing', 'Ready item behind failed item must play');
+  assert.equal(dbFailed?.downloadStatus, 'failed', 'Failed entry remains marked failed per policy');
+  assert.equal(dbFailed?.status, 'pending');
+});
+
+test('G. Host WebSocket PLAY and SYNC cannot set room.playing = true without a valid active song', async () => {
+  const session = await createTestSession('TestG_PlayGuard');
+
+  // Put only a downloading item (songId = null, status = 'pending') in the queue
+  await db.insert(queueItems).values({
+    sessionId: session.id,
+    songId: null,
+    userId: hostUserId,
+    position: 1,
+    status: 'pending',
+    tempTitle: 'Unready Track',
+    tempArtist: 'Unready Artist',
+    downloadStatus: 'downloading',
+    addedAt: new Date(),
+  });
+
+  const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/karaoke?sessionId=${session.id}&isHost=true&token=${hostToken}`;
+  const hostWs = new WebSocket(wsUrl);
+  const receivedTypes: string[] = [];
+
+  await new Promise<void>((resolve, reject) => {
+    hostWs.on('open', () => resolve());
+    hostWs.on('error', reject);
+  });
+  hostWs.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg?.type) receivedTypes.push(msg.type);
+    } catch {}
+  });
+
+  try {
+    await new Promise((r) => setTimeout(r, 40));
+    receivedTypes.length = 0;
+
+    // Attempt invalid PLAY and SYNC(playing: true) while no active song exists
+    hostWs.send(JSON.stringify({ type: 'PLAY' }));
+    hostWs.send(JSON.stringify({ type: 'SYNC', payload: { position: 12, playing: true } }));
+    await new Promise((r) => setTimeout(r, 80));
+
+    const room = getRoomState(session.id)!;
+    assert.equal(room.playing, false, 'room.playing must remain false when no valid active song exists');
+    assert.equal(room.currentSongId, null, 'room.currentSongId must remain null');
+    assert.equal(room.currentQueueItemId, null, 'room.currentQueueItemId must remain null');
+    assert.equal(receivedTypes.includes('PLAYING'), false, 'PLAYING broadcast must NOT be emitted without active song');
+  } finally {
+    hostWs.close();
+  }
+});
+
+test('H. Frontend host (RoomSession) and guest (GuestRoom) queue helpers reflect authoritative backend state', async () => {
+  // 1. Only unready (pos 1) and pending-ready (pos 2) -> host must NOT pick pending song as currentSong,
+  //    and guest index 0 (downloading) must NOT show NOW PLAYING.
+  const waitingQueue = [
+    { id: 101, position: 1, status: 'pending', songId: null, downloadStatus: 'downloading', songTitle: 'Song B' },
+    { id: 102, position: 2, status: 'pending', songId: 500, downloadStatus: 'ready', songTitle: 'Song A' },
+  ];
+
+  assert.equal(
+    selectCurrentPlayingSong(waitingQueue),
+    undefined,
+    'Host RoomSession must not independently select a pending song as currentSong'
+  );
+  assert.equal(
+    hasPreparingQueueItems(waitingQueue),
+    true,
+    'RoomSession must show preparing state while downloading/processing items remain'
+  );
+  assert.deepEqual(
+    getUpcomingQueueItems(waitingQueue, undefined).map((i) => i.id),
+    [101, 102],
+    'Upcoming queue must include all non-playing items in order'
+  );
+  assert.equal(getQueueItemDisplayState(waitingQueue[0]), 'downloading', 'Guest index 0 downloading must not be playing');
+  assert.equal(getQueueItemDisplayState(waitingQueue[1]), 'ready', 'Pending ready item must not be playing');
+
+  // 2. Processing / failed / playing / pending-ready mix (even if failed item precedes playing item)
+  const mixedQueue = [
+    { id: 201, position: 1, status: 'pending', songId: null, downloadStatus: 'failed', songTitle: 'Failed' },
+    { id: 202, position: 2, status: 'playing', songId: 501, downloadStatus: 'ready', songTitle: 'Playing' },
+    { id: 203, position: 3, status: 'pending', songId: null, downloadStatus: 'processing', songTitle: 'Processing' },
+    { id: 204, position: 4, status: 'pending', songId: 502, downloadStatus: 'ready', songTitle: 'Up Next' },
+  ];
+
+  const active = selectCurrentPlayingSong(mixedQueue);
+  assert.equal(active?.id, 202, 'Authoritative currentSong must select status === playing item');
+  assert.deepEqual(
+    getUpcomingQueueItems(mixedQueue, active).map((i) => i.id),
+    [201, 203, 204],
+    'Upcoming queue must exclude only the playing item and never drop other items'
+  );
+  assert.equal(getQueueItemDisplayState(mixedQueue[0]), 'failed');
+  assert.equal(getQueueItemDisplayState(mixedQueue[1]), 'playing');
+  assert.equal(getQueueItemDisplayState(mixedQueue[2]), 'processing');
+  assert.equal(getQueueItemDisplayState(mixedQueue[3]), 'ready');
 });
 
 test('Teardown karaoke Download & Queue race test harness', async () => {

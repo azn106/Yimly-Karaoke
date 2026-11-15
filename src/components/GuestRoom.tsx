@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Music, Search, Plus, Check, ArrowLeft, User, ListMusic, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { filterSongs, SearchableSong } from '../lib/search-utils';
+import { getQueueItemDisplayState } from '../lib/karaoke-queue-utils';
 
 interface QueueItem {
   id: number;
@@ -10,7 +11,8 @@ interface QueueItem {
   songTitle: string;
   artistName: string;
   userName?: string;
-  songId: number;
+  songId: number | null;
+  downloadStatus?: string | null;
   artworkPath?: string | null;
 }
 
@@ -327,11 +329,13 @@ export default function GuestRoom({
           /* Current Queue List */
           <div className="space-y-2.5">
             {queue.map((item, index) => {
-              const isPlaying = index === 0;
+              const itemState = getQueueItemDisplayState(item);
+              const isPlaying = itemState === 'playing';
+              const isDownloading = itemState === 'downloading';
+              const isProcessing = itemState === 'processing';
+              const isFailed = itemState === 'failed';
+              const isReadyPending = itemState === 'ready';
               const addedBy = item.userName || 'Guest';
-              const isDownloading = (item as any).songId === null && (item as any).downloadStatus === 'downloading';
-              const isProcessing = (item as any).songId === null && (item as any).downloadStatus === 'processing';
-              const isFailed = (item as any).songId === null && (item as any).downloadStatus === 'failed';
 
               return (
                 <div
@@ -384,6 +388,11 @@ export default function GuestRoom({
                   {isFailed && (
                     <span className="px-2 py-0.5 bg-red-500/10 border border-red-500/30 text-red-500 rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0">
                       FAILED
+                    </span>
+                  )}
+                  {isReadyPending && (
+                    <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0">
+                      READY
                     </span>
                   )}
                 </div>
