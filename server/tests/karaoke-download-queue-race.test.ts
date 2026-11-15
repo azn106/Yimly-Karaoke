@@ -1365,6 +1365,45 @@ test('H. Frontend host (RoomSession) and guest (GuestRoom) queue helpers reflect
   assert.equal(getQueueItemDisplayState(mixedQueue[1]), 'playing');
   assert.equal(getQueueItemDisplayState(mixedQueue[2]), 'processing');
   assert.equal(getQueueItemDisplayState(mixedQueue[3]), 'ready');
+
+  // 3. Status classification verification for QUEUED, PREPARING, DOWNLOADING, PROCESSING, FAILED, READY, PLAYING
+  assert.equal(
+    getQueueItemDisplayState({ id: 301, status: 'pending', songId: null, downloadStatus: 'queued' }),
+    'queued',
+    'Explicit downloadStatus === queued must display queued'
+  );
+  assert.equal(
+    getQueueItemDisplayState({ id: 302, status: 'pending', songId: null, downloadStatus: null }),
+    'preparing',
+    'Null songId with null downloadStatus must display preparing, not queued'
+  );
+  assert.equal(
+    getQueueItemDisplayState({ id: 303, status: 'pending', songId: null, downloadStatus: 'downloading' }),
+    'downloading',
+    'Null songId with downloadStatus === downloading must display downloading'
+  );
+  assert.equal(
+    getQueueItemDisplayState({ id: 304, status: 'pending', songId: null, downloadStatus: 'processing' }),
+    'processing'
+  );
+  assert.equal(
+    getQueueItemDisplayState({ id: 305, status: 'pending', songId: null, downloadStatus: 'failed' }),
+    'failed'
+  );
+  assert.equal(
+    getQueueItemDisplayState({ id: 306, status: 'pending', songId: 123, downloadStatus: 'ready' }),
+    'ready',
+    'Valid songId with downloadStatus === ready must yield ready'
+  );
+  assert.equal(
+    getQueueItemDisplayState({ id: 308, status: 'pending', songId: null, downloadStatus: 'ready' }),
+    'preparing',
+    'Null songId with downloadStatus === ready must yield preparing'
+  );
+  assert.equal(
+    getQueueItemDisplayState({ id: 307, status: 'playing', songId: 123, downloadStatus: 'ready' }),
+    'playing'
+  );
 });
 
 test('Teardown karaoke Download & Queue race test harness', async () => {

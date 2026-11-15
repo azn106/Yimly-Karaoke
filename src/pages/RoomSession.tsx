@@ -2846,8 +2846,11 @@ export default function RoomSession() {
                     <div className="text-xs font-bold text-white truncate">{item.songTitle} - {item.artistName || item.artist || 'Unknown Artist'}</div>
                     <div className="text-[10px] text-zinc-400 truncate flex items-center gap-1">
                       <span className="truncate">{singerName}</span>
+                      {itemState === 'queued' && <span className="text-zinc-400 font-semibold shrink-0">• Queued</span>}
+                      {itemState === 'preparing' && <span className="text-zinc-400 font-semibold shrink-0">• Preparing</span>}
                       {itemState === 'downloading' && <span className="text-amber-400 font-semibold shrink-0">• Downloading</span>}
                       {itemState === 'processing' && <span className="text-purple-400 font-semibold shrink-0">• Processing</span>}
+                      {itemState === 'ready' && <span className="text-emerald-400 font-semibold shrink-0">• Ready</span>}
                       {itemState === 'failed' && <span className="text-red-400 font-semibold shrink-0">• Failed</span>}
                     </div>
                   </div>

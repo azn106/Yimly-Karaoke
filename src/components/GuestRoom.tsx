@@ -335,6 +335,8 @@ export default function GuestRoom({
               const isProcessing = itemState === 'processing';
               const isFailed = itemState === 'failed';
               const isReadyPending = itemState === 'ready';
+              const isQueued = itemState === 'queued';
+              const isPreparing = itemState === 'preparing';
               const addedBy = item.userName || 'Guest';
 
               return (
@@ -366,6 +368,36 @@ export default function GuestRoom({
                       <span className="truncate">{item.artistName}</span>
                       <span className="text-zinc-600">•</span>
                       <span className="text-[#F472B6] font-semibold truncate">{addedBy}</span>
+                      {isQueued && (
+                        <span className="px-1.5 py-0.2 bg-zinc-500/15 border border-zinc-500/30 text-zinc-300 rounded text-[9px] font-bold uppercase tracking-wider shrink-0">
+                          QUEUED
+                        </span>
+                      )}
+                      {isPreparing && (
+                        <span className="px-1.5 py-0.2 bg-zinc-500/15 border border-zinc-500/30 text-zinc-400 rounded text-[9px] font-bold uppercase tracking-wider shrink-0">
+                          PREPARING
+                        </span>
+                      )}
+                      {isDownloading && (
+                        <span className="px-1.5 py-0.2 bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 rounded text-[9px] font-bold uppercase tracking-wider shrink-0">
+                          DOWNLOADING
+                        </span>
+                      )}
+                      {isProcessing && (
+                        <span className="px-1.5 py-0.2 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded text-[9px] font-bold uppercase tracking-wider shrink-0 animate-pulse">
+                          PROCESSING
+                        </span>
+                      )}
+                      {isReadyPending && (
+                        <span className="px-1.5 py-0.2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded text-[9px] font-bold uppercase tracking-wider shrink-0">
+                          READY
+                        </span>
+                      )}
+                      {isFailed && (
+                        <span className="px-1.5 py-0.2 bg-red-500/15 border border-red-500/30 text-red-400 rounded text-[9px] font-bold uppercase tracking-wider shrink-0">
+                          FAILED
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -373,26 +405,6 @@ export default function GuestRoom({
                   {isPlaying && (
                     <span className="px-2 py-0.5 bg-[#F472B6]/15 border border-[#F472B6]/30 text-[#F472B6] rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0">
                       NOW PLAYING
-                    </span>
-                  )}
-                  {isDownloading && (
-                    <span className="px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0">
-                      DOWNLOADING
-                    </span>
-                  )}
-                  {isProcessing && (
-                    <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0 animate-pulse">
-                      PROCESSING
-                    </span>
-                  )}
-                  {isFailed && (
-                    <span className="px-2 py-0.5 bg-red-500/10 border border-red-500/30 text-red-500 rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0">
-                      FAILED
-                    </span>
-                  )}
-                  {isReadyPending && (
-                    <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0">
-                      READY
                     </span>
                   )}
                 </div>

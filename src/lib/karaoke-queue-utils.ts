@@ -11,7 +11,7 @@ export interface KaraokeQueueItemLike {
   userName?: string | null;
 }
 
-export type QueueItemDisplayState = 'playing' | 'downloading' | 'processing' | 'failed' | 'ready';
+export type QueueItemDisplayState = 'playing' | 'queued' | 'downloading' | 'processing' | 'failed' | 'ready' | 'preparing';
 
 /**
  * Selects the actively playing queue item according to authoritative backend status.
@@ -34,25 +34,35 @@ export function getUpcomingQueueItems<T extends KaraokeQueueItemLike>(
 }
 
 /**
- * Classifies a queue item into a single mutually exclusive display state.
+ * Classifies a queue item into a single mutually exclusive display state:
+ * playing, queued, downloading, processing, failed, ready, or preparing.
  */
 export function getQueueItemDisplayState(item: KaraokeQueueItemLike): QueueItemDisplayState {
   if (item.status === 'playing' && item.songId !== null && item.songId !== undefined) {
     return 'playing';
   }
-  if (item.downloadStatus === 'downloading') return 'downloading';
-  if (item.downloadStatus === 'processing') return 'processing';
   if (item.downloadStatus === 'failed') return 'failed';
-  if (item.songId === null || item.songId === undefined) return 'downloading';
-  return 'ready';
+  if (item.downloadStatus === 'processing') return 'processing';
+  if (item.downloadStatus === 'downloading') return 'downloading';
+  if (item.downloadStatus === 'queued') return 'queued';
+  if (item.downloadStatus === 'ready') {
+    if (item.songId !== null && item.songId !== undefined) {
+      return 'ready';
+    }
+    return 'preparing';
+  }
+  if (!item.downloadStatus && item.songId !== null && item.songId !== undefined) {
+    return 'ready';
+  }
+  return 'preparing';
 }
 
 /**
- * Returns true if the queue has items still downloading or processing while no song is playing.
+ * Returns true if the queue has items still downloading, processing, or preparing while no song is playing.
  */
 export function hasPreparingQueueItems(queue: KaraokeQueueItemLike[]): boolean {
   return queue.some((item) => {
     const state = getQueueItemDisplayState(item);
-    return state === 'downloading' || state === 'processing';
+    return state === 'queued' || state === 'downloading' || state === 'processing' || state === 'preparing';
   });
 }

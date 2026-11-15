@@ -363,6 +363,7 @@ export class DownloadQueueManager {
             '--no-playlist',
             '--max-filesize', '100M',
             '--js-runtimes', 'node',
+            '--extractor-args', 'youtube:player_client=android,web',
             '-o', `${tempFileBase}.%(ext)s`,
             canonicalTargetUrl,
           ];
@@ -1340,6 +1341,7 @@ export class DownloadQueueManager {
               '--no-playlist',
               '--max-filesize', '100M',
               '--js-runtimes', 'node',
+              '--extractor-args', 'youtube:player_client=android,web',
               '-o', `${tempFileBase}.%(ext)s`,
               targetDownloadUrl,
             ];
