@@ -499,7 +499,8 @@ export default function RoomSession() {
         }
         if (showLibrary) {
           const activeEl = document.activeElement as HTMLElement;
-          if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+          const isBackspaceKey = key === 'backspace' || keyCode === 8;
+          if (isBackspaceKey && activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
             return; // Allow Backspace to handle text deletion
           }
           e.preventDefault();
@@ -556,7 +557,7 @@ export default function RoomSession() {
 
         // Determine container scope (explicitly targeted via data-modal-container to avoid matching #room-session-root)
         let searchContainer: HTMLElement | Document = document;
-        if (showEndSessionModal || showSessionInfoModal || showLibrary) {
+        if (showEndSessionModal || showSessionInfoModal) {
           const activeModal = document.querySelector<HTMLElement>('[data-modal-container]');
           if (activeModal) {
             searchContainer = activeModal;
@@ -2552,253 +2553,6 @@ export default function RoomSession() {
   // -------------------------------------------------------------
   return (
     <div id="room-session-root" className="fixed inset-0 flex h-full w-full bg-[#08090E] text-white overflow-hidden flex-col font-sans select-none">
-      {/* Room Song Catalog / Add to Queue Modal */}
-      {showLibrary && (
-        <div data-modal-container="library" className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-8">
-          <div className="w-full max-w-3xl bg-[#12131D] border border-white/10 rounded-3xl flex flex-col h-[85vh] shadow-2xl overflow-hidden">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-white/5 bg-[#0D0E17] flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-[#F472B6]/15 border border-[#F472B6]/30 rounded-xl text-[#F472B6]">
-                  <LibraryIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Song Catalog</h2>
-                  <p className="text-xs text-zinc-400">Search and queue songs to the live room</p>
-                </div>
-              </div>
-              <button 
-                data-tv-id="library-close"
-                onClick={() => setShowLibrary(false)}
-                className="p-2 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
-                title="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Search Input */}
-            <div className="p-4 border-b border-white/5 bg-[#0F101A] shrink-0">
-              <div className="relative">
-                <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input 
-                  data-tv-id="library-search"
-                  type="text"
-                  placeholder="Search song title, artist, or album..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[#08090E] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-2 focus:ring-[#F472B6]"
-                />
-              </div>
-            </div>
-
-            {/* Song List */}
-            <div data-tv-scroll-container="library" className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-2">
-              {!searchQuery.trim() ? (
-                availableSongs.map((song) => {
-                  const isAdding = addingQueueKeys.has(song.id);
-                  const isAdded = addedQueueKeys.has(song.id);
-                  const durationMin = song.duration ? Math.floor(song.duration / 60) : 0;
-                  const durationSec = song.duration ? song.duration % 60 : 0;
-                  const durationStr = song.duration ? `${durationMin}:${durationSec < 10 ? '0' : ''}${durationSec}` : '';
-
-                  return (
-                    <div 
-                      key={song.id}
-                      className="p-3.5 bg-[#0D0E17] hover:bg-[#1A1C2C] border border-white/5 rounded-2xl flex items-center justify-between gap-3 transition-colors group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0">
-                          <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-medium text-sm text-white truncate">{song.title}</h4>
-                          <div className="flex items-center gap-2 text-xs text-zinc-400 truncate">
-                            <span>{song.artist || 'Unknown Artist'}</span>
-                            {song.album && <span>• {song.album}</span>}
-                            {durationStr && <span>• {durationStr}</span>}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {song.hasLrc && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">
-                            LRC
-                          </span>
-                        )}
-                        <button
-                          onClick={() => handleAddSongToQueue(song.id)}
-                          disabled={isAdding || isAdded}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                            isAdded 
-                              ? 'bg-[#F472B6] text-white' 
-                              : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
-                          }`}
-                        >
-                          {isAdded ? (
-                            <>
-                              <Check className="w-3.5 h-3.5" /> Added
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-3.5 h-3.5" /> Add to Queue
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <>
-                  {librarySearchResults.length > 0 && (
-                    <div className="text-xs font-bold text-[#F472B6] uppercase tracking-wider mb-2 mt-4 px-1">
-                      In Library ({librarySearchResults.length})
-                    </div>
-                  )}
-                  {librarySearchResults.map((song) => {
-                    const isAdding = addingQueueKeys.has(song.id);
-                    const isAdded = addedQueueKeys.has(song.id);
-                    const durationMin = song.duration ? Math.floor(song.duration / 60) : 0;
-                    const durationSec = song.duration ? song.duration % 60 : 0;
-                    const durationStr = song.duration ? `${durationMin}:${durationSec < 10 ? '0' : ''}${durationSec}` : '';
-
-                    return (
-                      <div 
-                        key={`lib-${song.id}`}
-                        className="p-3.5 bg-[#0D0E17] hover:bg-[#1A1C2C] border border-white/5 rounded-2xl flex items-center justify-between gap-3 transition-colors group"
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0">
-                            <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-medium text-sm text-white truncate">{song.title}</h4>
-                            <div className="flex items-center gap-2 text-xs text-zinc-400 truncate">
-                              <span>{song.artist || 'Unknown Artist'}</span>
-                              {song.album && <span>• {song.album}</span>}
-                              {durationStr && <span>• {durationStr}</span>}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          {song.hasLrc && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">
-                              LRC
-                            </span>
-                          )}
-                          <button
-                            onClick={() => handleAddSongToQueue(song.id)}
-                            disabled={isAdding || isAdded}
-                            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                              isAdded 
-                                ? 'bg-[#F472B6] text-white' 
-                                : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
-                            }`}
-                          >
-                            {isAdded ? (
-                              <>
-                                <Check className="w-3.5 h-3.5" /> Added
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="w-3.5 h-3.5" /> Add to Queue
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {externalSearchResults.length > 0 && (
-                    <div className="text-xs font-bold text-[#F472B6] uppercase tracking-wider mb-2 mt-6 px-1">
-                      Available for Download ({externalSearchResults.length})
-                    </div>
-                  )}
-                  {externalSearchResults.map((track) => {
-                    const trackId = `dl_${track.title}_${track.artist}`;
-                    const isAdding = addingQueueKeys.has(trackId);
-                    const isAdded = addedQueueKeys.has(trackId);
-                    const durationMin = track.duration ? Math.floor(track.duration / 60) : 0;
-                    const durationSec = track.duration ? track.duration % 60 : 0;
-                    const durationStr = track.duration ? `${durationMin}:${durationSec < 10 ? '0' : ''}${durationSec}` : '';
-
-                    return (
-                      <div 
-                        key={trackId}
-                        className="p-3.5 bg-[#0D0E17] hover:bg-[#1A1C2C] border border-white/5 rounded-2xl flex items-center justify-between gap-3 transition-colors group"
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="w-10 h-10 rounded-xl bg-[#181926] border border-white/5 overflow-hidden flex items-center justify-center shrink-0">
-                            {track.artworkUrl ? (
-                              <img src={track.artworkUrl} className="w-full h-full object-cover yk-artwork-image" alt="" />
-                            ) : (
-                              <Music className="w-5 h-5 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-medium text-sm text-white truncate">{track.title}</h4>
-                            <div className="flex items-center gap-2 text-xs text-zinc-400 truncate">
-                              <span>{track.artist || 'Unknown Artist'}</span>
-                              {track.album && <span>• {track.album}</span>}
-                              {durationStr && <span>• {durationStr}</span>}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={() => handleAddTrackToQueue(track)}
-                            disabled={isAdding || isAdded}
-                            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                              isAdded 
-                                ? 'bg-[#F472B6] text-white' 
-                                : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
-                            }`}
-                          >
-                            {isAdded ? (
-                              <>
-                                <Check className="w-3.5 h-3.5" /> Queued
-                              </>
-                            ) : isAdding ? (
-                              <>
-                                <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" /> Queuing...
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="w-3.5 h-3.5" /> Download & Queue
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {isSearching && (
-                    <div className="py-8 text-center text-zinc-400">
-                      <div className="w-6 h-6 border-2 border-[#F472B6] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                      <p className="text-xs">Searching library and web...</p>
-                    </div>
-                  )}
-
-                  {!isSearching && librarySearchResults.length === 0 && externalSearchResults.length === 0 && (
-                    <div className="py-16 text-center text-zinc-500">
-                      <Music className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                      <p className="text-sm font-medium">No songs found</p>
-                      <p className="text-xs text-zinc-600 mt-1">Try another search term</p>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Top Room Navigation Bar */}
       <header id="room-session-header" className="px-4 md:px-6 py-2.5 border-b border-white/10 bg-[#0D0E17]/80 backdrop-blur-xl flex items-center justify-between relative z-50 shrink-0 select-none shadow-lg shadow-black/20">
         {/* Left: Refresh, QR, Add Song, then the upcoming queue */}
@@ -2809,29 +2563,22 @@ export default function RoomSession() {
           </button>
 
           {isHost && qrCodeDataUrl && (
-            <>
-              <div className="relative shrink-0">
-                <button data-tv-id="qr-toggle-button" onClick={(e) => { e.stopPropagation(); setShowQrPopover(prev => !prev); }}
-                  className="p-2 bg-white/5 hover:bg-white/15 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-colors border border-white/10 hover:border-white/25 backdrop-blur-md focus:outline-none focus:ring-4 focus:ring-[#F472B6]" title="Toggle QR Code">
-                  <QrCode className="w-4 h-4 text-[#F472B6]" />
-                </button>
-              </div>
-              {showQrPopover && (
-                <>
-                  <div className="fixed left-6 top-20 z-50 flex flex-col items-center animate-fadeIn text-center">
-                    <img src={qrCodeDataUrl} alt="Join Room QR Code" className="w-32 h-32 object-contain" />
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-3">QUEUE A SONG</span>
-                    <span className="text-lg font-mono font-black text-white tracking-widest mt-1">{session?.roomCode}</span>
-                  </div>
-                </>
-              )}
-            </>
+            <div className="relative shrink-0">
+              <button data-tv-id="qr-toggle-button" onClick={(e) => { e.stopPropagation(); setShowQrPopover(prev => !prev); }}
+                className="p-2 bg-white/5 hover:bg-white/15 hover:text-[#F472B6] text-zinc-300 rounded-xl transition-colors border border-white/10 hover:border-white/25 backdrop-blur-md focus:outline-none focus:ring-4 focus:ring-[#F472B6]" title="Toggle QR Code">
+                <QrCode className="w-4 h-4 text-[#F472B6]" />
+              </button>
+            </div>
           )}
 
 
-          <button data-tv-id="header-add-song-button" onClick={() => setShowLibrary(true)}
-            className="px-3.5 py-1.5 bg-[#F472B6]/90 hover:bg-[#DB2777] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 text-xs shadow-md shadow-[#F472B6]/25 border border-white/20 backdrop-blur-md shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]">
-            <Plus className="w-3.5 h-3.5" /><span>Add Song</span>
+          <button data-tv-id="header-add-song-button" onClick={() => setShowLibrary(prev => !prev)} aria-expanded={showLibrary}
+            className={`px-3.5 py-1.5 text-white font-bold rounded-xl transition-all flex items-center gap-1.5 text-xs shadow-md border backdrop-blur-md shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6] ${
+              showLibrary
+                ? 'bg-[#DB2777] border-white/40 shadow-[#F472B6]/40 ring-2 ring-[#F472B6]/50'
+                : 'bg-[#F472B6]/90 hover:bg-[#DB2777] border-white/20 shadow-[#F472B6]/25'
+            }`}>
+            {showLibrary ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}<span>Add Song</span>
           </button>
 
           <div className="hidden md:flex items-center gap-2 overflow-x-auto py-1 scrollbar-none flex-1 min-w-0">
@@ -2905,12 +2652,273 @@ export default function RoomSession() {
       {/* Main Container */}
       <div 
         id="room-session-content"
-        className="flex-1 min-h-0 flex flex-col relative w-full p-3 lg:p-4"
+        className={`flex-1 min-h-0 flex flex-col relative w-full p-2.5 sm:p-3 lg:p-4 ${
+          showLibrary
+            ? 'gap-2.5 sm:gap-3 lg:gap-4 [@media(min-width:900px)_and_(min-height:501px)]:flex-row [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:flex-row [@media(orientation:landscape)_and_(max-height:500px)]:flex-row'
+            : ''
+        }`}
       >
+        {/* Docked Host Add Songs Panel */}
+        {showLibrary && (
+          <aside
+            key="room-add-songs-panel"
+            aria-label="Add Songs"
+            className="order-2 flex-1 min-h-0 w-full bg-[#12131D] border border-white/10 rounded-2xl md:rounded-3xl flex flex-col shadow-2xl overflow-hidden [@media(min-width:900px)_and_(min-height:501px)]:order-1 [@media(min-width:900px)_and_(min-height:501px)]:flex-none [@media(min-width:900px)_and_(min-height:501px)]:w-1/3 [@media(min-width:900px)_and_(min-height:501px)]:min-w-[300px] [@media(min-width:900px)_and_(min-height:501px)]:max-w-[520px] [@media(min-width:900px)_and_(min-height:501px)]:h-full [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:order-1 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:flex-none [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:w-1/3 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:min-w-[280px] [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:max-w-[520px] [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:h-full [@media(orientation:landscape)_and_(max-height:500px)]:order-1 [@media(orientation:landscape)_and_(max-height:500px)]:flex-none [@media(orientation:landscape)_and_(max-height:500px)]:w-[42%] [@media(orientation:landscape)_and_(max-height:500px)]:min-w-[230px] [@media(orientation:landscape)_and_(max-height:500px)]:max-w-[360px] [@media(orientation:landscape)_and_(max-height:500px)]:h-full"
+          >
+            {/* Panel Header */}
+            <div className="px-3.5 py-2.5 sm:px-4 sm:py-3.5 [@media(orientation:landscape)_and_(max-height:500px)]:py-2 border-b border-white/5 bg-[#0D0E17] flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 bg-[#F472B6]/15 border border-[#F472B6]/30 rounded-xl text-[#F472B6] shrink-0">
+                  <LibraryIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm sm:text-base font-bold text-white truncate">Song Catalog</h2>
+                  <p className="text-[11px] text-zinc-400 truncate hidden sm:block [@media(orientation:landscape)_and_(max-height:500px)]:hidden">Search and queue songs to the live room</p>
+                </div>
+              </div>
+              <button 
+                data-tv-id="library-close"
+                onClick={() => setShowLibrary(false)}
+                className="p-1.5 sm:p-2 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors shrink-0 focus:outline-none focus:ring-4 focus:ring-[#F472B6]"
+                title="Close"
+              >
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-2.5 sm:p-3.5 [@media(orientation:landscape)_and_(max-height:500px)]:p-2 border-b border-white/5 bg-[#0F101A] shrink-0">
+              <div className="relative">
+                <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input 
+                  data-tv-id="library-search"
+                  type="text"
+                  placeholder="Search song title, artist, or album..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#08090E] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-2 focus:ring-[#F472B6]"
+                />
+              </div>
+            </div>
+
+            {/* Song List */}
+            <div data-tv-scroll-container="library" className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-3 space-y-2">
+              {!searchQuery.trim() ? (
+                availableSongs.map((song) => {
+                  const isAdding = addingQueueKeys.has(song.id);
+                  const isAdded = addedQueueKeys.has(song.id);
+                  const durationMin = song.duration ? Math.floor(song.duration / 60) : 0;
+                  const durationSec = song.duration ? song.duration % 60 : 0;
+                  const durationStr = song.duration ? `${durationMin}:${durationSec < 10 ? '0' : ''}${durationSec}` : '';
+
+                  return (
+                    <div 
+                      key={song.id}
+                      className="p-2.5 sm:p-3 bg-[#0D0E17] hover:bg-[#1A1C2C] border border-white/5 rounded-2xl flex items-center justify-between gap-2.5 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="w-9 h-9 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0">
+                          <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-medium text-sm text-white truncate">{song.title}</h4>
+                          <div className="flex items-center gap-1.5 text-xs text-zinc-400 truncate">
+                            <span className="truncate">{song.artist || 'Unknown Artist'}</span>
+                            {song.album && <span className="hidden xl:inline truncate">• {song.album}</span>}
+                            {durationStr && <span className="shrink-0">• {durationStr}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {song.hasLrc && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">
+                            LRC
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleAddSongToQueue(song.id)}
+                          disabled={isAdding || isAdded}
+                          title="Add to Queue"
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 whitespace-nowrap transition-colors ${
+                            isAdded 
+                              ? 'bg-[#F472B6] text-white' 
+                              : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
+                          }`}
+                        >
+                          {isAdded ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" /> Added
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5" /> Queue
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <>
+                  {librarySearchResults.length > 0 && (
+                    <div className="text-xs font-bold text-[#F472B6] uppercase tracking-wider mb-2 mt-2 px-1">
+                      In Library ({librarySearchResults.length})
+                    </div>
+                  )}
+                  {librarySearchResults.map((song) => {
+                    const isAdding = addingQueueKeys.has(song.id);
+                    const isAdded = addedQueueKeys.has(song.id);
+                    const durationMin = song.duration ? Math.floor(song.duration / 60) : 0;
+                    const durationSec = song.duration ? song.duration % 60 : 0;
+                    const durationStr = song.duration ? `${durationMin}:${durationSec < 10 ? '0' : ''}${durationSec}` : '';
+
+                    return (
+                      <div 
+                        key={`lib-${song.id}`}
+                        className="p-2.5 sm:p-3 bg-[#0D0E17] hover:bg-[#1A1C2C] border border-white/5 rounded-2xl flex items-center justify-between gap-2.5 transition-colors group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-9 h-9 rounded-xl bg-[#181926] border border-white/5 flex items-center justify-center shrink-0">
+                            <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-medium text-sm text-white truncate">{song.title}</h4>
+                            <div className="flex items-center gap-1.5 text-xs text-zinc-400 truncate">
+                              <span className="truncate">{song.artist || 'Unknown Artist'}</span>
+                              {song.album && <span className="hidden xl:inline truncate">• {song.album}</span>}
+                              {durationStr && <span className="shrink-0">• {durationStr}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {song.hasLrc && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#F472B6]/15 text-[#F472B6] border border-[#F472B6]/25">
+                              LRC
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleAddSongToQueue(song.id)}
+                            disabled={isAdding || isAdded}
+                            title="Add to Queue"
+                            className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 whitespace-nowrap transition-colors ${
+                              isAdded 
+                                ? 'bg-[#F472B6] text-white' 
+                                : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
+                            }`}
+                          >
+                            {isAdded ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" /> Added
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3.5 h-3.5" /> Queue
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {externalSearchResults.length > 0 && (
+                    <div className="text-xs font-bold text-[#F472B6] uppercase tracking-wider mb-2 mt-4 px-1">
+                      Available for Download ({externalSearchResults.length})
+                    </div>
+                  )}
+                  {externalSearchResults.map((track) => {
+                    const trackId = `dl_${track.title}_${track.artist}`;
+                    const isAdding = addingQueueKeys.has(trackId);
+                    const isAdded = addedQueueKeys.has(trackId);
+                    const durationMin = track.duration ? Math.floor(track.duration / 60) : 0;
+                    const durationSec = track.duration ? track.duration % 60 : 0;
+                    const durationStr = track.duration ? `${durationMin}:${durationSec < 10 ? '0' : ''}${durationSec}` : '';
+
+                    return (
+                      <div 
+                        key={trackId}
+                        className="p-2.5 sm:p-3 bg-[#0D0E17] hover:bg-[#1A1C2C] border border-white/5 rounded-2xl flex items-center justify-between gap-2.5 transition-colors group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-9 h-9 rounded-xl bg-[#181926] border border-white/5 overflow-hidden flex items-center justify-center shrink-0">
+                            {track.artworkUrl ? (
+                              <img src={track.artworkUrl} className="w-full h-full object-cover yk-artwork-image" alt="" />
+                            ) : (
+                              <Music className="w-4 h-4 text-zinc-400 group-hover:text-[#F472B6] transition-colors" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-medium text-sm text-white truncate">{track.title}</h4>
+                            <div className="flex items-center gap-1.5 text-xs text-zinc-400 truncate">
+                              <span className="truncate">{track.artist || 'Unknown Artist'}</span>
+                              {track.album && <span className="hidden xl:inline truncate">• {track.album}</span>}
+                              {durationStr && <span className="shrink-0">• {durationStr}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleAddTrackToQueue(track)}
+                            disabled={isAdding || isAdded}
+                            title="Download & Queue"
+                            className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 whitespace-nowrap transition-colors ${
+                              isAdded 
+                                ? 'bg-[#F472B6] text-white' 
+                                : 'bg-[#F472B6]/15 hover:bg-[#F472B6] text-[#F472B6] hover:text-white border border-[#F472B6]/30'
+                            }`}
+                          >
+                            {isAdded ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" /> Queued
+                              </>
+                            ) : isAdding ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" /> Queuing...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3.5 h-3.5" /> DL & Queue
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {isSearching && (
+                    <div className="py-8 text-center text-zinc-400">
+                      <div className="w-6 h-6 border-2 border-[#F472B6] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <p className="text-xs">Searching library and web...</p>
+                    </div>
+                  )}
+
+                  {!isSearching && librarySearchResults.length === 0 && externalSearchResults.length === 0 && (
+                    <div className="py-12 text-center text-zinc-500">
+                      <Music className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm font-medium">No songs found</p>
+                      <p className="text-xs text-zinc-600 mt-1">Try another search term</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </aside>
+        )}
+
         {/* Main Stage: Lyrics Card Container */}
         <main 
+          key="room-session-main"
           id="room-session-main"
-          className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-[#090811] border border-white/[0.08] shadow-[0_28px_90px_rgba(0,0,0,0.48)] flex-1 flex flex-col justify-between h-full min-h-0 min-w-0 transition-all select-none"
+          className={`relative overflow-hidden rounded-2xl md:rounded-3xl bg-[#090811] border border-white/[0.08] shadow-[0_28px_90px_rgba(0,0,0,0.48)] flex flex-col justify-between min-h-0 min-w-0 transition-colors select-none ${
+            showLibrary
+              ? 'order-1 flex-none h-[36%] min-h-[175px] max-h-[260px] w-full [@media(min-width:900px)_and_(min-height:501px)]:order-2 [@media(min-width:900px)_and_(min-height:501px)]:flex-1 [@media(min-width:900px)_and_(min-height:501px)]:h-full [@media(min-width:900px)_and_(min-height:501px)]:max-h-none [@media(min-width:900px)_and_(min-height:501px)]:w-auto [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:order-2 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:flex-1 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:h-full [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:max-h-none [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:w-auto [@media(orientation:landscape)_and_(max-height:500px)]:order-2 [@media(orientation:landscape)_and_(max-height:500px)]:flex-1 [@media(orientation:landscape)_and_(max-height:500px)]:h-full [@media(orientation:landscape)_and_(max-height:500px)]:max-h-none [@media(orientation:landscape)_and_(max-height:500px)]:w-auto'
+              : 'flex-1 h-full'
+          }`}
         >
           {/* Repeating blurred artwork tiles behind the full-height centre cover */}
           {currentSong?.songId && !artworkFailed ? (
@@ -2956,8 +2964,25 @@ export default function RoomSession() {
           <div ref={artworkGlowTopRef} className="absolute top-0 right-0 w-80 h-80 bg-[#F472B6]/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16 z-0" style={{ transition: 'opacity 220ms ease-out' }} />
           <div ref={artworkGlowBottomRef} className="absolute bottom-0 left-0 w-80 h-80 bg-[#F472B6]/5 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16 z-0" style={{ transition: 'opacity 220ms ease-out' }} />
 
+          {/* Host Room Join QR Popover (anchored inside #room-session-main so it never overlaps Add Songs) */}
+          {isHost && qrCodeDataUrl && showQrPopover && (
+            <div className={`absolute left-4 top-4 sm:left-5 sm:top-5 z-30 flex-col items-center animate-fadeIn text-center pointer-events-none ${
+              showLibrary
+                ? 'hidden [@media(min-width:900px)_and_(min-height:501px)]:flex [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:flex'
+                : 'flex'
+            }`}>
+              <img src={qrCodeDataUrl} alt="Join Room QR Code" className="w-28 h-28 xl:w-32 xl:h-32 object-contain" />
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-3">QUEUE A SONG</span>
+              <span className="text-lg font-mono font-black text-white tracking-widest mt-1">{session?.roomCode}</span>
+            </div>
+          )}
+
           {/* Card Top Header */}
-          <div className="relative z-10 flex items-center justify-between p-3.5 sm:p-4 lg:p-5 pb-0 shrink-0">
+          <div className={`relative z-10 flex items-center justify-between pb-0 shrink-0 ${
+            showLibrary
+              ? 'p-2.5 sm:p-3 [@media(min-width:900px)_and_(min-height:501px)]:p-4 [@media(min-width:900px)_and_(min-height:501px)]:pb-0 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:p-4 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:pb-0'
+              : 'p-3.5 sm:p-4 lg:p-5'
+          }`}>
             <div className="flex items-center gap-2">
               {isHost && audioError && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 text-[10px] font-bold">
@@ -3084,8 +3109,16 @@ export default function RoomSession() {
 
           {/* Centered Playback Controls & Timeline (Horizontally centered in lyrics area) */}
           {isHost ? (
-            <div className="w-full z-20 pb-4 sm:pb-6 px-4">
-              <div className="max-w-xl mx-auto flex flex-col items-center space-y-3">
+            <div className={`w-full z-20 shrink-0 ${
+              showLibrary
+                ? 'pb-2 px-3 [@media(min-width:900px)_and_(min-height:501px)]:pb-4 sm:[@media(min-width:900px)_and_(min-height:501px)]:pb-6 [@media(min-width:900px)_and_(min-height:501px)]:px-4 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:pb-4 sm:[@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:pb-6 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:px-4'
+                : 'pb-4 sm:pb-6 px-4'
+            }`}>
+              <div className={`max-w-xl mx-auto flex flex-col items-center ${
+                showLibrary
+                  ? 'space-y-1.5 [@media(min-width:900px)_and_(min-height:501px)]:space-y-3 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:space-y-3'
+                  : 'space-y-3'
+              }`}>
                 {/* Timeline Progress Slider */}
                 {currentSong && (
                   <div className="w-full flex items-center gap-3 px-2">
@@ -3108,15 +3141,19 @@ export default function RoomSession() {
                 )}
 
                 {/* Bottom Controls: [ ↶ ] [ ▶ ] [ ⏭ ] */}
-                <div className="flex items-center gap-5">
+                <div className={`flex items-center ${showLibrary ? 'gap-3.5 [@media(min-width:900px)_and_(min-height:501px)]:gap-5 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:gap-5' : 'gap-5'}`}>
                   <button 
                     data-tv-id="restart-button"
                     onClick={handleRestart}
                     disabled={!currentSong}
-                    className="p-3 bg-white/[0.055] hover:bg-white/[0.11] text-white/85 rounded-full transition-all disabled:opacity-30 border border-white/[0.09] hover:border-white/20 hover:scale-105 active:scale-95 shadow-[0_8px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6]/70 focus:ring-offset-2 focus:ring-offset-[#08090E]"
+                    className={`bg-white/[0.055] hover:bg-white/[0.11] text-white/85 rounded-full transition-all disabled:opacity-30 border border-white/[0.09] hover:border-white/20 hover:scale-105 active:scale-95 shadow-[0_8px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6]/70 focus:ring-offset-2 focus:ring-offset-[#08090E] ${
+                      showLibrary
+                        ? 'p-2 [@media(min-width:900px)_and_(min-height:501px)]:p-3 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:p-3'
+                        : 'p-3'
+                    }`}
                     title="Restart Track"
                   >
-                    <RotateCcw className="w-5 h-5" />
+                    <RotateCcw className={showLibrary ? 'w-4 h-4 [@media(min-width:900px)_and_(min-height:501px)]:w-5 [@media(min-width:900px)_and_(min-height:501px)]:h-5 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:w-5 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:h-5' : 'w-5 h-5'} />
                   </button>
                   
                   <button 
@@ -3124,20 +3161,32 @@ export default function RoomSession() {
                     data-tv-id="play-button"
                     onClick={togglePlay}
                     disabled={!currentSong}
-                    className="w-14 h-14 bg-gradient-to-br from-[#FF83BD] via-[#F472B6] to-[#DB2777] hover:brightness-110 text-white rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-[0_8px_34px_rgba(244,114,182,0.34)] ring-1 ring-white/25 disabled:opacity-30 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E] focus:scale-110 focus:shadow-[0_0_35px_rgba(255,79,163,0.55)]"
+                    className={`bg-gradient-to-br from-[#FF83BD] via-[#F472B6] to-[#DB2777] hover:brightness-110 text-white rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-[0_8px_34px_rgba(244,114,182,0.34)] ring-1 ring-white/25 disabled:opacity-30 focus:outline-none focus:ring-4 focus:ring-[#F472B6] focus:ring-offset-2 focus:ring-offset-[#08090E] focus:scale-110 focus:shadow-[0_0_35px_rgba(255,79,163,0.55)] ${
+                      showLibrary
+                        ? 'w-10 h-10 [@media(min-width:900px)_and_(min-height:501px)]:w-14 [@media(min-width:900px)_and_(min-height:501px)]:h-14 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:w-14 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:h-14'
+                        : 'w-14 h-14'
+                    }`}
                     title={playing ? 'Pause' : 'Play'}
                   >
-                    {playing ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
+                    {playing ? (
+                      <Pause className={`fill-white ${showLibrary ? 'w-4 h-4 [@media(min-width:900px)_and_(min-height:501px)]:w-6 [@media(min-width:900px)_and_(min-height:501px)]:h-6 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:w-6 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:h-6' : 'w-6 h-6'}`} />
+                    ) : (
+                      <Play className={`fill-white ml-0.5 ${showLibrary ? 'w-4 h-4 [@media(min-width:900px)_and_(min-height:501px)]:w-6 [@media(min-width:900px)_and_(min-height:501px)]:h-6 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:w-6 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:h-6' : 'w-6 h-6'}`} />
+                    )}
                   </button>
 
                   <button 
                     data-tv-id="skip-button"
                     onClick={handleSkip}
                     disabled={!currentSong}
-                    className="p-3 bg-white/[0.055] hover:bg-white/[0.11] text-white/85 rounded-full transition-all disabled:opacity-30 border border-white/[0.09] hover:border-white/20 hover:scale-105 active:scale-95 shadow-[0_8px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6]/70 focus:ring-offset-2 focus:ring-offset-[#08090E]"
+                    className={`bg-white/[0.055] hover:bg-white/[0.11] text-white/85 rounded-full transition-all disabled:opacity-30 border border-white/[0.09] hover:border-white/20 hover:scale-105 active:scale-95 shadow-[0_8px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-[#F472B6]/70 focus:ring-offset-2 focus:ring-offset-[#08090E] ${
+                      showLibrary
+                        ? 'p-2 [@media(min-width:900px)_and_(min-height:501px)]:p-3 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:p-3'
+                        : 'p-3'
+                    }`}
                     title="Skip Track"
                   >
-                    <SkipForward className="w-5 h-5" />
+                    <SkipForward className={showLibrary ? 'w-4 h-4 [@media(min-width:900px)_and_(min-height:501px)]:w-5 [@media(min-width:900px)_and_(min-height:501px)]:h-5 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:w-5 [@media(orientation:landscape)_and_(min-width:800px)_and_(min-height:501px)]:h-5' : 'w-5 h-5'} />
                   </button>
                 </div>
               </div>
