@@ -142,6 +142,21 @@ html, body {
   z-index: 1;
 }
 
+#room-session-root .yk-kb-key.yk-tv-focused {
+  background-color: #F472B6 !important;
+  border-color: #fbcfe8 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(244, 114, 182, 0.55) !important;
+  transform: scale(1.07);
+  z-index: 2;
+}
+
+#room-session-root .yk-kb-key-primary.yk-tv-focused {
+  background-color: #DB2777 !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 14px rgba(244, 114, 182, 0.65) !important;
+}
+
 /* Responsive Layout System: Default mobile / narrow-device styles (mobile-first) */
 .yk-desktop-layout {
   display: flex;

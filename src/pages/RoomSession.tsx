@@ -4,6 +4,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import QRCode from 'qrcode';
 import GuestRoom from '../components/GuestRoom';
 import { AutoResponsiveLyrics } from '../components/AutoResponsiveLyrics';
+import {
+  CompactSearchKeyboard,
+  insertSearchTextAtCursor,
+  backspaceSearchTextAtCursor,
+} from '../components/CompactSearchKeyboard';
 import { 
   getLyricsSettings, 
   fetchServerLyricsSettings,
@@ -214,6 +219,15 @@ export default function RoomSession() {
   // Library modal search & songs (for Guest Controller)
   const [availableSongs, setAvailableSongs] = useState<SongItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showLibraryKeyboard, setShowLibraryKeyboard] = useState(false);
+  const [searchSubmitNonce, setSearchSubmitNonce] = useState(0);
+  const immediateSearchSubmitRef = useRef(false);
+  const lastCompletedSearchQueryRef = useRef('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchAndKeyboardRef = useRef<HTMLDivElement>(null);
+  const keyboardContainerRef = useRef<HTMLDivElement>(null);
+  const typedWithPhysicalKeyRef = useRef(false);
+  const focusKeyboardOnOpenRef = useRef(false);
   const [librarySearchResults, setLibrarySearchResults] = useState<SongItem[]>([]);
   const [externalSearchResults, setExternalSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -295,6 +309,107 @@ export default function RoomSession() {
       }
     }
   }, []);
+
+  // Ensure the on-screen keyboard always closes when the Add Songs panel closes
+  useEffect(() => {
+    if (!showLibrary) {
+      setShowLibraryKeyboard(false);
+      typedWithPhysicalKeyRef.current = false;
+      focusKeyboardOnOpenRef.current = false;
+    }
+  }, [showLibrary]);
+
+  // Move TV focus into the keyboard once React has committed its DOM nodes
+  useEffect(() => {
+    if (showLibrary && showLibraryKeyboard && focusKeyboardOnOpenRef.current) {
+      focusKeyboardOnOpenRef.current = false;
+      const firstKey = document.querySelector<HTMLElement>('[data-tv-id="kb-key-q"]');
+      if (firstKey) safeFocus(firstKey);
+    }
+  }, [showLibrary, showLibraryKeyboard, safeFocus]);
+
+  // Close the on-screen keyboard when clicking outside the search & keyboard container
+  useEffect(() => {
+    if (!showLibrary || !showLibraryKeyboard) return;
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (searchAndKeyboardRef.current && !searchAndKeyboardRef.current.contains(target)) {
+        setShowLibraryKeyboard(false);
+        typedWithPhysicalKeyRef.current = false;
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, [showLibrary, showLibraryKeyboard]);
+
+  const handleVirtualKeyPress = useCallback((char: string) => {
+    const inputEl = searchInputRef.current;
+    const isInputFocused = Boolean(inputEl && document.activeElement === inputEl);
+    const selStart = isInputFocused ? inputEl!.selectionStart : null;
+    const selEnd = isInputFocused ? inputEl!.selectionEnd : null;
+
+    setSearchQuery(prev => {
+      const { value, nextCursor } = insertSearchTextAtCursor(prev, char, selStart, selEnd);
+      if (isInputFocused && inputEl) {
+        requestAnimationFrame(() => {
+          try {
+            inputEl.setSelectionRange(nextCursor, nextCursor);
+          } catch {}
+        });
+      }
+      return value;
+    });
+  }, []);
+
+  const handleVirtualBackspace = useCallback(() => {
+    const inputEl = searchInputRef.current;
+    const isInputFocused = Boolean(inputEl && document.activeElement === inputEl);
+    const selStart = isInputFocused ? inputEl!.selectionStart : null;
+    const selEnd = isInputFocused ? inputEl!.selectionEnd : null;
+
+    setSearchQuery(prev => {
+      const { value, nextCursor } = backspaceSearchTextAtCursor(prev, selStart, selEnd);
+      if (isInputFocused && inputEl) {
+        requestAnimationFrame(() => {
+          try {
+            inputEl.setSelectionRange(nextCursor, nextCursor);
+          } catch {}
+        });
+      }
+      return value;
+    });
+  }, []);
+
+  const handleVirtualClear = useCallback(() => {
+    typedWithPhysicalKeyRef.current = false;
+    setSearchQuery('');
+  }, []);
+
+  const handleSearchSubmit = useCallback(() => {
+    const activeEl = document.activeElement as HTMLElement | null;
+    const wasFocusInsideKeyboard = Boolean(
+      activeEl && keyboardContainerRef.current && keyboardContainerRef.current.contains(activeEl)
+    );
+
+    typedWithPhysicalKeyRef.current = false;
+    setShowLibraryKeyboard(false);
+
+    const trimmed = searchQuery.trim();
+    if (trimmed && (lastCompletedSearchQueryRef.current !== trimmed || isSearching)) {
+      immediateSearchSubmitRef.current = true;
+      setSearchSubmitNonce(n => n + 1);
+    }
+
+    if (wasFocusInsideKeyboard) {
+      requestAnimationFrame(() => {
+        const firstResultBtn = document.querySelector<HTMLElement>(
+          '[data-tv-scroll-container="library"] button:not([disabled])'
+        );
+        safeFocus(firstResultBtn || searchInputRef.current);
+      });
+    }
+  }, [searchQuery, isSearching, safeFocus]);
 
   // Ensure host room layout stays anchored at (0, 0) and does not scroll
   useEffect(() => {
@@ -483,6 +598,20 @@ export default function RoomSession() {
       const isBack = key === 'escape' || key === 'backspace' || key === 'goback' || key === 'back' ||
                      keyCode === 27 || keyCode === 8 || keyCode === 10009 || keyCode === 461 || keyCode === 4;
 
+      // Track direct physical keyboard typing inside the search input so physical Enter submits normally
+      if (
+        showLibrary &&
+        !showLibraryKeyboard &&
+        document.activeElement === searchInputRef.current &&
+        rawKey.length === 1 &&
+        rawKey !== ' ' &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        typedWithPhysicalKeyRef.current = true;
+      }
+
       // 1. Handle TV Remote Back / Escape Key
       if (isBack) {
         if (showEndSessionModal) {
@@ -504,6 +633,14 @@ export default function RoomSession() {
             return; // Allow Backspace to handle text deletion
           }
           e.preventDefault();
+          if (showLibraryKeyboard) {
+            setShowLibraryKeyboard(false);
+            typedWithPhysicalKeyRef.current = false;
+            if (activeEl && keyboardContainerRef.current?.contains(activeEl)) {
+              safeFocus(searchInputRef.current);
+            }
+            return;
+          }
           setShowLibrary(false);
           safeFocus(lastFocusedElementRef.current);
           return;
@@ -517,8 +654,43 @@ export default function RoomSession() {
         }
       }
 
-      // 2. Handle OK / Select Key when focus is on body or non-interactive container
+      // 2. Handle OK / Select Key
       if (isSelect) {
+        const activeEl = document.activeElement as HTMLElement | null;
+        const isExplicitRemoteSelect =
+          key === 'select' || keyCode === 29443 || keyCode === 23 || keyCode === 66;
+        const isEnterKey = key === 'enter' || keyCode === 13;
+
+        if (showLibrary && activeEl && activeEl === searchInputRef.current) {
+          if (
+            !showLibraryKeyboard &&
+            (isExplicitRemoteSelect || (isEnterKey && !typedWithPhysicalKeyRef.current))
+          ) {
+            e.preventDefault();
+            focusKeyboardOnOpenRef.current = true;
+            setShowLibraryKeyboard(true);
+            return;
+          }
+          if (showLibraryKeyboard && isExplicitRemoteSelect) {
+            e.preventDefault();
+            const firstKey = document.querySelector<HTMLElement>('[data-tv-id="kb-key-q"]');
+            if (firstKey) safeFocus(firstKey);
+            return;
+          }
+          if (isEnterKey) {
+            e.preventDefault();
+            handleSearchSubmit();
+            return;
+          }
+        }
+
+        // Activate focused buttons when a Smart TV remote sends a non-Enter/Space Select keyCode
+        if (isExplicitRemoteSelect && activeEl && activeEl !== document.body && activeEl.tagName === 'BUTTON') {
+          e.preventDefault();
+          activeEl.click();
+          return;
+        }
+
         if (document.activeElement === document.body) {
           e.preventDefault();
           const playBtn = playButtonRef.current || document.querySelector<HTMLElement>('[data-tv-id="play-button"], [data-tv-id="start-session-button"]');
@@ -610,14 +782,16 @@ export default function RoomSession() {
             if (candCenterY > activeCenterY + 2 || candRect.top >= activeRect.bottom - 5) {
               isDirectionValid = true;
               const dy = Math.max(0, candRect.top - activeRect.bottom);
-              const dx = Math.abs(candCenterX - activeCenterX);
+              const clampedX = Math.max(candRect.left, Math.min(activeCenterX, candRect.right));
+              const dx = Math.abs(clampedX - activeCenterX);
               score = dy + dx * 2.5;
             }
           } else if (isUp) {
             if (candCenterY < activeCenterY - 2 || candRect.bottom <= activeRect.top + 5) {
               isDirectionValid = true;
               const dy = Math.max(0, activeRect.top - candRect.bottom);
-              const dx = Math.abs(candCenterX - activeCenterX);
+              const clampedX = Math.max(candRect.left, Math.min(activeCenterX, candRect.right));
+              const dx = Math.abs(clampedX - activeCenterX);
               score = dy + dx * 2.5;
             }
           }
@@ -657,7 +831,7 @@ export default function RoomSession() {
     // Capture remote key events before nested controls or browser handlers can swallow them.
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isHost, showEndSessionModal, showSessionInfoModal, showLibrary, safeFocus]);
+  }, [isHost, showEndSessionModal, showSessionInfoModal, showLibrary, showLibraryKeyboard, handleSearchSubmit, safeFocus]);
 
   // Feature detect if native Element Fullscreen API is available
   const isNativeFullscreenSupported = () => {
@@ -1226,7 +1400,9 @@ export default function RoomSession() {
 
   // Debounced search for library and external songs
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      lastCompletedSearchQueryRef.current = '';
       setLibrarySearchResults([]);
       setExternalSearchResults([]);
       setIsSearching(false);
@@ -1235,6 +1411,8 @@ export default function RoomSession() {
 
     let cancelled = false;
     const controller = new AbortController();
+    const delay = immediateSearchSubmitRef.current ? 0 : 400;
+    immediateSearchSubmitRef.current = false;
     setIsSearching(true);
 
     const handler = setTimeout(() => {
@@ -1249,6 +1427,7 @@ export default function RoomSession() {
         })
         .then(data => {
           if (cancelled) return;
+          lastCompletedSearchQueryRef.current = trimmed;
           setLibrarySearchResults(data.library || []);
           setExternalSearchResults(data.external || []);
         })
@@ -1261,14 +1440,14 @@ export default function RoomSession() {
             setIsSearching(false);
           }
         });
-    }, 400);
+    }, delay);
 
     return () => {
       cancelled = true;
       clearTimeout(handler);
       controller.abort();
     };
-  }, [searchQuery]);
+  }, [searchQuery, searchSubmitNonce]);
 
   const handleAddTrackToQueue = async (track: any) => {
     if (!sessionId) return;
@@ -2686,19 +2865,46 @@ export default function RoomSession() {
               </button>
             </div>
 
-            {/* Search Input */}
-            <div className="p-2.5 sm:p-3.5 [@media(orientation:landscape)_and_(max-height:500px)]:p-2 border-b border-white/5 bg-[#0F101A] shrink-0">
-              <div className="relative">
-                <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            {/* Search Input & Compact On-Screen Keyboard */}
+            <div ref={searchAndKeyboardRef} className="p-2.5 sm:p-3.5 [@media(orientation:landscape)_and_(max-height:500px)]:p-2 border-b border-white/5 bg-[#0F101A] shrink-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSearchSubmit();
+                }}
+                className="relative"
+              >
+                <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input 
+                  ref={searchInputRef}
                   data-tv-id="library-search"
                   type="text"
                   placeholder="Search song title, artist, or album..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onClick={() => setShowLibraryKeyboard(true)}
+                  onChange={(e) => {
+                    const nextVal = e.target.value;
+                    if (!nextVal) {
+                      typedWithPhysicalKeyRef.current = false;
+                    }
+                    setSearchQuery(nextVal);
+                  }}
+                  onBlur={() => {
+                    typedWithPhysicalKeyRef.current = false;
+                  }}
                   className="w-full bg-[#08090E] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#F472B6] focus:ring-2 focus:ring-[#F472B6]"
                 />
-              </div>
+              </form>
+
+              {showLibraryKeyboard && (
+                <CompactSearchKeyboard
+                  containerRef={keyboardContainerRef}
+                  onKeyPress={handleVirtualKeyPress}
+                  onBackspace={handleVirtualBackspace}
+                  onClear={handleVirtualClear}
+                  onSearch={handleSearchSubmit}
+                />
+              )}
             </div>
 
             {/* Song List */}
